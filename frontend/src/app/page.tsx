@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { PublicLandingPage } from "@/modules/courses";
 
 export default function HomePage() {
-  redirect("/login");
+  return <PublicLandingPage />;
 }
