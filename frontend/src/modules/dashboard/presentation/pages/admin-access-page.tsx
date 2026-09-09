@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { RoleGate } from "@/shared/components/role-gate";
 
 export function AdminAccessPage() {
@@ -10,8 +12,16 @@ export function AdminAccessPage() {
       <section className="card">
         <h2>Acceso total</h2>
         <p className="muted">
-          Aquí podrás agregar módulos administrativos sin cambiar la lógica de roles.
+          Desde aquí puedes entrar a los módulos administrativos del sistema.
         </p>
+        <div className="table-actions" style={{ marginTop: "1rem" }}>
+          <Link className="primary-button button-link" href="/admin/miembros">
+            Ir a Miembros
+          </Link>
+          <Link className="secondary-button button-link" href="/admin/cursos">
+            Ir a Cursos
+          </Link>
+        </div>
       </section>
     </RoleGate>
   );

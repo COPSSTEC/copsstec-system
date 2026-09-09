@@ -52,7 +52,7 @@ def get_current_user(
 
     user = GetCurrentUserUseCase(repository).execute(user_id)
 
-    if user is None:
+    if user is None or user.state_id in {3, 16}:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sesión inválida.",

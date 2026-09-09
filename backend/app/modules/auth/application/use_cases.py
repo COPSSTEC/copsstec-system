@@ -42,6 +42,9 @@ class LoginUseCase:
         if user is None or not verify_password(password, user.password_hash):
             raise InvalidCredentialsError()
 
+        if user.state_id in {3, 16}:
+            raise InvalidCredentialsError()
+
         self.repository.update_last_connection(user.id)
         user = self.repository.get_user_by_id(user.id)
 
