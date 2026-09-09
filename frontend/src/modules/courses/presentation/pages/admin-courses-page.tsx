@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
+import Link from "next/link";
 
 import type {
   AdminCourse,
@@ -303,9 +304,19 @@ export function AdminCoursesPage() {
 
   return (
     <RoleGate requiredAccess="admin">
-      <section className="page-heading">
-        <h1>Cursos</h1>
-        <p>Gestión administrativa de cursos, inscritos, pagos, asistencia y certificados.</p>
+      <section className="page-heading page-heading-actions">
+        <div>
+          <h1>Cursos</h1>
+          <p>Gestión administrativa de cursos, inscritos, pagos, asistencia y certificados.</p>
+        </div>
+        <div className="hero-actions">
+          <Link className="secondary-button button-link" href="/cursos">
+            Ver catálogo público
+          </Link>
+          <Link className="secondary-button button-link" href="/mi-espacio/cursos">
+            Mis cursos
+          </Link>
+        </div>
       </section>
 
       {message ? <ActionAlert tone="success" title="Acción completada" message={message} /> : null}

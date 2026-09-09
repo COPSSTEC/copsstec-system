@@ -13,6 +13,7 @@ from app.modules.courses.application.use_cases import (
     CreateMemberInscriptionsUseCase,
     ListPublicCoursesUseCase,
     ManageCourseInscriptionsUseCase,
+    MemberCoursesUseCase,
 )
 from app.modules.courses.domain.entities import (
     AttendanceRequiredError,
@@ -32,6 +33,7 @@ from app.modules.courses.presentation.api.dependencies import (
     get_file_storage,
     get_list_public_courses_use_case,
     get_manage_course_inscriptions_use_case,
+    get_member_courses_use_case,
 )
 from app.modules.courses.presentation.api.schemas import (
     AdminCourseResponse,
@@ -47,6 +49,7 @@ from app.modules.courses.presentation.api.schemas import (
     FeedbackSubmitRequest,
     GuestInscriptionResponse,
     MemberInscriptionsRequest,
+    MemberCourseResponse,
     MemberOptionResponse,
     MessageResponse,
     PaymentRejectionRequest,
@@ -139,6 +142,75 @@ async def create_guest_inscription(
         course_id=inscription.course_id,
         state_id=inscription.state_id,
         message="Inscripción recibida correctamente.",
+    )
+
+
+@router.get("/member/my-courses", response_model=list[MemberCourseResponse])
+def list_my_courses(
+    use_case: Annotated[MemberCoursesUseCase, Depends(get_member_courses_use_case)],
+    user: Annotated[User, Depends(require_access("member"))],
+) -> list[MemberCourseResponse]:
+    return [MemberCourseResponse(**course) for course in use_case.list_my_courses(user.id)]
+
+
+@router.get("/member/available", response_model=list[MemberCourseResponse])
+def list_member_available_courses(
+    use_case: Annotated[MemberCoursesUseCase, Depends(get_member_courses_use_case)],
+    user: Annotated[User, Depends(require_access("member"))],
+) -> list[MemberCourseResponse]:
+    return [
+        MemberCourseResponse(**course)
+        for course in use_case.list_available_courses(user.id)
+    ]
+
+
+@router.post("/member/{course_id}/inscriptions", response_model=CourseInscriptionResponse)
+def enroll_member_self(
+    course_id: int,
+    use_case: Annotated[MemberCoursesUseCase, Depends(get_member_courses_use_case)],
+    user: Annotated[User, Depends(require_access("member"))],
+) -> CourseInscriptionResponse:
+    try:
+        return CourseInscriptionResponse.from_domain(
+            use_case.enroll_self(course_id, user.id),
+        )
+    except CourseUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curso no disponible.") from exc
+    except DuplicateInscriptionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc) or "Ya estás inscrito en este curso.",
+        ) from exc
+
+
+@router.get("/member/inscriptions/{inscription_id}/certificate/download")
+def download_member_certificate(
+    inscription_id: int,
+    use_case: Annotated[
+        ManageCourseInscriptionsUseCase,
+        Depends(get_manage_course_inscriptions_use_case),
+    ],
+    user: Annotated[User, Depends(require_access("member"))],
+) -> FileResponse:
+    inscription = use_case.repository.get_inscription(inscription_id)
+    if inscription is None or inscription.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inscripción no encontrada.")
+
+    try:
+        certificate = use_case.generate_certificate(inscription_id)
+    except AttendanceRequiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El certificado estará disponible cuando tengas asistencia marcada.",
+        ) from exc
+
+    if not Path(certificate.pdf_path).exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificado no encontrado.")
+
+    return FileResponse(
+        certificate.pdf_path,
+        media_type="application/pdf",
+        filename=f"{certificate.certificate_code}.pdf",
     )
 
 

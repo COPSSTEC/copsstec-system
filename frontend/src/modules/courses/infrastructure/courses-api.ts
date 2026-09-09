@@ -4,6 +4,7 @@ import type {
   Course,
   CourseFormInput,
   CourseInscription,
+  MemberCourse,
   MemberOption,
 } from "@/modules/courses/domain/types";
 
@@ -74,6 +75,52 @@ export async function listAdminCourses(token: string): Promise<AdminCourse[]> {
   });
 
   return parseResponse<AdminCourse[]>(response);
+}
+
+export async function listMyCourses(token: string): Promise<MemberCourse[]> {
+  const response = await fetch(`${API_URL}/api/courses/member/my-courses`, {
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<MemberCourse[]>(response);
+}
+
+export async function listMemberAvailableCourses(token: string): Promise<MemberCourse[]> {
+  const response = await fetch(`${API_URL}/api/courses/member/available`, {
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<MemberCourse[]>(response);
+}
+
+export async function enrollCurrentMember(
+  token: string,
+  courseId: number,
+): Promise<CourseInscription> {
+  const response = await fetch(`${API_URL}/api/courses/member/${courseId}/inscriptions`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<CourseInscription>(response);
+}
+
+export async function downloadMyCertificate(
+  token: string,
+  inscriptionId: number,
+): Promise<Blob> {
+  const response = await fetch(
+    `${API_URL}/api/courses/member/inscriptions/${inscriptionId}/certificate/download`,
+    {
+      headers: authHeaders(token),
+    },
+  );
+
+  if (!response.ok) {
+    await parseResponse<never>(response);
+  }
+
+  return response.blob();
 }
 
 export async function createCourse(

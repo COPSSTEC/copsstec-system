@@ -33,13 +33,21 @@ export function PublicCoursesPage() {
         <AppLogo />
         <nav className="nav" aria-label="Navegación pública">
           <Link href="/">Inicio</Link>
+          <Link href="/mi-espacio/cursos">Mis cursos</Link>
           <Link href="/login">Ingresar</Link>
         </nav>
       </header>
 
       <section className="page-heading">
-        <h1>Cursos disponibles</h1>
-        <p>Oferta pública de capacitaciones COPSSTEC.</p>
+        <div>
+          <h1>Cursos disponibles</h1>
+          <p>Oferta pública de capacitaciones COPSSTEC.</p>
+        </div>
+        <div className="hero-actions">
+          <Link className="secondary-button button-link" href="/mi-espacio/cursos">
+            Soy miembro, ver mis cursos
+          </Link>
+        </div>
       </section>
 
       {isLoading ? <p className="muted">Cargando cursos...</p> : null}

@@ -11,6 +11,7 @@ from app.modules.courses.application.use_cases import (
     CreateMemberInscriptionsUseCase,
     ListPublicCoursesUseCase,
     ManageCourseInscriptionsUseCase,
+    MemberCoursesUseCase,
 )
 from app.modules.courses.infrastructure.certificates import SimplePdfCertificateGenerator
 from app.modules.courses.infrastructure.files import LocalCourseFileStorage
@@ -60,6 +61,13 @@ def get_create_member_inscriptions_use_case(
     notifier: Annotated[LogEmailNotifier, Depends(get_notifier)],
 ) -> CreateMemberInscriptionsUseCase:
     return CreateMemberInscriptionsUseCase(repository, notifier)
+
+
+def get_member_courses_use_case(
+    repository: Annotated[CourseRepository, Depends(get_course_repository)],
+    notifier: Annotated[LogEmailNotifier, Depends(get_notifier)],
+) -> MemberCoursesUseCase:
+    return MemberCoursesUseCase(repository, notifier)
 
 
 def get_manage_course_inscriptions_use_case(

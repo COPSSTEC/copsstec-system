@@ -37,6 +37,7 @@ export function PublicCourseDetailPage({ courseId }: PublicCourseDetailPageProps
         <AppLogo />
         <nav className="nav" aria-label="Navegación pública">
           <Link href="/cursos">Cursos</Link>
+          <Link href="/mi-espacio/cursos">Mis cursos</Link>
           <Link href="/login">Ingresar</Link>
         </nav>
       </header>
@@ -78,6 +79,14 @@ export function PublicCourseDetailPage({ courseId }: PublicCourseDetailPageProps
               <strong>{course.capacitator}</strong>
             </p>
             <p className="muted">{course.capacitator_about}</p>
+            <div className="hero-actions">
+              <Link className="secondary-button button-link" href="/cursos">
+                Volver a cursos
+              </Link>
+              <Link className="secondary-button button-link" href="/mi-espacio/cursos">
+                Mis cursos
+              </Link>
+            </div>
           </section>
 
           <GuestInscriptionForm course={course} />

@@ -78,6 +78,65 @@ class CourseRepository:
 
         return [dict(row) for row in rows]
 
+    def list_member_courses(self, user_id: int) -> list[dict[str, Any]]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT
+                    c.*,
+                    cl.finished_at,
+                    ci.id AS inscription_id,
+                    ci.state_id AS inscription_state_id,
+                    ci.attended_at,
+                    ci.created_at AS inscription_created_at,
+                    cc.id AS certificate_id,
+                    cc.certificate_code,
+                    cc.sent_at AS certificate_sent_at
+                FROM course_inscriptions ci
+                INNER JOIN courses c ON c.id = ci.course_id
+                LEFT JOIN course_lifecycle cl ON cl.course_id = c.id
+                LEFT JOIN course_certificates cc ON cc.course_inscription_id = ci.id
+                WHERE ci.user_id = :user_id
+                  AND ci.deleted_at IS NULL
+                  AND c.deleted_at IS NULL
+                ORDER BY COALESCE(cl.finished_at, c.created_at) DESC, c.id DESC
+                """,
+            ),
+            {"user_id": user_id},
+        ).mappings().all()
+
+        return [dict(row) for row in rows]
+
+    def list_member_available_courses(self, user_id: int) -> list[dict[str, Any]]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT
+                    c.*,
+                    cl.finished_at,
+                    ci.id AS inscription_id,
+                    ci.state_id AS inscription_state_id,
+                    ci.attended_at,
+                    ci.created_at AS inscription_created_at,
+                    cc.id AS certificate_id,
+                    cc.certificate_code,
+                    cc.sent_at AS certificate_sent_at
+                FROM courses c
+                LEFT JOIN course_lifecycle cl ON cl.course_id = c.id
+                LEFT JOIN course_inscriptions ci ON ci.course_id = c.id
+                    AND ci.user_id = :user_id
+                    AND ci.deleted_at IS NULL
+                LEFT JOIN course_certificates cc ON cc.course_inscription_id = ci.id
+                WHERE c.state_id = :visible_state_id
+                  AND c.deleted_at IS NULL
+                ORDER BY c.id DESC
+                """,
+            ),
+            {"user_id": user_id, "visible_state_id": VISIBLE_STATE_ID},
+        ).mappings().all()
+
+        return [dict(row) for row in rows]
+
     def get_course(self, course_id: int) -> Course | None:
         row = self.session.execute(
             text(
@@ -569,6 +628,29 @@ class CourseRepository:
         ).mappings().first()
 
         return self._build_certificate(row) if row is not None else None
+
+    def certificate_belongs_to_member(
+        self,
+        certificate_id: int,
+        user_id: int,
+    ) -> bool:
+        row = self.session.execute(
+            text(
+                """
+                SELECT cc.id
+                FROM course_certificates cc
+                INNER JOIN course_inscriptions ci ON ci.id = cc.course_inscription_id
+                WHERE cc.id = :certificate_id
+                  AND ci.user_id = :user_id
+                  AND ci.attended_at IS NOT NULL
+                  AND ci.deleted_at IS NULL
+                LIMIT 1
+                """,
+            ),
+            {"certificate_id": certificate_id, "user_id": user_id},
+        ).first()
+
+        return row is not None
 
     def create_feedback_token(self, inscription_id: int) -> str:
         inscription = self.get_inscription(inscription_id)

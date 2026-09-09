@@ -170,6 +170,45 @@ class CreateMemberInscriptionsUseCase:
         return BulkResult(processed=processed, skipped=skipped, errors=errors)
 
 
+class MemberCoursesUseCase:
+    def __init__(
+        self,
+        repository: CourseRepository,
+        notifier: LogEmailNotifier,
+    ) -> None:
+        self.repository = repository
+        self.notifier = notifier
+
+    def list_my_courses(self, user_id: int) -> list[dict]:
+        return self.repository.list_member_courses(user_id)
+
+    def list_available_courses(self, user_id: int) -> list[dict]:
+        return self.repository.list_member_available_courses(user_id)
+
+    def enroll_self(self, course_id: int, user_id: int) -> CourseInscription:
+        course = self.repository.get_course(course_id)
+        if course is None or course.state_id != VISIBLE_STATE_ID:
+            raise CourseUnavailableError()
+
+        try:
+            inscription = self.repository.create_member_inscription(course_id, user_id)
+        except ValueError as exc:
+            raise DuplicateInscriptionError(str(exc)) from exc
+
+        self.notifier.send(
+            EmailMessage(
+                to=inscription.email,
+                subject=f"Inscripción confirmada: {course.title}",
+                body="Tu inscripción como miembro fue confirmada sin costo.",
+            ),
+        )
+
+        return inscription
+
+    def can_download_certificate(self, certificate_id: int, user_id: int) -> bool:
+        return self.repository.certificate_belongs_to_member(certificate_id, user_id)
+
+
 class ManageCourseInscriptionsUseCase:
     def __init__(
         self,

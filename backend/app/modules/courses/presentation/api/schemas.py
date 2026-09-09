@@ -51,6 +51,16 @@ class AdminCourseResponse(CourseResponse):
     certificates_sent_count: int = 0
 
 
+class MemberCourseResponse(CourseResponse):
+    inscription_id: int | None = None
+    inscription_state_id: int | None = None
+    attended_at: datetime | None = None
+    inscription_created_at: datetime | None = None
+    certificate_id: int | None = None
+    certificate_code: str | None = None
+    certificate_sent_at: datetime | None = None
+
+
 class GuestInscriptionResponse(BaseModel):
     id: int
     course_id: int

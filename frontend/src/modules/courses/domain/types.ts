@@ -29,6 +29,16 @@ export interface AdminCourse extends Course {
   certificates_sent_count: number;
 }
 
+export interface MemberCourse extends Course {
+  inscription_id: number | null;
+  inscription_state_id: number | null;
+  attended_at: string | null;
+  inscription_created_at: string | null;
+  certificate_id: number | null;
+  certificate_code: string | null;
+  certificate_sent_at: string | null;
+}
+
 export interface CourseInscription {
   id: number;
   course_id: number;

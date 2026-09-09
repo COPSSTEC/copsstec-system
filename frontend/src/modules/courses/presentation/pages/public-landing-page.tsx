@@ -9,6 +9,7 @@ export function PublicLandingPage() {
         <AppLogo />
         <nav className="nav" aria-label="Navegación pública">
           <Link href="/cursos">Cursos</Link>
+          <Link href="/mi-espacio/cursos">Mis cursos</Link>
           <Link href="/login">Ingresar</Link>
         </nav>
       </header>
