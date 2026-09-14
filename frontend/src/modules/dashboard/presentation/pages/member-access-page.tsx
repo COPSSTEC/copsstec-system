@@ -1,3 +1,4 @@
+import { MembershipInvoiceCard } from "@/modules/membership";
 import { RoleGate } from "@/shared/components/role-gate";
 
 export function MemberAccessPage() {
@@ -13,6 +14,7 @@ export function MemberAccessPage() {
           Este apartado queda preparado para mostrar trámites, datos o servicios propios.
         </p>
       </section>
+      <MembershipInvoiceCard />
     </RoleGate>
   );
 }

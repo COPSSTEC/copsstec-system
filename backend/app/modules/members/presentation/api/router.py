@@ -42,6 +42,25 @@ from app.modules.members.presentation.api.schemas import (
     MemberWriteRequest,
     MessageResponse,
 )
+from app.modules.membership.application.use_cases import (
+    ApproveMembershipUseCase,
+    GetApprovalPreviewUseCase,
+)
+from app.modules.membership.domain.exceptions import (
+    MailboxError,
+    MembershipConflictError as AffiliationConflictError,
+    MembershipNotFoundError as AffiliationNotFoundError,
+    MembershipValidationError as AffiliationValidationError,
+)
+from app.modules.membership.presentation.api.dependencies import (
+    get_approval_preview_use_case,
+    get_approve_membership_use_case,
+)
+from app.modules.membership.presentation.api.schemas import (
+    ApprovalPreviewResponse,
+    ApproveMemberRequest,
+    ApproveMemberResponse,
+)
 
 router = APIRouter(prefix="/api/members", tags=["members"])
 
@@ -55,6 +74,14 @@ def _http_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
     if isinstance(exc, InvalidMemberPhotoError):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
+    if isinstance(exc, AffiliationNotFoundError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Miembro no encontrado.")
+    if isinstance(exc, AffiliationConflictError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.message)
+    if isinstance(exc, AffiliationValidationError):
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
+    if isinstance(exc, MailboxError):
+        return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.message)
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno.")
 
 
@@ -263,19 +290,47 @@ def download_member_file(
     )
 
 
-@router.get("/{member_id}/certificate")
-def download_member_certificate(
-    member_id: int,
-    _: Annotated[User, Depends(require_access("admin"))],
-    use_case: Annotated[DownloadMemberPdfUseCase, Depends(get_download_pdf_use_case)],
-) -> Response:
-    try:
-        filename, content = use_case.execute(member_id, "certificate")
-    except MemberNotFoundError as exc:
-        raise _http_error(exc) from exc
-
     return Response(
         content=content,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{member_id}/approval-preview", response_model=ApprovalPreviewResponse)
+def approval_preview(
+    member_id: int,
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[GetApprovalPreviewUseCase, Depends(get_approval_preview_use_case)],
+) -> ApprovalPreviewResponse:
+    try:
+        preview = use_case.execute(member_id)
+    except (AffiliationNotFoundError, AffiliationValidationError) as exc:
+        raise _http_error(exc) from exc
+
+    return ApprovalPreviewResponse(**preview)
+
+
+@router.post("/{member_id}/approve", response_model=ApproveMemberResponse)
+def approve_member(
+    member_id: int,
+    request: ApproveMemberRequest,
+    current_user: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[ApproveMembershipUseCase, Depends(get_approve_membership_use_case)],
+) -> ApproveMemberResponse:
+    try:
+        member = use_case.execute(member_id, str(request.email_corp), current_user.id)
+    except (
+        AffiliationNotFoundError,
+        AffiliationValidationError,
+        AffiliationConflictError,
+        MailboxError,
+    ) as exc:
+        raise _http_error(exc) from exc
+
+    return ApproveMemberResponse(
+        message="Miembro habilitado, buzón corporativo creado y factura generada.",
+        user_id=member.user_id,
+        login_email=member.email,
+        state_id=member.state_id,
     )

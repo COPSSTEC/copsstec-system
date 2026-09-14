@@ -8,12 +8,21 @@ from app.core.security import (
     hash_reset_token,
     verify_password,
 )
-from app.modules.auth.application.rbac import resolve_access_policy
+from app.modules.auth.application.rbac import resolve_access_level, resolve_access_policy
 from app.modules.auth.domain.entities import AccessPolicy, User
 from app.modules.auth.infrastructure.repository import AuthRepository
+from app.modules.membership.domain.corporate_email import is_corporate_email
 
 
 class InvalidCredentialsError(Exception):
+    pass
+
+
+class MemberCorporateEmailRequiredError(Exception):
+    pass
+
+
+class AffiliationPendingError(Exception):
     pass
 
 
@@ -44,6 +53,14 @@ class LoginUseCase:
 
         if user.state_id in {3, 16}:
             raise InvalidCredentialsError()
+
+        access_level = resolve_access_level(user.roles)
+        if access_level == "member" and user.state_id == 2:
+            raise AffiliationPendingError()
+
+        if access_level == "member" and user.state_id == 1:
+            if not is_corporate_email(user.email, get_settings().corporate_email_domain):
+                raise MemberCorporateEmailRequiredError()
 
         self.repository.update_last_connection(user.id)
         user = self.repository.get_user_by_id(user.id)

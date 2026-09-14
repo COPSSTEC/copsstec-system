@@ -6,6 +6,8 @@ import { FormEvent, useState } from "react";
 
 import { login } from "@/modules/auth/infrastructure/auth-api";
 import { storeToken } from "@/modules/auth/infrastructure/auth-storage";
+import { membershipRedirect } from "@/modules/membership/domain/types";
+import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 
 export function LoginForm() {
   const router = useRouter();
@@ -22,7 +24,12 @@ export function LoginForm() {
     try {
       const response = await login(email, password);
       storeToken(response.access_token);
-      router.replace("/dashboard");
+      if (response.user.access_level === "member") {
+        const status = await getMembershipStatus(response.access_token);
+        router.replace(membershipRedirect(status.gate));
+      } else {
+        router.replace("/dashboard");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No fue posible iniciar sesión.");
     } finally {
@@ -61,6 +68,11 @@ export function LoginForm() {
       <button className="primary-button" disabled={isLoading} type="submit">
         {isLoading ? "Ingresando..." : "Ingresar"}
       </button>
+
+      <p className="muted">
+        Los miembros ingresan con el correo corporativo @copsstec.com y la contraseña que reciben
+        en su correo personal cuando el administrador aprueba la afiliación.
+      </p>
 
       <div className="auth-links">
         <Link href="/forgot-password">Olvidé mi contraseña</Link>

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import type { AccessPolicy, User } from "@/modules/auth/domain/types";
 import { getAccessPolicy, getCurrentUser } from "@/modules/auth/infrastructure/auth-api";
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { membershipRedirect } from "@/modules/membership/domain/types";
+import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 import { AppHeader } from "@/shared/components/app-header";
 
 interface DashboardShellProps {
@@ -34,6 +36,14 @@ export function DashboardShell({ children }: DashboardShellProps) {
           getCurrentUser(sessionToken),
           getAccessPolicy(sessionToken),
         ]);
+
+        if (currentUser.access_level === "member") {
+          const status = await getMembershipStatus(sessionToken);
+          if (status.gate !== "none") {
+            router.replace(membershipRedirect(status.gate));
+            return;
+          }
+        }
 
         setUser(currentUser);
         setAccessPolicy(policy);

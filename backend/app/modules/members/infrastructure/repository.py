@@ -18,6 +18,7 @@ from app.modules.members.domain.entities import (
     MemberWriteData,
 )
 from app.modules.members.domain.exceptions import MemberNotFoundError
+from app.shared.infrastructure.sequences import sync_serial_sequence
 
 
 SORT_COLUMNS: dict[str, str] = {
@@ -160,6 +161,8 @@ class SqlAlchemyMemberRepository:
 
     def create_member(self, data: MemberWriteData, password_hash: str) -> Member:
         now = datetime.now(UTC).replace(tzinfo=None)
+        sync_serial_sequence(self.session, "users")
+        sync_serial_sequence(self.session, "profiles")
         full_name = f"{data.names} {data.lastname}".strip()
 
         user_id = self.session.execute(

@@ -159,4 +159,5 @@ export function memberPhotoSrc(fotoId: string): string | null {
 }
 
 export const ENABLED_STATE_ID = 1;
+export const PENDING_ENABLE_STATE_ID = 2;
 export const DISABLED_STATE_ID = 3;

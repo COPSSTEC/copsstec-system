@@ -8,6 +8,8 @@ from app.modules.auth.application.use_cases import (
     InvalidCredentialsError,
     InvalidResetTokenError,
     LoginUseCase,
+    AffiliationPendingError,
+    MemberCorporateEmailRequiredError,
     PasswordConfirmationError,
     ResetPasswordUseCase,
 )
@@ -46,6 +48,16 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciales inválidas.",
+        ) from exc
+    except MemberCorporateEmailRequiredError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Los miembros habilitados deben ingresar con su correo corporativo @copsstec.com.",
+        ) from exc
+    except AffiliationPendingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tu afiliación aún no ha sido aprobada. Cuando el administrador confirme el pago recibirás tu correo corporativo y la contraseña en tu correo personal.",
         ) from exc
 
     return LoginResponse(

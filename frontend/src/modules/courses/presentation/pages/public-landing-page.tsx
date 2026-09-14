@@ -26,6 +26,9 @@ export function PublicLandingPage() {
             <Link className="primary-button button-link" href="/cursos">
               Ver cursos
             </Link>
+            <Link className="secondary-button button-link" href="/afiliacion">
+              Quiero ser miembro
+            </Link>
             <Link className="secondary-button button-link" href="/login">
               Soy miembro
             </Link>

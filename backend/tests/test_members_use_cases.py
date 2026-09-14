@@ -1,7 +1,12 @@
 from dataclasses import replace
 
 from app.core.security import hash_password, verify_password
-from app.modules.auth.application.use_cases import InvalidCredentialsError, LoginUseCase
+from app.modules.auth.application.use_cases import (
+    AffiliationPendingError,
+    InvalidCredentialsError,
+    LoginUseCase,
+    MemberCorporateEmailRequiredError,
+)
 from app.modules.auth.domain.entities import User
 from app.modules.members.application.use_cases import CreateMemberUseCase, SetMemberStateUseCase
 from app.modules.members.domain.entities import (
@@ -203,7 +208,7 @@ def test_login_accepts_enabled_user() -> None:
     user = User(
         id=100,
         name="Miembro",
-        email="habilitado@example.com",
+        email="habilitado@copsstec.com",
         password_hash=hash_password("secret123"),
         state_id=ENABLED_STATE_ID,
         email_verified_at=None,
@@ -212,5 +217,62 @@ def test_login_accepts_enabled_user() -> None:
         profile=None,
     )
 
-    result = LoginUseCase(FakeAuthRepository(user)).execute("habilitado@example.com", "secret123")
-    assert result.user.email == "habilitado@example.com"
+    result = LoginUseCase(FakeAuthRepository(user)).execute("habilitado@copsstec.com", "secret123")
+    assert result.user.email == "habilitado@copsstec.com"
+
+
+def test_login_enabled_member_rejects_non_copsstec_email() -> None:
+    user = User(
+        id=101,
+        name="Miembro",
+        email="miembro@gmail.com",
+        password_hash=hash_password("secret123"),
+        state_id=ENABLED_STATE_ID,
+        email_verified_at=None,
+        last_conexion=None,
+        roles=["miembro"],
+        profile=None,
+    )
+
+    try:
+        LoginUseCase(FakeAuthRepository(user)).execute("miembro@gmail.com", "secret123")
+        raise AssertionError("Expected corporate email restriction")
+    except MemberCorporateEmailRequiredError:
+        pass
+
+
+def test_login_admin_allows_non_copsstec_email() -> None:
+    user = User(
+        id=102,
+        name="Admin",
+        email="admin@gmail.com",
+        password_hash=hash_password("secret123"),
+        state_id=ENABLED_STATE_ID,
+        email_verified_at=None,
+        last_conexion=None,
+        roles=["admin"],
+        profile=None,
+    )
+
+    result = LoginUseCase(FakeAuthRepository(user)).execute("admin@gmail.com", "secret123")
+    assert result.user.email == "admin@gmail.com"
+
+
+def test_login_pending_member_rejects_until_approval() -> None:
+    user = User(
+        id=103,
+        name="Aspirante",
+        email="persona@gmail.com",
+        password_hash=hash_password("secret123"),
+        state_id=2,
+        email_verified_at=None,
+        last_conexion=None,
+        roles=["miembro"],
+        profile=None,
+    )
+
+    try:
+        LoginUseCase(FakeAuthRepository(user)).execute("persona@gmail.com", "secret123")
+        raise AssertionError("Expected affiliation pending")
+    except AffiliationPendingError:
+        pass

@@ -26,6 +26,7 @@ import {
 } from "@/modules/members/infrastructure/members-api";
 import { MemberActionsMenu } from "@/modules/members/presentation/components/member-actions-menu";
 import { MemberStatusBadge } from "@/modules/members/presentation/components/member-status-badge";
+import { ApproveMemberModal } from "@/modules/members/presentation/modals/approve-member-modal";
 import { ConfirmActionModal } from "@/modules/members/presentation/modals/confirm-action-modal";
 import { MemberFormModal } from "@/modules/members/presentation/modals/member-form-modal";
 import { RoleGate } from "@/shared/components/role-gate";
@@ -105,6 +106,7 @@ export function MembersPage() {
     type: "delete" | "disable" | "enable" | "credentials";
     member: Member;
   } | null>(null);
+  const [approvingMember, setApprovingMember] = useState<Member | null>(null);
 
   const loadMembers = useCallback(async () => {
     if (!token) {
@@ -354,6 +356,7 @@ export function MembersPage() {
             onDownload={(item) => void handleDownload(item, "file")}
             onDownloadCertificate={(item) => void handleDownload(item, "certificate")}
             onEdit={openEdit}
+            onApprove={(item) => setApprovingMember(item)}
             onResendCredentials={(item) => setConfirm({ type: "credentials", member: item })}
             onToggleState={(item) =>
               setConfirm({
@@ -471,6 +474,19 @@ export function MembersPage() {
           onPhotoChange={setPhotoFile}
           onSubmit={handleSubmit}
           photoFile={photoFile}
+        />
+      ) : null}
+
+      {approvingMember ? (
+        <ApproveMemberModal
+          memberId={approvingMember.user_id}
+          memberName={`${approvingMember.names} ${approvingMember.lastname}`}
+          onApproved={(message) => {
+            setNotice(message);
+            setApprovingMember(null);
+            void loadMembers();
+          }}
+          onClose={() => setApprovingMember(null)}
         />
       ) : null}
 
