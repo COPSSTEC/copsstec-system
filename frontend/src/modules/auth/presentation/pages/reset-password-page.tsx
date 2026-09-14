@@ -1,17 +1,16 @@
 import { ResetPasswordForm } from "@/modules/auth/presentation/forms/reset-password-form";
-import { AppLogo } from "@/shared/components/app-logo";
+import { AuthScene } from "@/shared/components/auth-scene";
 
 export function ResetPasswordPage() {
   return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <AppLogo />
-        <h1 className="auth-title">Crear nueva contraseña</h1>
-        <p className="auth-description">
-          Usa el token de recuperación para registrar una nueva contraseña.
+    <AuthScene>
+      <section className="login-glass-card login-glass-card-narrow">
+        <h1>Crear nueva contraseña</h1>
+        <p className="login-subtitle">
+          Usa el token que recibiste y elige una contraseña nueva para volver a entrar.
         </p>
         <ResetPasswordForm />
       </section>
-    </main>
+    </AuthScene>
   );
 }
