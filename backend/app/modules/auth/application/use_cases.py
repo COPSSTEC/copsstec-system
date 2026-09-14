@@ -34,6 +34,14 @@ class PasswordConfirmationError(Exception):
     pass
 
 
+class PasswordReuseError(Exception):
+    pass
+
+
+class WeakPasswordError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class LoginResult:
     access_token: str
@@ -133,3 +141,30 @@ class ResetPasswordUseCase:
             email=email,
             password_hash=hash_password(password),
         )
+
+
+class ChangePasswordUseCase:
+    def __init__(self, repository: AuthRepository) -> None:
+        self.repository = repository
+
+    def execute(
+        self,
+        user: User,
+        current_password: str,
+        password: str,
+        confirmation: str,
+    ) -> User:
+        if not verify_password(current_password, user.password_hash):
+            raise InvalidCredentialsError()
+        if password != confirmation:
+            raise PasswordConfirmationError()
+        if len(password.strip()) < 8:
+            raise WeakPasswordError()
+        if verify_password(password, user.password_hash):
+            raise PasswordReuseError()
+
+        self.repository.update_own_password(user.id, hash_password(password))
+        updated = self.repository.get_user_by_id(user.id)
+        if updated is None:
+            raise InvalidCredentialsError()
+        return updated

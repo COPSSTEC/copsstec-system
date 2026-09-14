@@ -4,14 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.modules.auth.application.rbac import resolve_access_policy
 from app.modules.auth.application.use_cases import (
+    AffiliationPendingError,
+    ChangePasswordUseCase,
     ForgotPasswordUseCase,
     InvalidCredentialsError,
     InvalidResetTokenError,
     LoginUseCase,
-    AffiliationPendingError,
     MemberCorporateEmailRequiredError,
     PasswordConfirmationError,
+    PasswordReuseError,
     ResetPasswordUseCase,
+    WeakPasswordError,
 )
 from app.modules.auth.domain.entities import User
 from app.modules.auth.infrastructure.repository import AuthRepository
@@ -22,6 +25,7 @@ from app.modules.auth.presentation.api.dependencies import (
 )
 from app.modules.auth.presentation.api.schemas import (
     AccessPolicyResponse,
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
@@ -122,6 +126,43 @@ def reset_password(
         ) from exc
 
     return MessageResponse(message="Contraseña actualizada correctamente.")
+
+
+@router.post("/change-password", response_model=UserResponse)
+def change_password(
+    request: ChangePasswordRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    repository: Annotated[AuthRepository, Depends(get_auth_repository)],
+) -> UserResponse:
+    try:
+        updated = ChangePasswordUseCase(repository).execute(
+            user=user,
+            current_password=request.current_password,
+            password=request.password,
+            confirmation=request.password_confirmation,
+        )
+    except InvalidCredentialsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual no es correcta.",
+        ) from exc
+    except PasswordConfirmationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La confirmación de contraseña no coincide.",
+        ) from exc
+    except WeakPasswordError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña debe tener al menos 8 caracteres.",
+        ) from exc
+    except PasswordReuseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña debe ser distinta a la temporal.",
+        ) from exc
+
+    return UserResponse.from_domain(updated, resolve_access_policy(updated.roles))
 
 
 @router.get("/admin/summary", response_model=MessageResponse)

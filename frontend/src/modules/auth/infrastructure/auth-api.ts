@@ -75,3 +75,23 @@ export async function resetPassword(input: {
 
   return parseResponse<{ message: string }>(response);
 }
+
+export async function changePassword(
+  token: string,
+  input: {
+    current_password: string;
+    password: string;
+    password_confirmation: string;
+  },
+): Promise<User> {
+  const response = await fetch(`${API_URL}/api/auth/change-password`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  return parseResponse<User>(response);
+}

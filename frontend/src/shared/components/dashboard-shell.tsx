@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { AccessPolicy, User } from "@/modules/auth/domain/types";
+import { passwordChangeRedirect } from "@/modules/auth/domain/types";
 import { getAccessPolicy, getCurrentUser } from "@/modules/auth/infrastructure/auth-api";
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipRedirect } from "@/modules/membership/domain/types";
@@ -36,6 +37,11 @@ export function DashboardShell({ children }: DashboardShellProps) {
           getCurrentUser(sessionToken),
           getAccessPolicy(sessionToken),
         ]);
+
+        if (currentUser.must_change_password) {
+          router.replace(passwordChangeRedirect());
+          return;
+        }
 
         if (currentUser.access_level === "member") {
           const status = await getMembershipStatus(sessionToken);

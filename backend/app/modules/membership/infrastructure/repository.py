@@ -378,7 +378,8 @@ class SqlAlchemyMembershipRepository:
             text(
                 """
                 UPDATE users
-                SET email = :email, password = :password, state_id = :state_id, updated_at = :now
+                SET email = :email, password = :password, state_id = :state_id,
+                    must_change_password = true, updated_at = :now
                 WHERE id = :user_id
                 """,
             ),

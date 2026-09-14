@@ -168,8 +168,8 @@ class SqlAlchemyMemberRepository:
         user_id = self.session.execute(
             text(
                 """
-                INSERT INTO users (name, email, password, state_id, created_at, updated_at)
-                VALUES (:name, :email, :password, :state_id, :now, :now)
+                INSERT INTO users (name, email, password, state_id, must_change_password, created_at, updated_at)
+                VALUES (:name, :email, :password, :state_id, true, :now, :now)
                 RETURNING id
                 """,
             ),
@@ -404,7 +404,7 @@ class SqlAlchemyMemberRepository:
             text(
                 """
                 UPDATE users
-                SET password = :password_hash, updated_at = :now
+                SET password = :password_hash, must_change_password = true, updated_at = :now
                 WHERE id = :user_id
                 """,
             ),

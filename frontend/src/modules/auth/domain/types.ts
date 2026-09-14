@@ -40,6 +40,7 @@ export interface User {
   state_id: number;
   email_verified_at: string | null;
   last_conexion: string | null;
+  must_change_password: boolean;
   roles: string[];
   access_level: AccessLevel;
   allowed_routes: string[];
@@ -62,4 +63,8 @@ export interface LoginResponse {
   access_token: string;
   token_type: "bearer";
   user: User;
+}
+
+export function passwordChangeRedirect(): string {
+  return "/cambiar-contrasena";
 }

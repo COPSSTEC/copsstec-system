@@ -16,7 +16,8 @@ class AuthRepository:
         user_row = self.session.execute(
             text(
                 """
-                SELECT id, name, email, password, state_id, email_verified_at, last_conexion
+                SELECT id, name, email, password, state_id, email_verified_at, last_conexion,
+                       COALESCE(must_change_password, false) AS must_change_password
                 FROM users
                 WHERE lower(email) = lower(:email)
                 LIMIT 1
@@ -34,7 +35,8 @@ class AuthRepository:
         user_row = self.session.execute(
             text(
                 """
-                SELECT id, name, email, password, state_id, email_verified_at, last_conexion
+                SELECT id, name, email, password, state_id, email_verified_at, last_conexion,
+                       COALESCE(must_change_password, false) AS must_change_password
                 FROM users
                 WHERE id = :user_id
                 LIMIT 1
@@ -106,7 +108,7 @@ class AuthRepository:
             text(
                 """
                 UPDATE users
-                SET password = :password_hash, updated_at = :now
+                SET password = :password_hash, must_change_password = false, updated_at = :now
                 WHERE lower(email) = lower(:email)
                 """,
             ),
@@ -119,6 +121,24 @@ class AuthRepository:
         self.session.execute(
             text("DELETE FROM password_reset_tokens WHERE lower(email) = lower(:email)"),
             {"email": email},
+        )
+        self.session.commit()
+
+    def update_own_password(self, user_id: int, password_hash: str) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        self.session.execute(
+            text(
+                """
+                UPDATE users
+                SET password = :password_hash, must_change_password = false, updated_at = :now
+                WHERE id = :user_id
+                """,
+            ),
+            {
+                "password_hash": password_hash,
+                "now": now,
+                "user_id": user_id,
+            },
         )
         self.session.commit()
 
@@ -135,6 +155,7 @@ class AuthRepository:
             last_conexion=row["last_conexion"],
             roles=self._get_roles(user_id),
             profile=self._get_profile(user_id),
+            must_change_password=bool(row["must_change_password"]),
         )
 
     def _get_roles(self, user_id: int) -> list[str]:

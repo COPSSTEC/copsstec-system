@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { passwordChangeRedirect } from "@/modules/auth/domain/types";
 import { login } from "@/modules/auth/infrastructure/auth-api";
 import { storeToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipRedirect } from "@/modules/membership/domain/types";
@@ -24,6 +25,10 @@ export function LoginForm() {
     try {
       const response = await login(email, password);
       storeToken(response.access_token);
+      if (response.user.must_change_password) {
+        router.replace(passwordChangeRedirect());
+        return;
+      }
       if (response.user.access_level === "member") {
         const status = await getMembershipStatus(response.access_token);
         router.replace(membershipRedirect(status.gate));

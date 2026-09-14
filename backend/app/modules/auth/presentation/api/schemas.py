@@ -49,6 +49,7 @@ class UserResponse(BaseModel):
     state_id: int
     email_verified_at: datetime | None
     last_conexion: datetime | None
+    must_change_password: bool
     roles: list[str]
     access_level: str
     allowed_routes: list[str]
@@ -67,6 +68,7 @@ class UserResponse(BaseModel):
             state_id=user.state_id,
             email_verified_at=user.email_verified_at,
             last_conexion=user.last_conexion,
+            must_change_password=user.must_change_password,
             roles=access_policy.roles,
             access_level=access_policy.access_level,
             allowed_routes=access_policy.allowed_routes,
@@ -125,6 +127,12 @@ class ForgotPasswordResponse(BaseModel):
 class ResetPasswordRequest(BaseModel):
     email: EmailStr
     token: str = Field(min_length=1)
+    password: str = Field(min_length=8)
+    password_confirmation: str = Field(min_length=8)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1)
     password: str = Field(min_length=8)
     password_confirmation: str = Field(min_length=8)
 

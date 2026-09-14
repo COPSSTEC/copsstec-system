@@ -47,6 +47,7 @@ class User:
     last_conexion: datetime | None
     roles: list[str]
     profile: Profile | None
+    must_change_password: bool = False
 
 
 @dataclass(frozen=True)

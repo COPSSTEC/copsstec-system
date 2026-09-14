@@ -3,9 +3,11 @@ from dataclasses import replace
 from app.core.security import hash_password, verify_password
 from app.modules.auth.application.use_cases import (
     AffiliationPendingError,
+    ChangePasswordUseCase,
     InvalidCredentialsError,
     LoginUseCase,
     MemberCorporateEmailRequiredError,
+    PasswordReuseError,
 )
 from app.modules.auth.domain.entities import User
 from app.modules.members.application.use_cases import CreateMemberUseCase, SetMemberStateUseCase
@@ -135,6 +137,13 @@ class FakeAuthRepository:
 
     def update_last_connection(self, user_id: int) -> None:
         return None
+
+    def update_own_password(self, user_id: int, password_hash: str) -> None:
+        self.user = replace(
+            self.user,
+            password_hash=password_hash,
+            must_change_password=False,
+        )
 
 
 def _write_data(**overrides: object) -> MemberWriteData:
@@ -275,4 +284,53 @@ def test_login_pending_member_rejects_until_approval() -> None:
         LoginUseCase(FakeAuthRepository(user)).execute("persona@gmail.com", "secret123")
         raise AssertionError("Expected affiliation pending")
     except AffiliationPendingError:
+        pass
+
+
+def test_change_password_clears_temporary_flag() -> None:
+    user = User(
+        id=104,
+        name="Miembro",
+        email="joel.gabriel@copsstec.com",
+        password_hash=hash_password("temporal1"),
+        state_id=ENABLED_STATE_ID,
+        email_verified_at=None,
+        last_conexion=None,
+        roles=["miembro"],
+        profile=None,
+        must_change_password=True,
+    )
+    repository = FakeAuthRepository(user)
+    updated = ChangePasswordUseCase(repository).execute(
+        user=user,
+        current_password="temporal1",
+        password="nuevaClave9",
+        confirmation="nuevaClave9",
+    )
+    assert updated.must_change_password is False
+    assert verify_password("nuevaClave9", updated.password_hash)
+
+
+def test_change_password_rejects_same_temporary() -> None:
+    user = User(
+        id=105,
+        name="Miembro",
+        email="joel.gabriel@copsstec.com",
+        password_hash=hash_password("temporal1"),
+        state_id=ENABLED_STATE_ID,
+        email_verified_at=None,
+        last_conexion=None,
+        roles=["miembro"],
+        profile=None,
+        must_change_password=True,
+    )
+    try:
+        ChangePasswordUseCase(FakeAuthRepository(user)).execute(
+            user=user,
+            current_password="temporal1",
+            password="temporal1",
+            confirmation="temporal1",
+        )
+        raise AssertionError("Expected password reuse")
+    except PasswordReuseError:
         pass
