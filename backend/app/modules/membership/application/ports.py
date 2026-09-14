@@ -63,6 +63,9 @@ class MailboxPort(Protocol):
     def create_mailbox(self, email: str, password: str) -> None:
         ...
 
+    def update_or_create_mailbox(self, email: str, password: str) -> None:
+        ...
+
 
 class EmailPort(Protocol):
     def send(self, to_email: str, subject: str, body: str) -> None:

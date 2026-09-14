@@ -19,6 +19,8 @@ from app.modules.members.infrastructure.notifications import LogMemberNotifier
 from app.modules.members.infrastructure.pdfs import BlankMemberPdfGenerator
 from app.modules.members.infrastructure.photos import LocalMemberPhotoStorage
 from app.modules.members.infrastructure.repository import SqlAlchemyMemberRepository
+from app.modules.membership.infrastructure.email import SmtpOrLogEmailSender
+from app.modules.membership.infrastructure.mailbox import MailInABoxMailbox
 
 
 def get_member_repository(
@@ -74,9 +76,12 @@ def get_set_member_state_use_case(
 
 def get_resend_credentials_use_case(
     repository: Annotated[SqlAlchemyMemberRepository, Depends(get_member_repository)],
-    notifier: Annotated[LogMemberNotifier, Depends(get_member_notifier)],
 ) -> ResendMemberCredentialsUseCase:
-    return ResendMemberCredentialsUseCase(repository, notifier)
+    return ResendMemberCredentialsUseCase(
+        repository,
+        mailbox=MailInABoxMailbox(),
+        email_sender=SmtpOrLogEmailSender(),
+    )
 
 
 def get_member_photo_storage() -> LocalMemberPhotoStorage:

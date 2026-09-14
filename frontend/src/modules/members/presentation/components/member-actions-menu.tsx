@@ -118,9 +118,11 @@ export function MemberActionsMenu({
             <button onClick={() => run(onDownloadCertificate)} type="button">
               Descargar certificado
             </button>
-            <button onClick={() => run(onResendCredentials)} type="button">
-              Reenviar credenciales
-            </button>
+            {enabled ? (
+              <button onClick={() => run(onResendCredentials)} type="button">
+                Reenviar credenciales
+              </button>
+            ) : null}
             <button className="danger-button" onClick={() => run(onDelete)} type="button">
               Eliminar
             </button>

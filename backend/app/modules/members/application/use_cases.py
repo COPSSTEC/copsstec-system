@@ -1,5 +1,6 @@
 from secrets import token_urlsafe
 
+from app.core.config import get_settings
 from app.core.security import hash_password
 from app.modules.members.application.ports import (
     BlankPdfGenerator,
@@ -7,6 +8,8 @@ from app.modules.members.application.ports import (
     MemberPhotoStorage,
     MemberRepository,
 )
+from app.modules.membership.application.ports import EmailPort, MailboxPort
+from app.modules.membership.domain.corporate_email import is_corporate_email
 from app.modules.members.domain.entities import (
     DISABLED_STATE_ID,
     ENABLED_STATE_ID,
@@ -105,18 +108,56 @@ class SetMemberStateUseCase:
 
 
 class ResendMemberCredentialsUseCase:
-    def __init__(self, repository: MemberRepository, notifier: MemberNotifier) -> None:
+    def __init__(
+        self,
+        repository: MemberRepository,
+        mailbox: MailboxPort,
+        email_sender: EmailPort,
+    ) -> None:
         self.repository = repository
-        self.notifier = notifier
+        self.mailbox = mailbox
+        self.email_sender = email_sender
 
     def execute(self, user_id: int) -> tuple[Member, str]:
         member = self.repository.get_member(user_id)
         if member is None:
             raise MemberNotFoundError()
 
-        password = generate_temporary_password()
+        if member.state_id != ENABLED_STATE_ID or not is_corporate_email(
+            member.login_email,
+            get_settings().corporate_email_domain,
+        ):
+            raise MemberValidationError(
+                "El miembro debe estar habilitado con correo corporativo.",
+            )
+
+        password = generate_temporary_password()[:10]
+        self.mailbox.update_or_create_mailbox(member.login_email, password)
         member = self.repository.update_password(user_id, hash_password(password))
-        self.notifier.notify_credentials(member.login_email, password, member.name)
+
+        personal = (member.email or "").strip()
+        if personal:
+            self.email_sender.send(
+                personal,
+                "Tus credenciales COPSSTEC",
+                (
+                    f"Hola {member.name},\n\n"
+                    f"Se generó una nueva contraseña temporal.\n"
+                    f"Correo corporativo: {member.login_email}\n"
+                    f"Contraseña temporal: {password}\n\n"
+                    "Ingresa al sistema con ese correo corporativo y cámbiala en el primer acceso.\n"
+                ),
+            )
+        self.email_sender.send(
+            member.login_email,
+            "Bienvenido a COPSSTEC",
+            (
+                f"Hola {member.name},\n\n"
+                f"Tu cuenta corporativa fue actualizada.\n"
+                f"Usuario: {member.login_email}\n"
+                f"Contraseña temporal: {password}\n"
+            ),
+        )
         return member, password
 
 

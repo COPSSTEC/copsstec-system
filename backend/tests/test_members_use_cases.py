@@ -10,7 +10,11 @@ from app.modules.auth.application.use_cases import (
     PasswordReuseError,
 )
 from app.modules.auth.domain.entities import User
-from app.modules.members.application.use_cases import CreateMemberUseCase, SetMemberStateUseCase
+from app.modules.members.application.use_cases import (
+    CreateMemberUseCase,
+    ResendMemberCredentialsUseCase,
+    SetMemberStateUseCase,
+)
 from app.modules.members.domain.entities import (
     DISABLED_STATE_ID,
     ENABLED_STATE_ID,
@@ -19,7 +23,8 @@ from app.modules.members.domain.entities import (
     MemberListResult,
     MemberWriteData,
 )
-from app.modules.members.domain.exceptions import MemberConflictError
+from app.modules.members.domain.exceptions import MemberConflictError, MemberValidationError
+from app.modules.membership.domain.exceptions import MailboxError
 
 
 class FakeMemberRepository:
@@ -333,4 +338,59 @@ def test_change_password_rejects_same_temporary() -> None:
         )
         raise AssertionError("Expected password reuse")
     except PasswordReuseError:
+        pass
+
+
+class FakeMailbox:
+    def __init__(self) -> None:
+        self.updated: list[tuple[str, str]] = []
+        self.fail = False
+
+    def create_mailbox(self, email: str, password: str) -> None:
+        self.updated.append((email, password))
+
+    def update_or_create_mailbox(self, email: str, password: str) -> None:
+        if self.fail:
+            raise MailboxError("Error al actualizar credenciales en Mail-in-a-Box")
+        self.updated.append((email, password))
+
+
+class FakeEmailSender:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, str]] = []
+
+    def send(self, to_email: str, subject: str, body: str) -> None:
+        self.sent.append((to_email, subject))
+
+
+def test_resend_credentials_updates_mailbox_for_enabled_member() -> None:
+    repository = FakeMemberRepository()
+    notifier = FakeNotifier()
+    mailbox = FakeMailbox()
+    email_sender = FakeEmailSender()
+    member, _ = CreateMemberUseCase(repository, notifier).execute(
+        _write_data(login_email="ana.perez@copsstec.com"),
+    )
+
+    member, password = ResendMemberCredentialsUseCase(repository, mailbox, email_sender).execute(
+        member.user_id,
+    )
+
+    assert password
+    assert mailbox.updated[0][0] == "ana.perez@copsstec.com"
+    assert verify_password(password, repository.passwords[member.user_id])
+    assert {item[0] for item in email_sender.sent} == {"ana@example.com", "ana.perez@copsstec.com"}
+
+
+def test_resend_credentials_rejects_pending_member() -> None:
+    repository = FakeMemberRepository()
+    notifier = FakeNotifier()
+    member, _ = CreateMemberUseCase(repository, notifier).execute(
+        _write_data(state_id=2, login_email="ana.perez@copsstec.com"),
+    )
+
+    try:
+        ResendMemberCredentialsUseCase(repository, FakeMailbox(), FakeEmailSender()).execute(member.user_id)
+        raise AssertionError("Expected validation error")
+    except MemberValidationError:
         pass

@@ -242,11 +242,11 @@ def resend_credentials(
 ) -> CredentialsResponse:
     try:
         member, password = use_case.execute(member_id)
-    except MemberNotFoundError as exc:
+    except (MemberNotFoundError, MemberValidationError, MailboxError) as exc:
         raise _http_error(exc) from exc
 
     return CredentialsResponse(
-        message="Se generó una nueva contraseña temporal.",
+        message="Credenciales reenviadas y actualizadas en Mail-in-a-Box.",
         temporary_password=password,
         member=MemberResponse.from_domain(member),
     )
