@@ -6,9 +6,15 @@ interface RevealOnScrollProps {
   children: ReactNode;
   className?: string;
   delay?: number;
+  from?: "up" | "left" | "right";
 }
 
-export function RevealOnScroll({ children, className = "", delay = 0 }: RevealOnScrollProps) {
+export function RevealOnScroll({
+  children,
+  className = "",
+  delay = 0,
+  from = "up",
+}: RevealOnScrollProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,7 +27,7 @@ export function RevealOnScroll({ children, className = "", delay = 0 }: RevealOn
       ([entry]) => {
         node.classList.toggle("is-inview", entry.isIntersecting);
       },
-      { threshold: 0.18, rootMargin: "0px 0px -8% 0px" },
+      { threshold: 0.16, rootMargin: "0px 0px -10% 0px" },
     );
 
     observer.observe(node);
@@ -29,7 +35,11 @@ export function RevealOnScroll({ children, className = "", delay = 0 }: RevealOn
   }, []);
 
   return (
-    <div className={`reveal-on-scroll ${className}`.trim()} ref={ref} style={{ transitionDelay: `${delay}ms` }}>
+    <div
+      className={`reveal-on-scroll reveal-from-${from} ${className}`.trim()}
+      ref={ref}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
       {children}
     </div>
   );

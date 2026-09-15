@@ -8,16 +8,16 @@ interface ScrollSequenceProps {
   children: ReactNode;
 }
 
-const PIXELS_PER_FRAME = 48;
-const SMOOTHING = 0.12;
+const PIXELS_PER_FRAME = 12;
+const SMOOTHING = 0.18;
+const FRAME_CACHE: Array<HTMLImageElement | null> = Array.from(
+  { length: LANDING_FRAME_COUNT },
+  () => null,
+);
 
 export function ScrollSequence({ children }: ScrollSequenceProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const framesRef = useRef<Array<HTMLImageElement | null>>(
-    Array.from({ length: LANDING_FRAME_COUNT }, () => null),
-  );
-  const loadingRef = useRef<Array<boolean>>(Array.from({ length: LANDING_FRAME_COUNT }, () => false));
   const lastDrawnRef = useRef<HTMLImageElement | null>(null);
   const targetRef = useRef(0);
   const displayRef = useRef(0);
@@ -28,6 +28,8 @@ export function ScrollSequence({ children }: ScrollSequenceProps) {
     if (!canvas) {
       return;
     }
+
+    let alive = true;
 
     function resize() {
       const next = canvasRef.current;
@@ -41,7 +43,6 @@ export function ScrollSequence({ children }: ScrollSequenceProps) {
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       next.width = Math.max(1, Math.floor(width * ratio));
       next.height = Math.max(1, Math.floor(height * ratio));
-      paint(displayRef.current);
     }
 
     function drawFrame(
@@ -54,16 +55,24 @@ export function ScrollSequence({ children }: ScrollSequenceProps) {
       const scale = Math.max(canvasWidth / frame.width, canvasHeight / frame.height);
       const drawWidth = frame.width * scale;
       const drawHeight = frame.height * scale;
-      const offsetX = (canvasWidth - drawWidth) / 2;
-      const offsetY = (canvasHeight - drawHeight) / 2;
       context.globalAlpha = alpha;
-      context.drawImage(frame, offsetX, offsetY, drawWidth, drawHeight);
+      context.drawImage(
+        frame,
+        (canvasWidth - drawWidth) / 2,
+        (canvasHeight - drawHeight) / 2,
+        drawWidth,
+        drawHeight,
+      );
     }
 
     function paint(progress: number) {
       const nextCanvas = canvasRef.current;
-      const context = nextCanvas?.getContext("2d", { alpha: false });
-      if (!nextCanvas || !context) {
+      if (!nextCanvas) {
+        return;
+      }
+
+      const context = nextCanvas.getContext("2d", { alpha: false });
+      if (!context) {
         return;
       }
 
@@ -71,54 +80,41 @@ export function ScrollSequence({ children }: ScrollSequenceProps) {
       const firstIndex = Math.max(0, Math.min(LANDING_FRAME_COUNT - 1, Math.floor(exact)));
       const secondIndex = Math.max(0, Math.min(LANDING_FRAME_COUNT - 1, firstIndex + 1));
       const blend = exact - firstIndex;
-      const first = framesRef.current[firstIndex] ?? lastDrawnRef.current;
-      const second = framesRef.current[secondIndex] ?? first;
+      const first = FRAME_CACHE[firstIndex] ?? lastDrawnRef.current;
+      const second = FRAME_CACHE[secondIndex] ?? first;
 
       if (!first) {
         return;
       }
 
       lastDrawnRef.current = second ?? first;
-      context.fillStyle = "#0f172a";
       context.globalAlpha = 1;
+      context.fillStyle = "#0f172a";
       context.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
       drawFrame(context, first, nextCanvas.width, nextCanvas.height, 1);
       if (second && second !== first && blend > 0.01) {
         drawFrame(context, second, nextCanvas.width, nextCanvas.height, blend);
       }
       context.globalAlpha = 1;
-
       trackRef.current?.style.setProperty("--sequence-progress", progress.toFixed(4));
     }
 
     function loadFrame(index: number) {
-      if (index < 0 || index >= LANDING_FRAME_COUNT) {
-        return;
-      }
-      if (framesRef.current[index] || loadingRef.current[index]) {
+      if (index < 0 || index >= LANDING_FRAME_COUNT || FRAME_CACHE[index]) {
         return;
       }
 
-      loadingRef.current[index] = true;
       const image = new Image();
       image.decoding = "async";
       image.src = landingFrameSrc(index + 1);
       image.onload = () => {
-        framesRef.current[index] = image;
-        loadingRef.current[index] = false;
-        const current = displayRef.current * (LANDING_FRAME_COUNT - 1);
-        if (Math.abs(current - index) < 2) {
-          paint(displayRef.current);
-        }
-      };
-      image.onerror = () => {
-        loadingRef.current[index] = false;
+        FRAME_CACHE[index] = image;
       };
     }
 
     function preloadAround(index: number) {
       loadFrame(index);
-      for (let offset = 1; offset <= 18; offset += 1) {
+      for (let offset = 1; offset <= 24; offset += 1) {
         loadFrame(index + offset);
         loadFrame(index - offset);
       }
@@ -134,47 +130,44 @@ export function ScrollSequence({ children }: ScrollSequenceProps) {
       return Math.min(1, Math.max(0, -track.getBoundingClientRect().top / maxScroll));
     }
 
-    function tick() {
-      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      const next = reduced
-        ? targetRef.current
-        : displayRef.current + (targetRef.current - displayRef.current) * SMOOTHING;
-      displayRef.current = next;
-      paint(next);
-
-      if (Math.abs(targetRef.current - displayRef.current) > 0.00035) {
-        rafRef.current = window.requestAnimationFrame(tick);
+    function loop() {
+      if (!alive) {
         return;
       }
 
-      displayRef.current = targetRef.current;
+      targetRef.current = progressFromScroll();
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      displayRef.current = reduced
+        ? targetRef.current
+        : displayRef.current + (targetRef.current - displayRef.current) * SMOOTHING;
+      preloadAround(Math.round(displayRef.current * (LANDING_FRAME_COUNT - 1)));
       paint(displayRef.current);
-      rafRef.current = 0;
+      rafRef.current = window.requestAnimationFrame(loop);
     }
 
-    function syncFromScroll() {
-      targetRef.current = progressFromScroll();
-      preloadAround(Math.round(targetRef.current * (LANDING_FRAME_COUNT - 1)));
+    function restart() {
+      resize();
       if (!rafRef.current) {
-        rafRef.current = window.requestAnimationFrame(tick);
+        rafRef.current = window.requestAnimationFrame(loop);
       }
     }
 
-    for (let index = 0; index < 20; index += 1) {
+    for (let index = 0; index < 24; index += 1) {
       loadFrame(index);
     }
 
-    resize();
-    syncFromScroll();
-    window.addEventListener("scroll", syncFromScroll, { passive: true });
+    restart();
     window.addEventListener("resize", resize);
+    window.addEventListener("pageshow", restart);
+    document.addEventListener("visibilitychange", restart);
 
     return () => {
-      window.removeEventListener("scroll", syncFromScroll);
+      alive = false;
       window.removeEventListener("resize", resize);
-      if (rafRef.current) {
-        window.cancelAnimationFrame(rafRef.current);
-      }
+      window.removeEventListener("pageshow", restart);
+      document.removeEventListener("visibilitychange", restart);
+      window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
     };
   }, []);
 

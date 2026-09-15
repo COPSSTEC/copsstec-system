@@ -1866,11 +1866,13 @@ textarea {
 }
 
 .landing-glass-card {
-  backdrop-filter: blur(18px) saturate(160%);
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 22px;
-  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.1);
+  backdrop-filter: blur(28px) saturate(180%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.42));
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 24px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 18px 50px rgba(15, 23, 42, 0.1);
   padding: 1.25rem 1.35rem;
 }
 
@@ -1913,9 +1915,28 @@ textarea {
   padding: 5rem 1.5rem;
 }
 
+.landing-about,
+.landing-services {
+  max-width: none;
+  overflow: hidden;
+  padding: 6rem 4vw;
+  position: relative;
+}
+
+.landing-about-glow {
+  background:
+    radial-gradient(circle at 12% 20%, rgba(96, 165, 250, 0.28), transparent 28rem),
+    radial-gradient(circle at 88% 8%, rgba(165, 180, 252, 0.22), transparent 24rem),
+    radial-gradient(circle at 70% 80%, rgba(56, 189, 248, 0.16), transparent 22rem);
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
 .landing-section-head {
   margin: 0 auto 2.5rem;
   max-width: 760px;
+  position: relative;
   text-align: center;
 }
 
@@ -1926,80 +1947,122 @@ textarea {
 }
 
 .reveal-on-scroll {
+  filter: blur(18px);
   opacity: 0;
-  transform: translate3d(0, 32px, 0);
+  transform: translate3d(0, 56px, 0) scale(0.96);
   transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-from-left {
+  transform: translate3d(-48px, 24px, 0) scale(0.96);
+}
+
+.reveal-from-right {
+  transform: translate3d(48px, 24px, 0) scale(0.96);
 }
 
 .reveal-on-scroll.is-inview {
+  filter: blur(0);
   opacity: 1;
   transform: none;
 }
 
-.landing-panel,
-.landing-service-card,
-.landing-partner-card,
-.landing-glass-card {
-  transition: transform 0.45s ease, box-shadow 0.45s ease;
+.liquid-glass {
+  backdrop-filter: blur(42px) saturate(210%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.22)),
+    linear-gradient(135deg, rgba(191, 219, 254, 0.22), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 32px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -40px 80px rgba(255, 255, 255, 0.12),
+    0 24px 70px rgba(15, 23, 42, 0.1);
+  isolation: isolate;
+  overflow: hidden;
+  position: relative;
 }
 
-.landing-panel:hover,
-.landing-service-card:hover,
-.landing-partner-card:hover {
-  transform: translateY(-6px);
+.liquid-glass::before {
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.7), transparent 46%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
 }
 
-.landing-service-card:hover {
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+.landing-about-bento {
+  display: grid;
+  gap: 1.1rem;
+  grid-template-columns: 1.15fr 0.85fr;
+  margin: 0 auto;
+  max-width: 1180px;
+  position: relative;
+}
+
+.about-bento-mission {
+  grid-row: span 2;
+  height: 100%;
+}
+
+.landing-about-bento > .reveal-on-scroll,
+.landing-about-bento .liquid-glass {
+  height: 100%;
+}
+
+.landing-about-card {
+  display: grid;
+  gap: 1rem;
+  height: 100%;
+  padding: 1.5rem;
+}
+
+.landing-about-card h3,
+.landing-about-card p,
+.landing-values-grid,
+.landing-tv {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-about-card h3 {
+  margin: 0;
 }
 
 .landing-section-head p,
-.landing-panel p {
+.landing-about-card p {
   color: var(--muted);
   line-height: 1.7;
 }
 
-.landing-about-grid {
-  display: grid;
-  gap: 1.25rem;
-  grid-template-columns: 1fr 1fr;
-}
-
-.landing-panel {
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  overflow: hidden;
-  padding: 1.5rem;
-}
-
-.landing-panel img,
+.landing-about-card img,
 .landing-tv img,
 .landing-values-grid img,
 .landing-partner-logo img {
-  border-radius: 16px;
+  border-radius: 20px;
   display: block;
   object-fit: cover;
+  position: relative;
   width: 100%;
+  z-index: 1;
 }
 
-.landing-panel img,
+.landing-about-card img,
 .landing-tv img {
-  margin-top: 1rem;
   max-height: 280px;
 }
 
 .landing-values-grid {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.55rem;
   grid-template-columns: 1fr 1fr;
-  margin-top: 1rem;
 }
 
 .landing-values-grid img {
-  height: 120px;
+  height: 108px;
 }
 
 .landing-tv {
@@ -2008,7 +2071,9 @@ textarea {
 }
 
 .landing-tv span {
-  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(18px) saturate(180%);
+  background: rgba(15, 23, 42, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 999px;
   color: white;
   font-weight: 800;
@@ -2017,6 +2082,7 @@ textarea {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
+  z-index: 2;
 }
 
 .landing-kicker {
@@ -2039,9 +2105,14 @@ textarea {
   gap: 1.5rem;
 }
 
+.landing-services-list {
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
 .landing-service-card {
-  border-radius: 28px;
-  min-height: 420px;
+  border-radius: 36px;
+  min-height: 460px;
   overflow: hidden;
   position: relative;
 }
@@ -2054,32 +2125,38 @@ textarea {
   width: 100%;
 }
 
-.landing-service-overlay {
-  background: linear-gradient(90deg, rgba(8, 18, 40, 0.82), rgba(8, 18, 40, 0.35) 70%, transparent);
-  color: white;
+.landing-service-glass {
+  color: #0f172a;
   display: grid;
   gap: 0.7rem;
-  height: 100%;
-  max-width: 560px;
-  padding: 3rem 2.2rem;
+  left: 1.4rem;
+  max-width: 460px;
+  padding: 1.6rem 1.5rem;
   position: relative;
+  top: 1.4rem;
 }
 
-.landing-service-overlay h3 {
-  font-size: clamp(1.8rem, 4vw, 3rem);
+.landing-service-glass h3,
+.landing-service-glass p,
+.landing-service-glass span,
+.landing-service-glass ul,
+.landing-service-glass a {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-service-glass h3 {
+  font-size: clamp(1.7rem, 3.4vw, 2.7rem);
   margin: 0;
-  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-.landing-service-overlay p {
-  font-size: 1.05rem;
-  line-height: 1.6;
+.landing-service-glass p {
+  font-size: 1.02rem;
+  line-height: 1.55;
   margin: 0;
-  max-width: 28rem;
-  text-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
-.landing-service-overlay ul {
+.landing-service-glass ul {
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
@@ -2088,11 +2165,11 @@ textarea {
   padding: 0;
 }
 
-.landing-service-overlay li {
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+.landing-service-glass li {
+  background: rgba(255, 255, 255, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
   padding: 0.35rem 0.7rem;
 }
@@ -2217,14 +2294,19 @@ textarea {
     max-width: none;
   }
 
-  .landing-about-grid,
+  .landing-about-bento,
   .landing-partner-card {
     grid-template-columns: 1fr;
   }
 
-  .landing-service-overlay {
-    max-width: none;
-    padding: 2rem 1.25rem;
+  .about-bento-mission {
+    grid-row: auto;
+  }
+
+  .landing-service-glass {
+    left: 1rem;
+    max-width: calc(100% - 2rem);
+    top: 1rem;
   }
 
   .landing-cta-title {
@@ -2243,7 +2325,11 @@ textarea {
     transform: none;
   }
 
-  .reveal-on-scroll {
+  .reveal-on-scroll,
+  .reveal-from-left,
+  .reveal-from-right {
+    filter: none;
     opacity: 1;
+    transform: none;
   }
 }
