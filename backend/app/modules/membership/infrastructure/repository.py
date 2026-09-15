@@ -238,10 +238,21 @@ class SqlAlchemyMembershipRepository:
                     mp.status AS payment_status,
                     EXISTS(
                         SELECT 1 FROM membership_invoices mi WHERE mi.user_id = u.id
-                    ) AS has_invoice
+                    ) AS has_invoice,
+                    ms.coverage_until,
+                    COALESCE(ms.credit_balance, 0) AS credit_balance,
+                    (
+                        SELECT pay.status FROM payments pay
+                        WHERE pay.user_id = u.id
+                          AND lower(pay.type) IN ('membresía', 'membresia')
+                          AND pay.status IN ('pending_payment', 'pending_review')
+                        ORDER BY pay.id DESC
+                        LIMIT 1
+                    ) AS open_payment_status
                 FROM users u
                 LEFT JOIN profiles p ON p.user_id = u.id
                 LEFT JOIN membership_payments mp ON mp.user_id = u.id
+                LEFT JOIN member_subscriptions ms ON ms.user_id = u.id
                 WHERE u.id = :user_id
                 LIMIT 1
                 """,
@@ -268,6 +279,11 @@ class SqlAlchemyMembershipRepository:
             names=row["names"],
             lastname=row["lastname"],
             identifier=row["identifier"],
+            must_pay_subscription=False,
+            coverage_until=row["coverage_until"],
+            credit_balance=Decimal(str(row["credit_balance"] or 0)),
+            days_overdue=0,
+            open_payment_status=row["open_payment_status"],
         )
 
     def get_payment(self, user_id: int) -> MembershipPayment | None:

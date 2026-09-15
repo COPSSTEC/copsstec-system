@@ -1,4 +1,7 @@
 from secrets import token_urlsafe
+from dataclasses import replace
+from datetime import date
+from decimal import Decimal
 
 from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password
@@ -9,12 +12,16 @@ from app.modules.membership.application.ports import (
     MailboxPort,
     MembershipFileStorage,
     MembershipRepository,
+    RecordAffiliationPaymentPort,
 )
 from app.modules.membership.domain.corporate_email import is_corporate_email, suggest_corporate_email
 from app.modules.membership.domain.entities import (
     BLOOD_TYPES,
     ENABLED_STATE_ID,
     GATE_NONE,
+    GATE_PAYMENT,
+    GATE_PENDING_APPROVAL,
+    GATE_SUBSCRIPTION_DUE,
     GENDERS,
     PAYMENT_APPROVED,
     PAYMENT_REVIEW,
@@ -32,6 +39,7 @@ from app.modules.membership.domain.exceptions import (
     MembershipNotFoundError,
     MembershipValidationError,
 )
+from app.modules.payments.domain.subscription import apply_subscription_gate, days_overdue
 
 
 def _validate_registration(data: MembershipRegistrationData) -> None:
@@ -128,7 +136,8 @@ class GetMembershipStatusUseCase:
     def __init__(self, repository: MembershipRepository) -> None:
         self.repository = repository
 
-    def execute(self, user_id: int, roles: list[str]) -> MembershipStatus:
+    def execute(self, user_id: int, roles: list[str], today: date | None = None) -> MembershipStatus:
+        today = today or date.today()
         policy = resolve_access_policy(roles)
         status = self.repository.get_status(user_id)
         if status is None:
@@ -145,24 +154,40 @@ class GetMembershipStatusUseCase:
                 names="",
                 lastname="",
                 identifier="",
+                must_pay_subscription=False,
+                coverage_until=None,
+                credit_balance=Decimal("0.00"),
+                days_overdue=0,
+                open_payment_status=None,
             )
 
+        overdue = days_overdue(status.coverage_until, today)
         if policy.access_level != "member":
-            return MembershipStatus(
-                user_id=status.user_id,
-                state_id=status.state_id,
-                personal_email=status.personal_email,
-                login_email=status.login_email,
-                payment_status=status.payment_status,
+            return replace(
+                status,
                 gate=GATE_NONE,
                 must_complete_payment=False,
                 must_wait_approval=False,
-                has_invoice=status.has_invoice,
-                names=status.names,
-                lastname=status.lastname,
-                identifier=status.identifier,
+                must_pay_subscription=False,
+                days_overdue=overdue,
             )
-        return status
+
+        gate = status.gate
+        if gate == GATE_NONE:
+            gate = apply_subscription_gate(
+                GATE_NONE,
+                status.coverage_until,
+                status.credit_balance,
+                today,
+            )
+        return replace(
+            status,
+            gate=gate,
+            must_complete_payment=gate == GATE_PAYMENT,
+            must_wait_approval=gate == GATE_PENDING_APPROVAL,
+            must_pay_subscription=gate == GATE_SUBSCRIPTION_DUE,
+            days_overdue=overdue,
+        )
 
 
 class GetPaymentInfoUseCase:
@@ -270,12 +295,14 @@ class ApproveMembershipUseCase:
         email_sender: EmailPort,
         invoices: InvoiceGenerator,
         storage: MembershipFileStorage,
+        affiliation_payment: RecordAffiliationPaymentPort | None = None,
     ) -> None:
         self.repository = repository
         self.mailbox = mailbox
         self.email_sender = email_sender
         self.invoices = invoices
         self.storage = storage
+        self.affiliation_payment = affiliation_payment
 
     def execute(self, user_id: int, email_corp: str, reviewed_by: int) -> RegisteredMember:
         settings = get_settings()
@@ -320,6 +347,13 @@ class ApproveMembershipUseCase:
             invoice_number=invoice_number,
             invoice_pdf_path=pdf_path,
         )
+
+        if self.affiliation_payment is not None:
+            self.affiliation_payment.record_affiliation_payment(
+                user_id=user_id,
+                amount=payment.amount,
+                payment_date=date.today(),
+            )
 
         personal = str(preview["personal_email"])
         self.email_sender.send(

@@ -14,6 +14,7 @@ interface MemberActionsMenuProps {
   onDelete: (member: Member) => void;
   onToggleState: (member: Member) => void;
   onApprove: (member: Member) => void;
+  onPayments: (member: Member) => void;
 }
 
 function placeDropdown(trigger: HTMLElement, dropdown: HTMLElement) {
@@ -44,6 +45,7 @@ export function MemberActionsMenu({
   onDelete,
   onToggleState,
   onApprove,
+  onPayments,
 }: MemberActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -111,6 +113,9 @@ export function MemberActionsMenu({
           <div className="actions-dropdown" ref={dropdownRef}>
             <button onClick={() => run(onEdit)} type="button">
               Editar
+            </button>
+            <button onClick={() => run(onPayments)} type="button">
+              Pagos
             </button>
             <button onClick={() => run(onDownload)} type="button">
               Descargar

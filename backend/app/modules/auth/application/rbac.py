@@ -20,6 +20,7 @@ NAVIGATION_BY_ACCESS: dict[str, list[dict[str, str]]] = {
     "member": [
         {"label": "Dashboard", "href": "/dashboard"},
         {"label": "Mis cursos", "href": "/mi-espacio/cursos"},
+        {"label": "Mis pagos", "href": "/mi-espacio/pagos"},
         {"label": "Mi espacio", "href": "/mi-espacio"},
         {"label": "Mi perfil", "href": "/profile"},
     ],
@@ -29,6 +30,7 @@ NAVIGATION_BY_ACCESS: dict[str, list[dict[str, str]]] = {
     "admin": [
         {"label": "Dashboard", "href": "/dashboard"},
         {"label": "Miembros", "href": "/admin/miembros"},
+        {"label": "Pagos", "href": "/admin/pagos"},
         {"label": "Cursos", "href": "/admin/cursos"},
         {"label": "Blogs", "href": "/admin/blogs"},
     ],

@@ -11,6 +11,7 @@ from app.modules.courses.presentation.api.router import router as courses_router
 from app.modules.members.presentation.api.router import router as members_router
 from app.modules.membership.presentation.api.router import router as membership_router
 from app.modules.partners.presentation.api.router import router as partners_router
+from app.modules.payments.presentation.api.router import router as payments_router
 
 settings = get_settings()
 
@@ -33,6 +34,7 @@ app.include_router(courses_router)
 app.include_router(members_router)
 app.include_router(membership_router)
 app.include_router(partners_router)
+app.include_router(payments_router)
 
 member_media_dir = Path("storage/members")
 member_media_dir.mkdir(parents=True, exist_ok=True)
@@ -56,6 +58,14 @@ app.mount(
     "/media/blogs",
     StaticFiles(directory=str(blog_media_dir)),
     name="blog-media",
+)
+
+payments_media_dir = Path("storage/payments")
+payments_media_dir.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/payments",
+    StaticFiles(directory=str(payments_media_dir)),
+    name="payments-media",
 )
 
 

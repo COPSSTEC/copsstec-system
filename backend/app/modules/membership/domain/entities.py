@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 
@@ -15,6 +15,7 @@ PAYMENT_APPROVED = "approved"
 
 GATE_PAYMENT = "payment"
 GATE_PENDING_APPROVAL = "pending_approval"
+GATE_SUBSCRIPTION_DUE = "subscription_due"
 GATE_NONE = "none"
 
 BLOOD_TYPES = (
@@ -109,6 +110,11 @@ class MembershipStatus:
     names: str
     lastname: str
     identifier: str
+    must_pay_subscription: bool = False
+    coverage_until: date | None = None
+    credit_balance: Decimal = Decimal("0.00")
+    days_overdue: int = 0
+    open_payment_status: str | None = None
 
 
 @dataclass(frozen=True)

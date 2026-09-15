@@ -21,6 +21,9 @@ export function AdminAccessPage() {
           <Link className="secondary-button button-link" href="/admin/cursos">
             Ir a Cursos
           </Link>
+          <Link className="secondary-button button-link" href="/admin/pagos">
+            Ir a Pagos
+          </Link>
         </div>
       </section>
     </RoleGate>

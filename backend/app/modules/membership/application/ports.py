@@ -1,3 +1,5 @@
+from datetime import date
+from decimal import Decimal
 from typing import Protocol
 
 from app.modules.membership.domain.entities import (
@@ -7,6 +9,11 @@ from app.modules.membership.domain.entities import (
     MembershipStatus,
     RegisteredMember,
 )
+
+
+class RecordAffiliationPaymentPort(Protocol):
+    def record_affiliation_payment(self, user_id: int, amount: Decimal, payment_date: date) -> None:
+        ...
 
 
 class MembershipRepository(Protocol):

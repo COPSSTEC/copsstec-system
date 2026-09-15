@@ -11,7 +11,7 @@ export const BLOOD_TYPES = [
 
 export const GENDERS = ["Masculino", "Femenino"] as const;
 
-export type MembershipGate = "payment" | "pending_approval" | "none";
+export type MembershipGate = "payment" | "pending_approval" | "subscription_due" | "none";
 
 export interface MembershipStatus {
   must_complete_payment: boolean;
@@ -25,6 +25,11 @@ export interface MembershipStatus {
   names: string;
   lastname: string;
   identifier: string;
+  must_pay_subscription?: boolean;
+  coverage_until?: string | null;
+  credit_balance?: string | null;
+  days_overdue?: number | null;
+  open_payment_status?: string | null;
 }
 
 export interface PaymentInfo {
@@ -120,6 +125,9 @@ export function membershipRedirect(gate: MembershipGate): string {
   }
   if (gate === "pending_approval") {
     return "/afiliacion/en-revision";
+  }
+  if (gate === "subscription_due") {
+    return "/suscripcion/pendiente";
   }
   return "/dashboard";
 }

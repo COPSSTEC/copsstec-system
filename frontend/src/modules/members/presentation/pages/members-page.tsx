@@ -28,6 +28,7 @@ import { MemberStatusBadge } from "@/modules/members/presentation/components/mem
 import { ApproveMemberModal } from "@/modules/members/presentation/modals/approve-member-modal";
 import { ConfirmActionModal } from "@/modules/members/presentation/modals/confirm-action-modal";
 import { MemberFormModal } from "@/modules/members/presentation/modals/member-form-modal";
+import { MemberPaymentsModal } from "@/modules/payments";
 import { DataTable, type DataTableColumn } from "@/shared/components/data-table";
 import { RoleGate } from "@/shared/components/role-gate";
 import { UserAvatar } from "@/shared/components/user-avatar";
@@ -96,6 +97,7 @@ export function MembersPage() {
     member: Member;
   } | null>(null);
   const [approvingMember, setApprovingMember] = useState<Member | null>(null);
+  const [paymentsMember, setPaymentsMember] = useState<Member | null>(null);
 
   const loadMembers = useCallback(async () => {
     if (!token) {
@@ -347,6 +349,7 @@ export function MembersPage() {
             onDownloadCertificate={(item) => void handleDownload(item, "certificate")}
             onEdit={openEdit}
             onApprove={(item) => setApprovingMember(item)}
+            onPayments={(item) => setPaymentsMember(item)}
             onResendCredentials={(item) => setConfirm({ type: "credentials", member: item })}
             onToggleState={(item) =>
               setConfirm({
@@ -477,6 +480,14 @@ export function MembersPage() {
             void loadMembers();
           }}
           onClose={() => setApprovingMember(null)}
+        />
+      ) : null}
+
+      {paymentsMember ? (
+        <MemberPaymentsModal
+          member={paymentsMember}
+          onClose={() => setPaymentsMember(null)}
+          open
         />
       ) : null}
 

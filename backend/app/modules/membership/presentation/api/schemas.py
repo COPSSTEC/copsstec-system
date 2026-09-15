@@ -23,9 +23,15 @@ class MembershipStatusResponse(BaseModel):
     names: str = ""
     lastname: str = ""
     identifier: str = ""
+    must_pay_subscription: bool = False
+    coverage_until: str | None = None
+    credit_balance: str = "0.00"
+    days_overdue: int = 0
+    open_payment_status: str | None = None
 
     @classmethod
     def from_domain(cls, status: MembershipStatus) -> "MembershipStatusResponse":
+        coverage = status.coverage_until.isoformat() if status.coverage_until else None
         return cls(
             must_complete_payment=status.must_complete_payment,
             must_wait_approval=status.must_wait_approval,
@@ -38,6 +44,11 @@ class MembershipStatusResponse(BaseModel):
             names=status.names,
             lastname=status.lastname,
             identifier=status.identifier,
+            must_pay_subscription=status.must_pay_subscription,
+            coverage_until=coverage,
+            credit_balance=f"{status.credit_balance.quantize(Decimal('0.01')):.2f}",
+            days_overdue=status.days_overdue,
+            open_payment_status=status.open_payment_status,
         )
 
 

@@ -18,6 +18,7 @@ from app.modules.membership.infrastructure.files import LocalMembershipFileStora
 from app.modules.membership.infrastructure.invoices import MembershipInvoicePdfGenerator
 from app.modules.membership.infrastructure.mailbox import MailInABoxMailbox
 from app.modules.membership.infrastructure.repository import SqlAlchemyMembershipRepository
+from app.modules.payments.infrastructure.repository import SqlAlchemyPaymentsRepository
 
 
 def get_membership_repository(
@@ -71,6 +72,7 @@ def get_approval_preview_use_case(
 def get_approve_membership_use_case(
     repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
     storage: Annotated[LocalMembershipFileStorage, Depends(get_membership_storage)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> ApproveMembershipUseCase:
     return ApproveMembershipUseCase(
         repository=repository,
@@ -78,4 +80,5 @@ def get_approve_membership_use_case(
         email_sender=SmtpOrLogEmailSender(),
         invoices=MembershipInvoicePdfGenerator(),
         storage=storage,
+        affiliation_payment=SqlAlchemyPaymentsRepository(session),
     )
