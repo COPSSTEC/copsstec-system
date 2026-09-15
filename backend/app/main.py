@@ -9,6 +9,7 @@ from app.modules.auth.presentation.api.router import router as auth_router
 from app.modules.courses.presentation.api.router import router as courses_router
 from app.modules.members.presentation.api.router import router as members_router
 from app.modules.membership.presentation.api.router import router as membership_router
+from app.modules.partners.presentation.api.router import router as partners_router
 
 settings = get_settings()
 
@@ -29,6 +30,7 @@ app.include_router(auth_router)
 app.include_router(courses_router)
 app.include_router(members_router)
 app.include_router(membership_router)
+app.include_router(partners_router)
 
 member_media_dir = Path("storage/members")
 member_media_dir.mkdir(parents=True, exist_ok=True)

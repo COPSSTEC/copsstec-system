@@ -1,0 +1,2 @@
+-- La tabla partners ya existe en la base COPSSTEC.
+-- Columnas usadas por la landing: name_enterprise, service, about, image, link, state_id, deleted_at.

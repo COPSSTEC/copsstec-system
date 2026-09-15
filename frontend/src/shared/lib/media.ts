@@ -8,7 +8,8 @@ export function resolveMediaSrc(path: string | null | undefined): string | null 
     path.startsWith("https://") ||
     path.startsWith("data:") ||
     path.startsWith("/media/brand/") ||
-    path.startsWith("/media/login/")
+    path.startsWith("/media/login/") ||
+    path.startsWith("/media/landing/")
   ) {
     return path;
   }
