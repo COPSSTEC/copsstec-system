@@ -6,7 +6,6 @@ import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import {
   ENABLED_STATE_ID,
   EMPTY_MEMBER_FORM,
-  memberPhotoSrc,
   splitCsv,
   type Member,
   type MemberColumn,
@@ -29,8 +28,9 @@ import { MemberStatusBadge } from "@/modules/members/presentation/components/mem
 import { ApproveMemberModal } from "@/modules/members/presentation/modals/approve-member-modal";
 import { ConfirmActionModal } from "@/modules/members/presentation/modals/confirm-action-modal";
 import { MemberFormModal } from "@/modules/members/presentation/modals/member-form-modal";
-import { RoleGate } from "@/shared/components/role-gate";
 import { DataTable, type DataTableColumn } from "@/shared/components/data-table";
+import { RoleGate } from "@/shared/components/role-gate";
+import { UserAvatar } from "@/shared/components/user-avatar";
 
 const COLUMNS_STORAGE_KEY = "copsstec.members.visible_columns";
 
@@ -68,17 +68,6 @@ function memberToForm(member: Member): MemberWriteInput {
     fourth_title: member.fourth_title ?? "",
     codigo_senescyt_cuarto: member.codigo_senescyt_cuarto ?? "",
   };
-}
-
-function initials(member: Member): string {
-  const source = `${member.names} ${member.lastname}`.trim() || member.name;
-  return source
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }
 
 export function MembersPage() {
@@ -280,11 +269,12 @@ export function MembersPage() {
     const renderers: Record<string, (member: Member) => ReactNode> = {
       member: (member) => (
         <div className="member-cell">
-          {memberPhotoSrc(member.foto_id) ? (
-            <img alt={member.name} className="member-avatar" src={memberPhotoSrc(member.foto_id) ?? ""} />
-          ) : (
-            <span className="member-avatar member-avatar-fallback">{initials(member)}</span>
-          )}
+          <UserAvatar
+            className="member-avatar"
+            fotoId={member.foto_id}
+            name={`${member.names} ${member.lastname}`.trim() || member.name}
+            size="sm"
+          />
           <strong>
             {member.names} {member.lastname}
           </strong>

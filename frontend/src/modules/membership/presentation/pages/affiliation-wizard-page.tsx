@@ -16,6 +16,7 @@ import {
 import { registerAffiliation } from "@/modules/membership/infrastructure/membership-api";
 import { storeToken } from "@/modules/auth/infrastructure/auth-storage";
 import { AppLogo } from "@/shared/components/app-logo";
+import { PublicFooter } from "@/shared/components/public-footer";
 
 const STEPS = [
   { id: 1, label: "Datos Personales" },
@@ -379,6 +380,7 @@ export function AffiliationWizardPage() {
           </div>
         </div>
       ) : null}
+      <PublicFooter />
     </main>
   );
 }

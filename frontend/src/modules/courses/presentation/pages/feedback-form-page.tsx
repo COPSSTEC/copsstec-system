@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { getFeedbackContext, submitFeedback } from "@/modules/courses/infrastructure/courses-api";
 import { AppLogo } from "@/shared/components/app-logo";
+import { PublicFooter } from "@/shared/components/public-footer";
 
 interface FeedbackFormPageProps {
   token: string;
@@ -102,6 +103,7 @@ export function FeedbackFormPage({ token }: FeedbackFormPageProps) {
           </form>
         ) : null}
       </section>
+      <PublicFooter />
     </main>
   );
 }

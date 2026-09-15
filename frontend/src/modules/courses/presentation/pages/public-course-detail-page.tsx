@@ -7,6 +7,7 @@ import type { Course } from "@/modules/courses/domain/types";
 import { getPublicCourse } from "@/modules/courses/infrastructure/courses-api";
 import { GuestInscriptionForm } from "@/modules/courses/presentation/forms/guest-inscription-form";
 import { AppLogo } from "@/shared/components/app-logo";
+import { PublicFooter } from "@/shared/components/public-footer";
 
 interface PublicCourseDetailPageProps {
   courseId: number;
@@ -92,6 +93,7 @@ export function PublicCourseDetailPage({ courseId }: PublicCourseDetailPageProps
           <GuestInscriptionForm course={course} />
         </div>
       ) : null}
+      <PublicFooter />
     </main>
   );
 }

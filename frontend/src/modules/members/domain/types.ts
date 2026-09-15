@@ -1,3 +1,5 @@
+import { resolveMediaSrc } from "@/shared/lib/media";
+
 export interface MemberColumn {
   id: string;
   label: string;
@@ -146,16 +148,7 @@ export function splitCsv(value: string | null | undefined): string[] {
 }
 
 export function memberPhotoSrc(fotoId: string): string | null {
-  if (!fotoId) {
-    return null;
-  }
-
-  if (fotoId.startsWith("http://") || fotoId.startsWith("https://")) {
-    return fotoId;
-  }
-
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-  return `${apiUrl}${fotoId.startsWith("/") ? fotoId : `/${fotoId}`}`;
+  return resolveMediaSrc(fotoId);
 }
 
 export const ENABLED_STATE_ID = 1;

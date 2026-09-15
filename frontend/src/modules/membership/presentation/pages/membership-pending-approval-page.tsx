@@ -7,6 +7,7 @@ import { clearStoredToken, getStoredToken } from "@/modules/auth/infrastructure/
 import { membershipRedirect } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 import { AppLogo } from "@/shared/components/app-logo";
+import { PublicFooter } from "@/shared/components/public-footer";
 
 export function MembershipPendingApprovalPage() {
   const router = useRouter();
@@ -68,6 +69,7 @@ export function MembershipPendingApprovalPage() {
           que inicies sesión volverás a esta pantalla.
         </p>
       </section>
+      <PublicFooter />
     </main>
   );
 }

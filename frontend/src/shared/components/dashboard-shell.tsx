@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import type { AccessPolicy, User } from "@/modules/auth/domain/types";
@@ -10,9 +10,10 @@ import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipRedirect } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 import { AppHeader } from "@/shared/components/app-header";
+import { AppSidebar } from "@/shared/components/app-sidebar";
 
 interface DashboardShellProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function DashboardShell({ children }: DashboardShellProps) {
@@ -20,6 +21,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const [user, setUser] = useState<User | null>(null);
   const [accessPolicy, setAccessPolicy] = useState<AccessPolicy | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -68,9 +70,17 @@ export function DashboardShell({ children }: DashboardShellProps) {
   }
 
   return (
-    <div className="shell">
-      <AppHeader navigation={accessPolicy?.navigation ?? []} user={user} />
-      <main className="main">{children}</main>
+    <div className={`app-shell ${isSidebarOpen ? "is-sidebar-open" : ""}`}>
+      <AppSidebar
+        accessLevel={user?.access_level ?? "restricted"}
+        isOpen={isSidebarOpen}
+        navigation={accessPolicy?.navigation ?? []}
+        onClose={() => setIsSidebarOpen(false)}
+      />
+      <div className="app-shell-main">
+        <AppHeader onMenuToggle={() => setIsSidebarOpen((open) => !open)} user={user} />
+        <main className="main">{children}</main>
+      </div>
     </div>
   );
 }

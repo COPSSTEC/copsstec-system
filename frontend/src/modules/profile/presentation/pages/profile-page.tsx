@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { User } from "@/modules/auth";
 import { getCurrentUser } from "@/modules/auth/infrastructure/auth-api";
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { UserAvatar } from "@/shared/components/user-avatar";
 
 function ProfileItem({ label, value }: { label: string; value: string | number | boolean | null }) {
   return (
@@ -47,20 +48,30 @@ export function ProfilePage() {
 
   if (user.profile === null) {
     return (
-      <section className="card">
-        <h1>Perfil pendiente</h1>
-        <p className="muted">
-          Tu usuario existe, pero todavía no tiene un perfil asociado.
-        </p>
+      <section className="card profile-heading">
+        <UserAvatar name={user.name} size="lg" />
+        <div>
+          <h1>Perfil pendiente</h1>
+          <p className="muted">
+            Tu usuario existe, pero todavía no tiene un perfil asociado.
+          </p>
+        </div>
       </section>
     );
   }
 
   return (
     <>
-      <section className="page-heading">
-        <h1>Mi perfil</h1>
-        <p>Información cargada desde la tabla profiles.</p>
+      <section className="page-heading profile-heading">
+        <UserAvatar
+          fotoId={user.profile.foto_id}
+          name={`${user.profile.names} ${user.profile.lastname}`}
+          size="lg"
+        />
+        <div>
+          <h1>Mi perfil</h1>
+          <p>Información cargada desde la tabla profiles.</p>
+        </div>
       </section>
 
       <section className="card">

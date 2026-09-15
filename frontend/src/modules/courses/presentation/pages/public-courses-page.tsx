@@ -7,6 +7,7 @@ import type { Course } from "@/modules/courses/domain/types";
 import { listPublicCourses } from "@/modules/courses/infrastructure/courses-api";
 import { CourseCard } from "@/modules/courses/presentation/components/course-card";
 import { AppLogo } from "@/shared/components/app-logo";
+import { PublicFooter } from "@/shared/components/public-footer";
 
 export function PublicCoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -64,6 +65,7 @@ export function PublicCoursesPage() {
           <CourseCard course={course} key={course.id} />
         ))}
       </section>
+      <PublicFooter />
     </main>
   );
 }

@@ -12,6 +12,7 @@ import {
   uploadPaymentVoucher,
 } from "@/modules/membership/infrastructure/membership-api";
 import { AppLogo } from "@/shared/components/app-logo";
+import { PublicFooter } from "@/shared/components/public-footer";
 import type { PaymentInfo } from "@/modules/membership/domain/types";
 
 export function MembershipPaymentPage() {
@@ -154,6 +155,7 @@ export function MembershipPaymentPage() {
           <Link href="/">Volver al inicio</Link>
         </p>
       </section>
+      <PublicFooter />
     </main>
   );
 }

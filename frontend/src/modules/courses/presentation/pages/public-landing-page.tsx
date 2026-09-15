@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AppLogo } from "@/shared/components/app-logo";
+import { PublicFooter } from "@/shared/components/public-footer";
 
 export function PublicLandingPage() {
   return (
@@ -39,6 +40,7 @@ export function PublicLandingPage() {
           <span>Inscripciones abiertas para miembros e invitados externos.</span>
         </aside>
       </section>
+      <PublicFooter />
     </main>
   );
 }
