@@ -1757,8 +1757,8 @@ textarea {
 }
 
 .landing-page {
-  background: #f7f8fb;
-  color: var(--foreground);
+  background: #ffffff;
+  color: #1d1d1f;
 }
 
 .landing-topbar {
@@ -1908,42 +1908,237 @@ textarea {
 
 .landing-about,
 .landing-services,
-.landing-partners,
-.landing-cta {
-  margin: 0 auto;
-  max-width: 1180px;
-  padding: 5rem 1.5rem;
-}
-
-.landing-about,
-.landing-services {
+.landing-partners {
+  background: #ffffff;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Helvetica, Arial, sans-serif;
+  margin: 0;
   max-width: none;
   overflow: hidden;
-  padding: 6rem 4vw;
+  padding: 0;
   position: relative;
 }
 
-.landing-about-glow {
-  background:
-    radial-gradient(circle at 12% 20%, rgba(96, 165, 250, 0.28), transparent 28rem),
-    radial-gradient(circle at 88% 8%, rgba(165, 180, 252, 0.22), transparent 24rem),
-    radial-gradient(circle at 70% 80%, rgba(56, 189, 248, 0.16), transparent 22rem);
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-}
-
-.landing-section-head {
-  margin: 0 auto 2.5rem;
-  max-width: 760px;
-  position: relative;
+.avp-statement {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin: 0 auto;
+  max-width: 920px;
+  min-height: 78vh;
+  padding: 12rem 1.5rem 10rem;
   text-align: center;
 }
 
-.landing-section-head h2 {
-  font-size: clamp(2rem, 5vw, 4.6rem);
-  letter-spacing: -0.04em;
-  margin: 0 0 1rem;
+.avp-statement-compact {
+  min-height: 0;
+  padding: 9rem 1.5rem 7rem;
+}
+
+.avp-statement p {
+  color: #1d1d1f;
+  font-size: clamp(1.7rem, 3.6vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.18;
+  margin: 0 0 2.4rem;
+}
+
+.avp-statement p:last-child {
+  margin-bottom: 0;
+}
+
+.avp-statement .avp-eyebrow {
+  color: #6e6e73;
+  font-size: clamp(1.05rem, 1.5vw, 1.25rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.85rem;
+}
+
+.avp-statement h2,
+.avp-stage-copy h2,
+.avp-stage-copy h3 {
+  font-size: clamp(2.6rem, 6.4vw, 5.4rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.avp-statement h2 {
+  color: #1d1d1f;
+}
+
+.avp-eyebrow {
+  color: rgba(255, 255, 255, 0.92);
+  display: block;
+  font-size: clamp(1rem, 1.4vw, 1.2rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.55rem;
+  text-transform: none;
+}
+
+.avp-eyebrow-dark {
+  color: #6e6e73;
+}
+
+.avp-module {
+  background: #ffffff;
+}
+
+.avp-stage {
+  background: #1d1d1f;
+  height: 100vh;
+  min-height: 640px;
+  overflow: hidden;
+  position: relative;
+}
+
+.avp-stage::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.38) 52%, rgba(0, 0, 0, 0.46));
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+}
+
+.avp-stage img,
+.avp-stage video {
+  display: block;
+  height: 100%;
+  inset: 0;
+  object-fit: cover;
+  position: absolute;
+  width: 100%;
+}
+
+.avp-stage-copy {
+  align-items: center;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  inset: 0;
+  justify-content: center;
+  padding: 6rem 1.5rem;
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+  z-index: 2;
+}
+
+.avp-stage-light {
+  align-items: center;
+  background: #f5f5f7;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 7rem 1.5rem 4.5rem;
+}
+
+.avp-stage-light::after {
+  content: none;
+}
+
+.avp-stage-copy-dark {
+  color: #1d1d1f;
+  inset: auto;
+  padding: 0 1.5rem 2.5rem;
+  position: relative;
+}
+
+.avp-partner-mark {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  max-width: 720px;
+  min-height: 280px;
+  padding: 1rem 1.5rem 3rem;
+  position: relative;
+  width: 100%;
+  z-index: 2;
+}
+
+.avp-partner-mark img {
+  height: auto;
+  inset: auto;
+  max-height: 240px;
+  max-width: min(100%, 520px);
+  object-fit: contain;
+  position: relative;
+  width: auto;
+}
+
+.avp-caption {
+  bottom: 1.4rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.78rem;
+  font-weight: 500;
+  position: absolute;
+  right: 1.6rem;
+  z-index: 3;
+}
+
+.avp-copy-band {
+  background: #ffffff;
+  padding: 8.5rem 1.5rem 9.5rem;
+  text-align: center;
+}
+
+.avp-copy-band p {
+  color: #6e6e73;
+  font-size: clamp(1.12rem, 2vw, 1.31rem);
+  font-weight: 400;
+  letter-spacing: -0.011em;
+  line-height: 1.47;
+  margin: 0 auto;
+  max-width: 680px;
+}
+
+.avp-link {
+  color: #0066cc;
+  display: inline-block;
+  font-size: clamp(1.12rem, 2vw, 1.31rem);
+  font-weight: 400;
+  margin-top: 1.05rem;
+}
+
+.avp-link:hover,
+.avp-caption:hover {
+  text-decoration: underline;
+}
+
+.avp-look {
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 0 0 5rem;
+}
+
+.avp-look img {
+  display: block;
+  height: min(38vh, 320px);
+  object-fit: cover;
+  width: 100%;
+}
+
+.avp-stage > .reveal-on-scroll {
+  align-items: center;
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  z-index: 2;
+}
+
+.avp-stage-light > .reveal-on-scroll {
+  inset: auto;
+  position: relative;
+  width: 100%;
 }
 
 .reveal-on-scroll {
@@ -1968,251 +2163,6 @@ textarea {
   filter: blur(0);
   opacity: 1;
   transform: none;
-}
-
-.liquid-glass {
-  backdrop-filter: blur(42px) saturate(210%);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0.22)),
-    linear-gradient(135deg, rgba(191, 219, 254, 0.22), rgba(255, 255, 255, 0.08));
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 32px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -40px 80px rgba(255, 255, 255, 0.12),
-    0 24px 70px rgba(15, 23, 42, 0.1);
-  isolation: isolate;
-  overflow: hidden;
-  position: relative;
-}
-
-.liquid-glass::before {
-  background: linear-gradient(125deg, rgba(255, 255, 255, 0.7), transparent 46%);
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-}
-
-.landing-about-bento {
-  display: grid;
-  gap: 1.1rem;
-  grid-template-columns: 1.15fr 0.85fr;
-  margin: 0 auto;
-  max-width: 1180px;
-  position: relative;
-}
-
-.about-bento-mission {
-  grid-row: span 2;
-  height: 100%;
-}
-
-.landing-about-bento > .reveal-on-scroll,
-.landing-about-bento .liquid-glass {
-  height: 100%;
-}
-
-.landing-about-card {
-  display: grid;
-  gap: 1rem;
-  height: 100%;
-  padding: 1.5rem;
-}
-
-.landing-about-card h3,
-.landing-about-card p,
-.landing-values-grid,
-.landing-tv {
-  position: relative;
-  z-index: 1;
-}
-
-.landing-about-card h3 {
-  margin: 0;
-}
-
-.landing-section-head p,
-.landing-about-card p {
-  color: var(--muted);
-  line-height: 1.7;
-}
-
-.landing-about-card img,
-.landing-tv img,
-.landing-values-grid img,
-.landing-partner-logo img {
-  border-radius: 20px;
-  display: block;
-  object-fit: cover;
-  position: relative;
-  width: 100%;
-  z-index: 1;
-}
-
-.landing-about-card img,
-.landing-tv img {
-  max-height: 280px;
-}
-
-.landing-values-grid {
-  display: grid;
-  gap: 0.55rem;
-  grid-template-columns: 1fr 1fr;
-}
-
-.landing-values-grid img {
-  height: 108px;
-}
-
-.landing-tv {
-  display: block;
-  position: relative;
-}
-
-.landing-tv span {
-  backdrop-filter: blur(18px) saturate(180%);
-  background: rgba(15, 23, 42, 0.42);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 999px;
-  color: white;
-  font-weight: 800;
-  left: 50%;
-  padding: 0.55rem 1rem;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-}
-
-.landing-kicker {
-  color: var(--primary);
-  display: inline-block;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.landing-section-head em {
-  color: var(--primary);
-  font-style: normal;
-}
-
-.landing-services-list,
-.landing-partners-list {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.landing-services-list {
-  margin: 0 auto;
-  max-width: 1180px;
-}
-
-.landing-service-card {
-  border-radius: 36px;
-  min-height: 460px;
-  overflow: hidden;
-  position: relative;
-}
-
-.landing-service-card video {
-  height: 100%;
-  inset: 0;
-  object-fit: cover;
-  position: absolute;
-  width: 100%;
-}
-
-.landing-service-glass {
-  color: #0f172a;
-  display: grid;
-  gap: 0.7rem;
-  left: 1.4rem;
-  max-width: 460px;
-  padding: 1.6rem 1.5rem;
-  position: relative;
-  top: 1.4rem;
-}
-
-.landing-service-glass h3,
-.landing-service-glass p,
-.landing-service-glass span,
-.landing-service-glass ul,
-.landing-service-glass a {
-  position: relative;
-  z-index: 1;
-}
-
-.landing-service-glass h3 {
-  font-size: clamp(1.7rem, 3.4vw, 2.7rem);
-  margin: 0;
-}
-
-.landing-service-glass p {
-  font-size: 1.02rem;
-  line-height: 1.55;
-  margin: 0;
-}
-
-.landing-service-glass ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.45rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.landing-service-glass li {
-  background: rgba(255, 255, 255, 0.38);
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: 999px;
-  font-size: 0.76rem;
-  font-weight: 800;
-  padding: 0.35rem 0.7rem;
-}
-
-.landing-partners {
-  max-width: none;
-  padding-inline: 0;
-}
-
-.landing-partners .landing-kicker {
-  display: block;
-  padding: 0 1.5rem 1rem;
-}
-
-.landing-partner-card {
-  align-items: center;
-  background: linear-gradient(90deg, #eef6ff 0%, #f4fbff 52%, #e8f3ff 100%);
-  display: grid;
-  gap: 2rem;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
-  min-height: 70vh;
-  padding: 4rem 6vw;
-}
-
-.landing-partner-card h3 {
-  font-size: clamp(2rem, 4vw, 3.4rem);
-  margin: 0.35rem 0 1rem;
-}
-
-.landing-partner-logo {
-  align-items: center;
-  background: white;
-  border-radius: 28px;
-  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
-  display: flex;
-  justify-content: center;
-  min-height: 260px;
-  padding: 2rem;
-}
-
-.landing-partner-logo img {
-  max-height: 180px;
-  object-fit: contain;
 }
 
 .landing-cta {
@@ -2268,17 +2218,30 @@ textarea {
   font-weight: 700;
 }
 
-.landing-footer {
-  margin: 0 auto;
-  max-width: 1180px;
-  padding: 1.5rem;
+.landing-page .landing-footer {
+  background: #f5f5f7;
+  border-top: 1px solid #d2d2d7;
+  color: #6e6e73;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 0.75rem;
+  margin: 0;
+  max-width: none;
+  padding: 2.25rem 8vw 3rem;
 }
 
 .landing-footer-contacts {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
-  font-weight: 700;
+  font-weight: 500;
+}
+
+.landing-page .landing-footer a {
+  color: #424245;
+}
+
+.landing-page .landing-footer a:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 900px) {
@@ -2294,19 +2257,45 @@ textarea {
     max-width: none;
   }
 
-  .landing-about-bento,
-  .landing-partner-card {
-    grid-template-columns: 1fr;
+  .avp-statement {
+    padding: 6.5rem 1.25rem 5rem;
   }
 
-  .about-bento-mission {
-    grid-row: auto;
+  .avp-statement-compact {
+    padding: 5.5rem 1.25rem 4rem;
   }
 
-  .landing-service-glass {
+  .avp-statement p {
+    font-size: clamp(1.35rem, 6vw, 1.85rem);
+    margin-bottom: 1.6rem;
+  }
+
+  .avp-stage {
+    height: 78vh;
+    min-height: 520px;
+  }
+
+  .avp-stage-copy {
+    padding: 4.5rem 1.15rem;
+  }
+
+  .avp-copy-band {
+    padding: 3.5rem 1.25rem 4.25rem;
+  }
+
+  .avp-look {
+    grid-template-columns: 1fr 1fr;
+    padding-bottom: 3rem;
+  }
+
+  .avp-look img {
+    height: 28vh;
+  }
+
+  .avp-caption {
+    bottom: 1rem;
     left: 1rem;
-    max-width: calc(100% - 2rem);
-    top: 1rem;
+    right: auto;
   }
 
   .landing-cta-title {
@@ -2316,9 +2305,7 @@ textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .reveal-on-scroll,
-  .landing-panel,
-  .landing-service-card,
-  .landing-partner-card,
+  .avp-module,
   .landing-glass-card,
   .landing-cta-title span {
     transition: none;

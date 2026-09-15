@@ -87,166 +87,223 @@ export function PublicLandingPage() {
       </ScrollSequence>
 
       <section className="landing-about" id="quienes-somos">
-        <div className="landing-about-glow" />
-        <RevealOnScroll>
-          <header className="landing-section-head">
-            <span className="landing-kicker">El colegio</span>
-            <h2>Quiénes somos</h2>
+        <div className="avp-statement">
+          <RevealOnScroll>
             <p>
-              Somos el Colegio de Profesionales de Seguridad y Salud en el Trabajo del Ecuador.
-              Representamos a los profesionales de SST, fomentamos la unidad y fortalecemos el
-              compañerismo entre nuestros miembros.
+              COPSSTEC reúne a los profesionales
+              <br />
+              de SST del Ecuador.
             </p>
-          </header>
-        </RevealOnScroll>
-
-        <div className="landing-about-bento">
-          <RevealOnScroll className="about-bento-mission" from="left">
-            <article className="liquid-glass landing-about-card">
-              <div>
-                <h3>Nuestra misión</h3>
-                <p>
-                  Impulsar el crecimiento profesional con capacitación, convenios, cursos,
-                  talleres, congresos y espacios de encuentro para quienes trabajan en SST.
-                </p>
-              </div>
-              <img
-                alt="Miembros de COPSSTEC con cascos y chalecos de seguridad"
-                src={LANDING_MEDIA.aboutTeam}
-              />
-            </article>
+            <p>
+              Capacitamos, representamos y fortalecemos
+              <br />
+              el compañerismo del gremio.
+            </p>
+            <p>El colegio que impulsa tu carrera está aquí.</p>
           </RevealOnScroll>
+        </div>
 
-          <RevealOnScroll className="about-bento-values" delay={90} from="right">
-            <article className="liquid-glass landing-about-card">
-              <h3>Valores</h3>
+        <article className="avp-module">
+          <div className="avp-stage">
+            <img alt="Miembros de COPSSTEC con cascos y chalecos de seguridad" src={LANDING_MEDIA.aboutTeam} />
+            <div className="avp-stage-copy">
+              <p className="avp-eyebrow">Misión</p>
+              <h2>
+                Impulsar el crecimiento
+                <br />
+                profesional.
+              </h2>
+            </div>
+          </div>
+          <div className="avp-copy-band">
+            <RevealOnScroll>
               <p>
-                Franqueza, honestidad y trabajo en equipo. Sumamos, colaboramos y construimos
-                lazos abiertos, multidisciplinares e integradores.
+                Impulsamos el desarrollo de quienes trabajan en SST con capacitación, convenios,
+                cursos, talleres, congresos y espacios de encuentro para el colectivo.
               </p>
-              <div className="landing-values-grid">
-                {LANDING_MEDIA.valuesGallery.map((src, index) => (
-                  <img alt={VALUE_ALTS[index] ?? "Profesionales de SST"} key={src} src={src} />
-                ))}
-              </div>
-            </article>
-          </RevealOnScroll>
+            </RevealOnScroll>
+          </div>
+        </article>
 
-          <RevealOnScroll className="about-bento-tv" delay={80} from="up">
-            <article className="liquid-glass landing-about-card">
-              <h3>COPSSTEC TV</h3>
-              <p>Contenido del gremio en nuestro canal de YouTube.</p>
+        <article className="avp-module">
+          <div className="avp-stage">
+            <img alt={VALUE_ALTS[0]} src={LANDING_MEDIA.valuesGallery[0]} />
+            <div className="avp-stage-copy">
+              <p className="avp-eyebrow">Valores</p>
+              <h2>
+                Franqueza, honestidad
+                <br />
+                y trabajo en equipo.
+              </h2>
+            </div>
+          </div>
+          <div className="avp-copy-band">
+            <RevealOnScroll>
+              <p>
+                Sumamos, colaboramos y construimos lazos abiertos, multidisciplinares e
+                integradores. El gremio crece cuando cada profesional avanza con los demás.
+              </p>
+            </RevealOnScroll>
+          </div>
+          <div className="avp-look">
+            {LANDING_MEDIA.valuesGallery.map((src, index) => (
+              <img alt={VALUE_ALTS[index] ?? "Profesionales de SST"} key={src} src={src} />
+            ))}
+          </div>
+        </article>
+
+        <article className="avp-module">
+          <div className="avp-stage">
+            <img alt="Profesionales de COPSSTEC en contenido audiovisual" src={LANDING_MEDIA.aboutTv} />
+            <div className="avp-stage-copy">
+              <p className="avp-eyebrow">COPSSTEC TV</p>
+              <h2>
+                El gremio,
+                <br />
+                también en pantalla.
+              </h2>
+            </div>
+            <a
+              className="avp-caption"
+              href={LANDING_MEDIA.youtubeChannel}
+              onClick={() => trackEvent("click", { element_name: "copsstec_tv", section: "about" })}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Ver canal ↗
+            </a>
+          </div>
+          <div className="avp-copy-band">
+            <RevealOnScroll>
+              <p>Contenido del colegio, voces del gremio y recursos para quienes trabajan en SST.</p>
               <a
-                className="landing-tv"
+                className="avp-link"
                 href={LANDING_MEDIA.youtubeChannel}
-                onClick={() => trackEvent("click", { element_name: "copsstec_tv", section: "about" })}
+                onClick={() => trackEvent("click", { element_name: "copsstec_tv_copy", section: "about" })}
                 rel="noreferrer"
                 target="_blank"
               >
-                <img alt="Profesionales de COPSSTEC en contenido audiovisual" src={LANDING_MEDIA.aboutTv} />
-                <span>Ver canal</span>
+                Ir a YouTube ↗
               </a>
-            </article>
-          </RevealOnScroll>
+            </RevealOnScroll>
+          </div>
+        </article>
 
-          <RevealOnScroll className="about-bento-vision" delay={140} from="right">
-            <article className="liquid-glass landing-about-card">
-              <h3>Visión</h3>
+        <article className="avp-module">
+          <div className="avp-stage">
+            <img alt="Visión global de COPSSTEC en seguridad y salud en el trabajo" src={LANDING_MEDIA.visionGlobe} />
+            <div className="avp-stage-copy">
+              <p className="avp-eyebrow">Visión</p>
+              <h2>
+                Un referente
+                <br />
+                en SST.
+              </h2>
+            </div>
+          </div>
+          <div className="avp-copy-band">
+            <RevealOnScroll>
               <p>
-                Ser un referente nacional e internacional en SST, usando la organización social
-                para alcanzar las metas del colectivo.
+                Ser un referente nacional e internacional en seguridad y salud en el trabajo,
+                usando la organización social para alcanzar las metas del colectivo.
               </p>
-              <img alt="Visión global de COPSSTEC en seguridad y salud en el trabajo" src={LANDING_MEDIA.visionGlobe} />
-            </article>
-          </RevealOnScroll>
-        </div>
+            </RevealOnScroll>
+          </div>
+        </article>
       </section>
 
       <section className="landing-services" id="servicios">
-        <RevealOnScroll>
-          <header className="landing-section-head">
-            <span className="landing-kicker">Nuestros servicios</span>
+        <div className="avp-statement avp-statement-compact">
+          <RevealOnScroll>
+            <p className="avp-eyebrow avp-eyebrow-dark">Nuestros servicios</p>
             <h2>
-              Soluciones que <em>transforman</em>
+              Soluciones que
+              <br />
+              transforman tu práctica.
             </h2>
-            <p>
-              Desde consultoría hasta herramientas digitales, cada servicio está pensado para
-              impulsar tu crecimiento profesional.
-            </p>
-          </header>
-        </RevealOnScroll>
-
-        <div className="landing-services-list">
-          {LANDING_SERVICES.map((service, index) => (
-            <RevealOnScroll delay={index * 80} from={index % 2 === 0 ? "left" : "right"} key={service.id}>
-              <article className="landing-service-card">
-                <video autoPlay loop muted playsInline src={service.video} />
-                <div className="liquid-glass landing-service-glass">
-                  <span>{service.kicker}</span>
-                  <h3>{service.title}</h3>
-                  <p>{service.description}</p>
-                  <ul>
-                    {service.chips.map((chip) => (
-                      <li key={chip}>{chip}</li>
-                    ))}
-                  </ul>
-                  <Link
-                    className="landing-button"
-                    href={service.href}
-                    onClick={() =>
-                      trackEvent("click", {
-                        element_name: `explorar_${service.id}`,
-                        section: "servicios",
-                        page_type: "landing",
-                      })
-                    }
-                  >
-                    {service.cta}
-                  </Link>
-                </div>
-              </article>
-            </RevealOnScroll>
-          ))}
+          </RevealOnScroll>
         </div>
+
+        {LANDING_SERVICES.map((service) => (
+          <article className="avp-module" key={service.id}>
+            <div className="avp-stage">
+              <video autoPlay loop muted playsInline src={service.video} />
+              <div className="avp-stage-copy">
+                <p className="avp-eyebrow">{service.kicker}</p>
+                <h3>{service.title}.</h3>
+              </div>
+            </div>
+            <div className="avp-copy-band">
+              <RevealOnScroll>
+                <p>{service.description}</p>
+                <Link
+                  className="avp-link"
+                  href={service.href}
+                  onClick={() =>
+                    trackEvent("click", {
+                      element_name: `explorar_${service.id}`,
+                      section: "servicios",
+                      page_type: "landing",
+                    })
+                  }
+                >
+                  {service.cta} ↗
+                </Link>
+              </RevealOnScroll>
+            </div>
+          </article>
+        ))}
       </section>
 
       <section className="landing-partners" id="aliados">
-        <RevealOnScroll>
-          <p className="landing-kicker">Alianzas estratégicas</p>
-        </RevealOnScroll>
-        <div className="landing-partners-list">
-          {partners.map((partner, index) => (
-            <RevealOnScroll delay={index * 80} key={partner.id}>
-              <article className="landing-partner-card">
-                <div>
-                  {partner.slogan ? <p className="landing-kicker">{partner.slogan}</p> : null}
-                  <h3>{partner.name}</h3>
-                  <p>{partner.description}</p>
-                  {partner.link ? (
-                    <a
-                      className="landing-text-link"
-                      href={partner.link}
-                      onClick={() =>
-                        trackEvent("click", {
-                          element_name: "visitar_aliado",
-                          section: "aliados",
-                          partner_name: partner.name,
-                        })
-                      }
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      Visitar sitio
-                    </a>
-                  ) : null}
-                </div>
-                <div className="landing-partner-logo">
-                  <img alt={`Logo de ${partner.name}`} src={partner.logo_url} />
-                </div>
-              </article>
-            </RevealOnScroll>
-          ))}
+        <div className="avp-statement avp-statement-compact">
+          <RevealOnScroll>
+            <p className="avp-eyebrow avp-eyebrow-dark">Alianzas estratégicas</p>
+            <h2>
+              Confianza que se
+              <br />
+              construye en red.
+            </h2>
+          </RevealOnScroll>
         </div>
+
+        {partners.map((partner) => (
+          <article className="avp-module" key={partner.id}>
+            <div className="avp-stage avp-stage-light">
+              <div className="avp-stage-copy avp-stage-copy-dark">
+                {partner.slogan ? (
+                  <p className="avp-eyebrow avp-eyebrow-dark">{partner.slogan.split(",")[0]}</p>
+                ) : null}
+                <h3>{partner.name.replace(/\.$/, "")}.</h3>
+              </div>
+              <div className="avp-partner-mark">
+                <img alt={`Logo de ${partner.name}`} src={partner.logo_url} />
+              </div>
+            </div>
+            <div className="avp-copy-band">
+              <RevealOnScroll>
+                <p>{partner.description}</p>
+                {partner.link ? (
+                  <a
+                    className="avp-link"
+                    href={partner.link}
+                    onClick={() =>
+                      trackEvent("click", {
+                        element_name: "visitar_aliado",
+                        section: "aliados",
+                        partner_name: partner.name,
+                      })
+                    }
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Visitar sitio ↗
+                  </a>
+                ) : null}
+              </RevealOnScroll>
+            </div>
+          </article>
+        ))}
       </section>
 
       <section className="landing-cta" id="afiliate">
