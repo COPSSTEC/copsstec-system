@@ -6,8 +6,8 @@ import Link from "next/link";
 import type { Course } from "@/modules/courses/domain/types";
 import { listPublicCourses } from "@/modules/courses/infrastructure/courses-api";
 import { CourseCard } from "@/modules/courses/presentation/components/course-card";
-import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
+import { PublicSiteHeader } from "@/shared/components/public-site-header";
 
 export function PublicCoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -30,14 +30,7 @@ export function PublicCoursesPage() {
 
   return (
     <main className="public-page">
-      <header className="public-header">
-        <AppLogo />
-        <nav className="nav" aria-label="Navegación pública">
-          <Link href="/">Inicio</Link>
-          <Link href="/mi-espacio/cursos">Mis cursos</Link>
-          <Link href="/login">Ingresar</Link>
-        </nav>
-      </header>
+      <PublicSiteHeader current="cursos" />
 
       <section className="page-heading">
         <div>

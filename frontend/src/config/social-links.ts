@@ -38,6 +38,7 @@ export type NavIconName =
   | "usersPlus"
   | "home"
   | "user"
+  | "newspaper"
   | SocialIconName;
 
 export function navIconForHref(href: string): NavIconName {
@@ -47,6 +48,10 @@ export function navIconForHref(href: string): NavIconName {
 
   if (href.includes("/cursos") || href.startsWith("/admin/cursos")) {
     return "certificate";
+  }
+
+  if (href.includes("/blogs") || href.startsWith("/admin/blogs")) {
+    return "newspaper";
   }
 
   if (href === "/mi-espacio") {

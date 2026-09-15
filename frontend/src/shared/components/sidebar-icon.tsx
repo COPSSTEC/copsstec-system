@@ -39,6 +39,13 @@ const PATHS: Record<NavIconName, string[]> = {
     "M16 19h6",
     "M19 16v6",
   ],
+  newspaper: [
+    "M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1",
+    "M15 8h6v10a2 2 0 01-2 2h-4",
+    "M7 8h6",
+    "M7 12h6",
+    "M7 16h4",
+  ],
   home: [
     "M5 12H3l9-9 9 9h-2",
     "M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7",

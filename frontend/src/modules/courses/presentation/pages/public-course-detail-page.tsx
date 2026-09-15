@@ -6,8 +6,8 @@ import Link from "next/link";
 import type { Course } from "@/modules/courses/domain/types";
 import { getPublicCourse } from "@/modules/courses/infrastructure/courses-api";
 import { GuestInscriptionForm } from "@/modules/courses/presentation/forms/guest-inscription-form";
-import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
+import { PublicSiteHeader } from "@/shared/components/public-site-header";
 
 interface PublicCourseDetailPageProps {
   courseId: number;
@@ -34,14 +34,7 @@ export function PublicCourseDetailPage({ courseId }: PublicCourseDetailPageProps
 
   return (
     <main className="public-page">
-      <header className="public-header">
-        <AppLogo />
-        <nav className="nav" aria-label="Navegación pública">
-          <Link href="/cursos">Cursos</Link>
-          <Link href="/mi-espacio/cursos">Mis cursos</Link>
-          <Link href="/login">Ingresar</Link>
-        </nav>
-      </header>
+      <PublicSiteHeader current="cursos" />
 
       {isLoading ? <p className="muted">Cargando curso...</p> : null}
       {error ? <p className="form-error">{error}</p> : null}

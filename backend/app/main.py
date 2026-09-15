@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
 from app.modules.auth.presentation.api.router import router as auth_router
+from app.modules.blogs.presentation.api.router import router as blogs_router
 from app.modules.courses.presentation.api.router import router as courses_router
 from app.modules.members.presentation.api.router import router as members_router
 from app.modules.membership.presentation.api.router import router as membership_router
@@ -27,6 +28,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(blogs_router)
 app.include_router(courses_router)
 app.include_router(members_router)
 app.include_router(membership_router)
@@ -46,6 +48,14 @@ app.mount(
     "/media/membership",
     StaticFiles(directory=str(membership_media_dir)),
     name="membership-media",
+)
+
+blog_media_dir = Path("storage/blogs")
+blog_media_dir.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/blogs",
+    StaticFiles(directory=str(blog_media_dir)),
+    name="blog-media",
 )
 
 
