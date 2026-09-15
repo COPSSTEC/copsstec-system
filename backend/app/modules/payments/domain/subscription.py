@@ -200,6 +200,10 @@ def is_coverage_expired(coverage_until: date | None, today: date) -> bool:
     return coverage_until is not None and today > coverage_until
 
 
+def is_coverage_current(coverage_until: date | None, today: date) -> bool:
+    return coverage_until is not None and today <= coverage_until
+
+
 def is_subscription_due(
     coverage_until: date | None,
     credit_balance: Decimal,

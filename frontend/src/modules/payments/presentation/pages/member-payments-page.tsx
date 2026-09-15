@@ -1,20 +1,32 @@
 "use client";
 
-import { formatIsoDate, formatUsd } from "@/modules/payments/domain/types";
+import { useState } from "react";
+
+import { formatIsoDate, formatUsd, memberNeedsRenewal } from "@/modules/payments/domain/types";
 import { PaymentListItem } from "@/modules/payments/presentation/components/payment-list-item";
-import { RenewalVoucherForm } from "@/modules/payments/presentation/components/renewal-voucher-form";
 import { SubscriptionStatusBadge } from "@/modules/payments/presentation/components/subscription-status-badge";
 import { useMyPayments } from "@/modules/payments/presentation/hooks/use-my-payments";
+import { MemberRenewalModal } from "@/modules/payments/presentation/modals/member-renewal-modal";
 import { RoleGate } from "@/shared/components/role-gate";
 
 export function MemberPaymentsPage() {
   const payments = useMyPayments();
+  const [renewalOpen, setRenewalOpen] = useState(false);
+  const needsRenewal = memberNeedsRenewal(payments.subscription, payments.openPayment);
+  const inReview = payments.openPayment?.status === "pending_review";
 
   return (
     <RoleGate requiredAccess="member">
-      <section className="page-heading">
-        <h1>Mis pagos</h1>
-        <p>Consulta tu cobertura, el pago pendiente y el historial de cuotas.</p>
+      <section className="page-heading page-heading-actions">
+        <div>
+          <h1>Mis pagos</h1>
+          <p>Consulta tu cobertura y el historial de cuotas. Si debes una cuota, ábrela para pagarla.</p>
+        </div>
+        {needsRenewal ? (
+          <button className="create-button" onClick={() => setRenewalOpen(true)} type="button">
+            {inReview ? "Ver comprobante" : "Pagar cuota"}
+          </button>
+        ) : null}
       </section>
 
       {payments.error ? (
@@ -54,24 +66,14 @@ export function MemberPaymentsPage() {
         ) : (
           <p className="muted">Aún no hay historial de membresía registrado.</p>
         )}
-      </section>
-
-      <section className="card">
-        <h2>Pendiente</h2>
-        <p className="muted">Elige el plan, transfiere y sube el comprobante para renovar.</p>
-        <RenewalVoucherForm
-          error={payments.error}
-          isSubmitting={payments.isSubmitting}
-          onChoosePlan={payments.choosePlan}
-          onUpload={payments.uploadVoucher}
-          openPayment={payments.openPayment}
-          paymentInfo={payments.paymentInfo}
-        />
+        {!payments.isLoading && !needsRenewal ? (
+          <p className="muted">No tienes pagos pendientes por cancelar.</p>
+        ) : null}
       </section>
 
       <section className="card">
         <h2>Historial</h2>
-        <p className="muted">Pagos aprobados y rechazados. No se pueden editar ni eliminar.</p>
+        <p className="muted">Pagos registrados. No se pueden editar ni eliminar.</p>
         {payments.isLoading ? <p className="muted">Cargando historial...</p> : null}
         <div className="payment-card-list">
           {payments.history.map((payment) => (
@@ -82,6 +84,19 @@ export function MemberPaymentsPage() {
           ) : null}
         </div>
       </section>
+
+      <MemberRenewalModal
+        error={payments.error}
+        isSubmitting={payments.isSubmitting}
+        onClose={() => setRenewalOpen(false)}
+        onUpload={async (file, plan) => {
+          await payments.uploadVoucher(file, plan);
+          setRenewalOpen(false);
+        }}
+        open={renewalOpen}
+        openPayment={payments.openPayment}
+        paymentInfo={payments.paymentInfo}
+      />
     </RoleGate>
   );
 }

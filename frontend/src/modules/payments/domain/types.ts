@@ -284,6 +284,19 @@ export function isOpenMembershipStatus(status: string): boolean {
   return status === "pending_payment" || status === "pending_review";
 }
 
+export function memberNeedsRenewal(
+  subscription: SubscriptionSummary | null,
+  openPayment: OpenPayment | null,
+): boolean {
+  if (openPayment?.status === "pending_review" || openPayment?.status === "pending_payment") {
+    return true;
+  }
+  if (!subscription) {
+    return false;
+  }
+  return subscription.status === "vencida" || subscription.status === "gracia";
+}
+
 export function paymentTitle(payment: Payment): string {
   return payment.reference?.trim() || payment.description || "Pago";
 }

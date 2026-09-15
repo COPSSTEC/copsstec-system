@@ -104,7 +104,6 @@ export function SubscriptionDuePage() {
         <RenewalVoucherForm
           error={payments.error}
           isSubmitting={payments.isSubmitting}
-          onChoosePlan={payments.choosePlan}
           onUpload={payments.uploadVoucher}
           openPayment={payments.openPayment}
           paymentInfo={payments.paymentInfo}

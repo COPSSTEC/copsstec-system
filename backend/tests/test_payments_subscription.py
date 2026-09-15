@@ -37,7 +37,7 @@ from app.modules.payments.domain.entities import (
     SubscriptionListQuery,
     SubscriptionListResult,
 )
-from app.modules.payments.domain.exceptions import PaymentConflictError
+from app.modules.payments.domain.exceptions import PaymentConflictError, PaymentValidationError
 from app.modules.payments.domain.subscription import (
     GATE_SUBSCRIPTION_DUE as PAYMENTS_GATE_SUBSCRIPTION_DUE,
     MONTHLY_FEE,
@@ -131,6 +131,18 @@ class FakePaymentsRepository:
             and item.status in {STATUS_PENDING_PAYMENT, STATUS_PENDING_REVIEW}
         ]
         return max(opens, key=lambda item: item.id) if opens else None
+
+    def cancel_unused_pending_renewal(self, user_id: int) -> None:
+        stale_ids = [
+            item.id
+            for item in self.payments.values()
+            if item.user_id == user_id
+            and is_membership_type(item.type)
+            and item.status == STATUS_PENDING_PAYMENT
+            and not item.voucher_path
+        ]
+        for payment_id in stale_ids:
+            self.payments.pop(payment_id, None)
 
     def create_payment(
         self,
@@ -554,6 +566,66 @@ def test_router_admin_forbidden_for_member() -> None:
         assert response.status_code == 403
     finally:
         app.dependency_overrides.clear()
+
+
+def test_get_my_payments_does_not_create_pending_when_current() -> None:
+    repo = FakePaymentsRepository()
+    CreateAdminPaymentUseCase(repo).execute(
+        CreatePaymentCommand(1, "membresía", "Anual", YEARLY_FEE, "02/05/2026"),
+    )
+    view = GetMyPaymentsUseCase(repo).execute(1, today=date(2026, 9, 15))
+    assert view.subscription is not None
+    assert view.subscription.coverage_until == date(2027, 5, 2)
+    assert view.open_payment is None
+
+
+def test_get_my_payments_cancels_stale_pending_when_current() -> None:
+    repo = FakePaymentsRepository()
+    CreateAdminPaymentUseCase(repo).execute(
+        CreatePaymentCommand(1, "membresía", "Anual", YEARLY_FEE, "02/05/2026"),
+    )
+    repo.create_payment(
+        user_id=1,
+        payment_type="membresía",
+        description="Renovación de membresía",
+        amount=YEARLY_FEE,
+        date_register="03/05/2027",
+        status=STATUS_PENDING_PAYMENT,
+        recalculate=False,
+    )
+    view = GetMyPaymentsUseCase(repo).execute(1, today=date(2026, 9, 15))
+    assert view.open_payment is None
+    assert all(item.status != STATUS_PENDING_PAYMENT for item in view.items)
+
+
+def test_create_renewal_rejected_when_al_dia() -> None:
+    repo = FakePaymentsRepository()
+    CreateAdminPaymentUseCase(repo).execute(
+        CreatePaymentCommand(1, "membresía", "Anual", YEARLY_FEE, "02/05/2026"),
+    )
+    try:
+        CreateRenewalUseCase(repo).execute(1, "yearly", today=date(2026, 9, 15))
+        raise AssertionError("Se esperaba error de cuota al día")
+    except PaymentValidationError as exc:
+        assert "pendiente" in exc.message.lower()
+
+
+def test_create_admin_payment_cancels_stale_pending() -> None:
+    repo = FakePaymentsRepository()
+    repo.create_payment(
+        user_id=1,
+        payment_type="membresía",
+        description="Renovación de membresía",
+        amount=MONTHLY_FEE,
+        date_register="16/09/2026",
+        status=STATUS_PENDING_PAYMENT,
+        recalculate=False,
+    )
+    CreateAdminPaymentUseCase(repo).execute(
+        CreatePaymentCommand(1, "membresía", "Pago de membresía", YEARLY_FEE, "15/09/2026"),
+        today=date(2026, 9, 15),
+    )
+    assert repo.get_open_membership_payment(1) is None
 
 
 def test_router_me_returns_only_own_payments() -> None:

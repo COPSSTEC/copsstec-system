@@ -15,15 +15,20 @@ import { MembershipPaymentsPanel } from "@/modules/payments/presentation/compone
 import { PaymentStatusBadge } from "@/modules/payments/presentation/components/payment-status-badge";
 import { useAdminPayments } from "@/modules/payments/presentation/hooks/use-admin-payments";
 import { ApproveRenewalModal } from "@/modules/payments/presentation/modals/approve-renewal-modal";
+import { MemberPaymentsModal } from "@/modules/payments/presentation/modals/member-payments-modal";
+import { SelectMemberModal } from "@/modules/payments/presentation/modals/select-member-modal";
 import { DataTable, type DataTableColumn } from "@/shared/components/data-table";
 import { RoleGate } from "@/shared/components/role-gate";
 
 type AdminTab = "all" | "membership";
+type PaymentsMember = { user_id: number; names: string; lastname: string };
 
 export function AdminPaymentsPage() {
   const payments = useAdminPayments();
   const [tab, setTab] = useState<AdminTab>("all");
   const [reviewTarget, setReviewTarget] = useState<Payment | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [paymentsMember, setPaymentsMember] = useState<PaymentsMember | null>(null);
 
   useEffect(() => {
     if (tab === "membership") {
@@ -98,16 +103,28 @@ export function AdminPaymentsPage() {
         filterable: false,
         hideable: false,
         width: "160px",
-        cell: (row) =>
-          row.status === "pending_review" ? (
-            <div className="table-actions">
+        cell: (row) => (
+          <div className="table-actions">
+            {row.status === "pending_review" ? (
               <button className="primary-button" onClick={() => setReviewTarget(row)} type="button">
                 Revisar
               </button>
-            </div>
-          ) : (
-            <span className="muted">—</span>
-          ),
+            ) : null}
+            <button
+              className="secondary-button"
+              onClick={() =>
+                setPaymentsMember({
+                  user_id: row.user_id,
+                  names: row.member_name || "",
+                  lastname: "",
+                })
+              }
+              type="button"
+            >
+              Pagos
+            </button>
+          </div>
+        ),
       },
     ],
     [],
@@ -120,9 +137,14 @@ export function AdminPaymentsPage() {
 
   return (
     <RoleGate requiredAccess="admin">
-      <section className="page-heading">
-        <h1>Pagos</h1>
-        <p>Controla los pagos del colegio, vouchers de renovación y el estado de las suscripciones.</p>
+      <section className="page-heading page-heading-actions">
+        <div>
+          <h1>Pagos</h1>
+          <p>Controla los pagos del colegio, vouchers de renovación y el estado de las suscripciones.</p>
+        </div>
+        <button className="create-button" onClick={() => setPickerOpen(true)} type="button">
+          Registrar pago
+        </button>
       </section>
 
       {payments.notice ? (
@@ -218,6 +240,7 @@ export function AdminPaymentsPage() {
           onPageChange={payments.setMembershipPage}
           onPageSizeChange={payments.setMembershipPageSize}
           onQueryChange={payments.setMembershipQ}
+          onRegister={(member) => setPaymentsMember(member)}
           onReview={(voucher) =>
             setReviewTarget({
               id: voucher.id,
@@ -256,6 +279,29 @@ export function AdminPaymentsPage() {
             setReviewTarget(null);
           }}
           payment={reviewTarget}
+        />
+      ) : null}
+
+      <SelectMemberModal
+        onClose={() => setPickerOpen(false)}
+        onSelect={(member) => {
+          setPickerOpen(false);
+          setPaymentsMember(member);
+        }}
+        open={pickerOpen}
+      />
+
+      {paymentsMember ? (
+        <MemberPaymentsModal
+          member={paymentsMember}
+          onClose={() => {
+            setPaymentsMember(null);
+            void payments.loadPayments();
+            if (tab === "membership") {
+              void payments.loadMembership();
+            }
+          }}
+          open
         />
       ) : null}
     </RoleGate>

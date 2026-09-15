@@ -31,7 +31,7 @@ from app.modules.payments.domain.subscription import (
     as_money,
     canonicalize_payment_type,
     format_register_date,
-    is_coverage_expired,
+    is_coverage_current,
     parse_register_date,
     subscription_status_label,
     days_overdue,
@@ -80,6 +80,13 @@ def _require_payment(payment: Payment | None) -> Payment:
     if payment is None:
         raise PaymentNotFoundError()
     return payment
+
+
+def _discard_stale_pending(repository: PaymentsRepository, user_id: int, today: date) -> None:
+    subscription = repository.get_subscription(user_id)
+    if subscription is None or not is_coverage_current(subscription.coverage_until, today):
+        return
+    repository.cancel_unused_pending_renewal(user_id)
 
 
 def _with_subscription_view(subscription, today: date):
@@ -162,6 +169,7 @@ class GetMemberPaymentsAdminUseCase:
         member = self.repository.get_member_header(member_id)
         if member is None:
             raise PaymentNotFoundError()
+        _discard_stale_pending(self.repository, member_id, today)
         return MemberPaymentsView(
             member=member,
             items=self.repository.list_payments_for_user(member_id),
@@ -186,6 +194,7 @@ class CreateAdminPaymentUseCase:
             date_register=_parse_date(command.date_register),
             status=STATUS_APPROVED,
         )
+        _discard_stale_pending(self.repository, command.member_id, today)
         subscription = self.repository.get_subscription(command.member_id)
         return PaymentMutationResult(payment=payment, subscription=_with_subscription_view(subscription, today))
 
@@ -235,6 +244,7 @@ class ApprovePaymentUseCase:
         else:
             date_register = _parse_date(date_register)
         approved = self.repository.approve_payment(payment_id, reviewed_by, date_register)
+        _discard_stale_pending(self.repository, approved.user_id, today)
         subscription = self.repository.get_subscription(approved.user_id)
         return PaymentMutationResult(payment=approved, subscription=_with_subscription_view(subscription, today))
 
@@ -274,25 +284,12 @@ class GetMyPaymentsUseCase:
 
     def execute(self, user_id: int, today: date | None = None) -> MyPaymentsView:
         today = today or _today()
+        _discard_stale_pending(self.repository, user_id, today)
         subscription = _with_subscription_view(self.repository.get_subscription(user_id), today)
-        open_payment = self.repository.get_open_membership_payment(user_id)
-        if (
-            subscription is not None
-            and is_coverage_expired(subscription.coverage_until, today)
-            and open_payment is None
-            and subscription.coverage_until is not None
-        ):
-            due = subscription.coverage_until
-            open_payment = self.repository.ensure_pending_renewal(
-                user_id=user_id,
-                amount=MONTHLY_FEE,
-                date_register=format_register_date(due + timedelta(days=1)),
-                reference=RENEWAL_REFERENCE,
-            )
         items = self.repository.list_payments_for_user(user_id)
         return MyPaymentsView(
             items=items,
-            open_payment=open_payment,
+            open_payment=self.repository.get_open_membership_payment(user_id),
             subscription=subscription,
             payment_info=_bank_info(),
         )
@@ -312,10 +309,14 @@ class CreateRenewalUseCase:
         open_payment = self.repository.get_open_membership_payment(user_id)
         if open_payment is not None and open_payment.status == STATUS_PENDING_REVIEW:
             raise PaymentConflictError("Ya hay un comprobante en revisión. Espera la respuesta del administrador.")
+
+        subscription = self.repository.get_subscription(user_id)
+        if is_coverage_current(subscription.coverage_until if subscription else None, today):
+            raise PaymentValidationError("No tienes una cuota pendiente por pagar.")
+
         if open_payment is not None and open_payment.status == STATUS_PENDING_PAYMENT:
             return self.repository.update_pending_renewal(open_payment.id, amount), False
 
-        subscription = self.repository.get_subscription(user_id)
         if subscription and subscription.coverage_until is not None:
             date_register = format_register_date(subscription.coverage_until + timedelta(days=1))
         else:

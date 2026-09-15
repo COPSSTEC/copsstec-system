@@ -78,7 +78,8 @@ export function useMyPayments(enabled = true) {
     setIsSubmitting(true);
     setError(null);
     try {
-      let paymentId = openPayment && openPayment.status !== "rejected" ? openPayment.id : null;
+      let paymentId =
+        openPayment && openPayment.status === "pending_review" ? openPayment.id : null;
       if (!paymentId) {
         const created = await createMyRenewal(token, plan);
         paymentId = created.id;

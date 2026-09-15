@@ -250,6 +250,21 @@ class SqlAlchemyPaymentsRepository:
             return None
         return self._to_payment(row)
 
+    def cancel_unused_pending_renewal(self, user_id: int) -> None:
+        self.session.execute(
+            text(
+                """
+                DELETE FROM payments
+                WHERE user_id = :user_id
+                  AND lower(type) IN ('membresía', 'membresia')
+                  AND status = :status
+                  AND (voucher_path IS NULL OR voucher_path = '')
+                """,
+            ),
+            {"user_id": user_id, "status": STATUS_PENDING_PAYMENT},
+        )
+        self.session.commit()
+
     def create_payment(
         self,
         *,

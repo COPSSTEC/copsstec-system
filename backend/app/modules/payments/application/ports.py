@@ -37,6 +37,9 @@ class PaymentsRepository(Protocol):
     def get_open_membership_payment(self, user_id: int) -> Payment | None:
         ...
 
+    def cancel_unused_pending_renewal(self, user_id: int) -> None:
+        ...
+
     def create_payment(
         self,
         *,

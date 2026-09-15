@@ -16,7 +16,6 @@ interface RenewalVoucherFormProps {
   paymentInfo: RenewalPaymentInfo | null;
   isSubmitting?: boolean;
   error?: string | null;
-  onChoosePlan: (plan: RenewalPlan) => Promise<unknown>;
   onUpload: (file: File, plan: RenewalPlan) => Promise<void>;
 }
 
@@ -32,7 +31,6 @@ export function RenewalVoucherForm({
   paymentInfo,
   isSubmitting = false,
   error = null,
-  onChoosePlan,
   onUpload,
 }: RenewalVoucherFormProps) {
   const [plan, setPlan] = useState<RenewalPlan>(planFromPayment(openPayment));
@@ -46,25 +44,21 @@ export function RenewalVoucherForm({
   const inReview = status === "pending_review";
   const rejected = status === "rejected";
   const canChangePlan = !openPayment || status === "pending_payment" || rejected;
-  const amount = openPayment?.amount ?? (plan === "yearly" ? YEARLY_FEE : MONTHLY_FEE);
+  const amount = inReview
+    ? (openPayment?.amount ?? (plan === "yearly" ? YEARLY_FEE : MONTHLY_FEE))
+    : plan === "yearly"
+      ? YEARLY_FEE
+      : MONTHLY_FEE;
   const qrSrc = paymentInfo?.qr_payload
     ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(paymentInfo.qr_payload)}`
     : null;
 
-  async function handlePlanSelect(next: RenewalPlan) {
-    setPlan(next);
-    setLocalError(null);
+  function handlePlanSelect(next: RenewalPlan) {
     if (!canChangePlan) {
       return;
     }
-    if (openPayment && status !== "rejected" && next === planFromPayment(openPayment)) {
-      return;
-    }
-    try {
-      await onChoosePlan(next);
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : "No se pudo actualizar el plan.");
-    }
+    setPlan(next);
+    setLocalError(null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -112,7 +106,7 @@ export function RenewalVoucherForm({
           aria-pressed={plan === "monthly"}
           className={`plan-option ${plan === "monthly" ? "is-active" : ""}`}
           disabled={isSubmitting || !canChangePlan}
-          onClick={() => void handlePlanSelect("monthly")}
+          onClick={() => handlePlanSelect("monthly")}
           type="button"
         >
           <strong>Mensual</strong>
@@ -122,7 +116,7 @@ export function RenewalVoucherForm({
           aria-pressed={plan === "yearly"}
           className={`plan-option ${plan === "yearly" ? "is-active" : ""}`}
           disabled={isSubmitting || !canChangePlan}
-          onClick={() => void handlePlanSelect("yearly")}
+          onClick={() => handlePlanSelect("yearly")}
           type="button"
         >
           <strong>Anual</strong>

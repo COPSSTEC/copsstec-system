@@ -27,6 +27,7 @@ interface MembershipPaymentsPanelProps {
   onQueryChange: (value: string) => void;
   onStatusChange: (value: SubscriptionStatus | "") => void;
   onReview: (voucher: PendingVoucher) => void;
+  onRegister: (member: { user_id: number; names: string; lastname: string }) => void;
 }
 
 export function MembershipPaymentsPanel({
@@ -41,6 +42,7 @@ export function MembershipPaymentsPanel({
   onQueryChange,
   onStatusChange,
   onReview,
+  onRegister,
 }: MembershipPaymentsPanelProps) {
   const subscriptions = data?.subscriptions.items ?? [];
   const pending = data?.pending_vouchers ?? [];
@@ -101,6 +103,29 @@ export function MembershipPaymentsPanel({
       sortable: false,
       filterable: false,
       cell: (row) => row.payments_count,
+    },
+    {
+      id: "actions",
+      header: "Acciones",
+      sortable: false,
+      filterable: false,
+      hideable: false,
+      width: "140px",
+      cell: (row) => (
+        <button
+          className="secondary-button"
+          onClick={() =>
+            onRegister({
+              user_id: row.user_id,
+              names: row.member_name,
+              lastname: "",
+            })
+          }
+          type="button"
+        >
+          Registrar
+        </button>
+      ),
     },
   ];
 

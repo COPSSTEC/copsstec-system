@@ -21,7 +21,7 @@ export function useMemberPayments(memberId: number, enabled: boolean) {
   const token = useMemo(() => getStoredToken(), []);
   const [items, setItems] = useState<Payment[]>([]);
   const [subscription, setSubscription] = useState<MemberPaymentsAdminResponse["subscription"]>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(enabled);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
