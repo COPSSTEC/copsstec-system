@@ -19,28 +19,20 @@ ACCESS_PRIORITY: dict[str, int] = {
 NAVIGATION_BY_ACCESS: dict[str, list[dict[str, str]]] = {
     "member": [
         {"label": "Dashboard", "href": "/dashboard"},
-        {"label": "Mi espacio", "href": "/mi-espacio"},
         {"label": "Mis cursos", "href": "/mi-espacio/cursos"},
+        {"label": "Mi espacio", "href": "/mi-espacio"},
         {"label": "Mi perfil", "href": "/profile"},
     ],
     "operations": [
         {"label": "Dashboard", "href": "/dashboard"},
-        {"label": "Operaciones", "href": "/operaciones"},
-        {"label": "Mi perfil", "href": "/profile"},
     ],
     "admin": [
         {"label": "Dashboard", "href": "/dashboard"},
-        {"label": "Administración", "href": "/admin"},
         {"label": "Miembros", "href": "/admin/miembros"},
         {"label": "Cursos", "href": "/admin/cursos"},
-        {"label": "Operaciones", "href": "/operaciones"},
-        {"label": "Mi espacio", "href": "/mi-espacio"},
-        {"label": "Mis cursos", "href": "/mi-espacio/cursos"},
-        {"label": "Mi perfil", "href": "/profile"},
     ],
     "restricted": [
         {"label": "Dashboard", "href": "/dashboard"},
-        {"label": "Mi perfil", "href": "/profile"},
     ],
 }
 
