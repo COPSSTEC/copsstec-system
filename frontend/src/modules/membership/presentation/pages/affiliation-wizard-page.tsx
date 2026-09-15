@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -17,6 +17,7 @@ import { registerAffiliation } from "@/modules/membership/infrastructure/members
 import { storeToken } from "@/modules/auth/infrastructure/auth-storage";
 import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
+import { trackEvent } from "@/shared/lib/analytics";
 
 const STEPS = [
   { id: 1, label: "Datos Personales" },
@@ -68,6 +69,10 @@ export function AffiliationWizardPage() {
     () => ECUADOR_PROVINCES.find((item) => item.name === form.province)?.cities ?? [],
     [form.province],
   );
+
+  useEffect(() => {
+    trackEvent("form_start", { form_name: "afiliacion", page_type: "signup" });
+  }, []);
 
   function update<K extends keyof AffiliationForm>(field: K, value: AffiliationForm[K]) {
     setForm((current) => {
@@ -140,6 +145,8 @@ export function AffiliationWizardPage() {
     setError(null);
     try {
       const result = await registerAffiliation(form, photo);
+      trackEvent("generate_lead", { form_name: "afiliacion", method: "signup" });
+      trackEvent("form_submit", { form_name: "afiliacion", success: true });
       storeToken(result.access_token);
       router.replace("/afiliacion/pago");
     } catch (err) {

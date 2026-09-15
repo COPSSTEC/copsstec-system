@@ -1841,9 +1841,11 @@ textarea {
   display: flex;
   inset: 0;
   justify-content: space-between;
+  opacity: calc(1 - min(1, var(--sequence-progress, 0) * 1.15));
   padding: 7rem 4vw 4rem;
   pointer-events: none;
   position: absolute;
+  transform: translate3d(0, calc(var(--sequence-progress, 0) * -24px), 0);
 }
 
 .landing-hero-copy a,
@@ -1917,11 +1919,40 @@ textarea {
   text-align: center;
 }
 
-.landing-section-head h2,
-.landing-cta-title {
+.landing-section-head h2 {
   font-size: clamp(2rem, 5vw, 4.6rem);
   letter-spacing: -0.04em;
   margin: 0 0 1rem;
+}
+
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translate3d(0, 32px, 0);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal-on-scroll.is-inview {
+  opacity: 1;
+  transform: none;
+}
+
+.landing-panel,
+.landing-service-card,
+.landing-partner-card,
+.landing-glass-card {
+  transition: transform 0.45s ease, box-shadow 0.45s ease;
+}
+
+.landing-panel:hover,
+.landing-service-card:hover,
+.landing-partner-card:hover {
+  transform: translateY(-6px);
+}
+
+.landing-service-card:hover {
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
 }
 
 .landing-section-head p,
@@ -2108,33 +2139,51 @@ textarea {
 }
 
 .landing-cta {
-  min-height: 70vh;
-  text-align: center;
+  max-width: none;
+  min-height: 220vh;
+  padding: 0;
+  position: relative;
+}
+
+.landing-cta-sticky {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  justify-content: center;
+  padding: 5rem 4vw 3rem;
+  position: sticky;
+  top: 0;
+  width: 100%;
+}
+
+.landing-cta-title-wrap {
+  width: min(100%, 1600px);
+}
+
+.landing-cta-title {
+  font-size: clamp(4.2rem, 18vw, 13.5rem);
+  font-weight: 800;
+  letter-spacing: -0.08em;
+  line-height: 0.82;
+  margin: 0;
+  text-align: left;
+  width: 100%;
 }
 
 .landing-cta-title span {
   display: inline-block;
   opacity: 0;
-  transform: translateX(-18px);
-}
-
-.landing-cta-title.is-visible span {
-  animation: landing-letter 0.55s ease forwards;
-}
-
-@keyframes landing-letter {
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  will-change: opacity, transform;
 }
 
 .landing-cta-actions {
   align-items: center;
   display: flex;
   gap: 1rem;
-  justify-content: center;
-  margin-top: 1.5rem;
+  justify-content: flex-start;
+  margin-top: 2.5rem;
+  width: min(100%, 1600px);
 }
 
 .landing-text-link {
@@ -2176,5 +2225,25 @@ textarea {
   .landing-service-overlay {
     max-width: none;
     padding: 2rem 1.25rem;
+  }
+
+  .landing-cta-title {
+    font-size: clamp(3rem, 22vw, 6.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll,
+  .landing-panel,
+  .landing-service-card,
+  .landing-partner-card,
+  .landing-glass-card,
+  .landing-cta-title span {
+    transition: none;
+    transform: none;
+  }
+
+  .reveal-on-scroll {
+    opacity: 1;
   }
 }
