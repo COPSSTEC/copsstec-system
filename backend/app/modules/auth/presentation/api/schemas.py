@@ -83,6 +83,7 @@ class UserResponse(BaseModel):
 class NavigationItemResponse(BaseModel):
     label: str
     href: str
+    children: list["NavigationItemResponse"] = []
 
 
 class AccessPolicyResponse(BaseModel):
@@ -139,3 +140,6 @@ class ChangePasswordRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+NavigationItemResponse.model_rebuild()

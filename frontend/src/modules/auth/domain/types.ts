@@ -50,6 +50,7 @@ export interface User {
 export interface NavigationItem {
   label: string;
   href: string;
+  children?: NavigationItem[];
 }
 
 export interface AccessPolicy {

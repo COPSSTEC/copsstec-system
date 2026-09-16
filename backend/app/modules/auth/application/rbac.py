@@ -16,13 +16,14 @@ ACCESS_PRIORITY: dict[str, int] = {
     "admin": 3,
 }
 
-NAVIGATION_BY_ACCESS: dict[str, list[dict[str, str]]] = {
+NAVIGATION_BY_ACCESS: dict[str, list[dict]] = {
     "member": [
         {"label": "Dashboard", "href": "/dashboard"},
         {"label": "Mis cursos", "href": "/mi-espacio/cursos"},
         {"label": "Mis pagos", "href": "/mi-espacio/pagos"},
         {"label": "Mi espacio", "href": "/mi-espacio"},
         {"label": "Mi perfil", "href": "/profile"},
+        {"label": "Votaciones", "href": "/mi-espacio/votaciones"},
     ],
     "operations": [
         {"label": "Dashboard", "href": "/dashboard"},
@@ -33,11 +34,32 @@ NAVIGATION_BY_ACCESS: dict[str, list[dict[str, str]]] = {
         {"label": "Pagos", "href": "/admin/pagos"},
         {"label": "Cursos", "href": "/admin/cursos"},
         {"label": "Blogs", "href": "/admin/blogs"},
+        {
+            "label": "Votaciones",
+            "href": "/admin/votaciones",
+            "children": [
+                {"label": "Listas de candidatos", "href": "/admin/votaciones/listas"},
+                {"label": "Calendario electoral", "href": "/admin/votaciones/calendario"},
+                {"label": "Configuración", "href": "/admin/votaciones/configuracion"},
+                {"label": "Votantes habilitados", "href": "/admin/votaciones/votantes"},
+                {"label": "Reportes de votación", "href": "/admin/votaciones/reportes"},
+            ],
+        },
     ],
     "restricted": [
         {"label": "Dashboard", "href": "/dashboard"},
     ],
 }
+
+
+def flatten_navigation_hrefs(items: list[dict]) -> list[str]:
+    hrefs: list[str] = []
+    for item in items:
+        href = item.get("href")
+        if href:
+            hrefs.append(str(href))
+        hrefs.extend(flatten_navigation_hrefs(item.get("children") or []))
+    return hrefs
 
 
 def resolve_access_level(roles: list[str]) -> str:
@@ -59,7 +81,7 @@ def resolve_access_policy(roles: list[str]) -> AccessPolicy:
     return AccessPolicy(
         access_level=access_level,
         roles=roles,
-        allowed_routes=[item["href"] for item in navigation],
+        allowed_routes=flatten_navigation_hrefs(navigation),
         navigation=navigation,
     )
 

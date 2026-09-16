@@ -12,6 +12,7 @@ from app.modules.members.presentation.api.router import router as members_router
 from app.modules.membership.presentation.api.router import router as membership_router
 from app.modules.partners.presentation.api.router import router as partners_router
 from app.modules.payments.presentation.api.router import router as payments_router
+from app.modules.votaciones.presentation.api.router import router as votaciones_router
 
 settings = get_settings()
 
@@ -35,6 +36,7 @@ app.include_router(members_router)
 app.include_router(membership_router)
 app.include_router(partners_router)
 app.include_router(payments_router)
+app.include_router(votaciones_router)
 
 member_media_dir = Path("storage/members")
 member_media_dir.mkdir(parents=True, exist_ok=True)
@@ -66,6 +68,14 @@ app.mount(
     "/media/payments",
     StaticFiles(directory=str(payments_media_dir)),
     name="payments-media",
+)
+
+votaciones_media_dir = Path("storage/votaciones")
+votaciones_media_dir.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/votaciones",
+    StaticFiles(directory=str(votaciones_media_dir)),
+    name="votaciones-media",
 )
 
 

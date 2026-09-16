@@ -55,4 +55,4 @@ class AccessPolicy:
     access_level: str
     roles: list[str]
     allowed_routes: list[str]
-    navigation: list[dict[str, str]]
+    navigation: list[dict]

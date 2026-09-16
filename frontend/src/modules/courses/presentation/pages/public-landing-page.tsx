@@ -7,8 +7,8 @@ import { usePathname } from "next/navigation";
 import { LANDING_MEDIA, LANDING_SERVICES } from "@/config/landing-media";
 import type { Partner } from "@/modules/partners/domain/types";
 import { listPublicPartners } from "@/modules/partners/infrastructure/partners-api";
+import { PublicElectionCalendarTeaser } from "@/modules/votaciones";
 import { PublicFooter } from "@/shared/components/public-footer";
-import { PublicTopbar } from "@/shared/components/public-topbar";
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
 import { ScrollFillTitle } from "@/shared/components/scroll-fill-title";
 import { ScrollSequence } from "@/shared/components/scroll-sequence";
@@ -32,9 +32,7 @@ export function PublicLandingPage() {
   }, []);
 
   return (
-    <div className="landing-page">
-      <PublicTopbar />
-
+    <div className="landing-page" id="inicio">
       <ScrollSequence key={pathname}>
         <div className="landing-hero-copy">
           <article className="landing-glass-card landing-hero-left">
@@ -305,6 +303,8 @@ export function PublicLandingPage() {
           </article>
         ))}
       </section>
+
+      <PublicElectionCalendarTeaser />
 
       <section className="landing-cta" id="afiliate">
         <div className="landing-cta-sticky">

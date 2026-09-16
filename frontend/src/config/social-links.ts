@@ -39,9 +39,14 @@ export type NavIconName =
   | "home"
   | "user"
   | "newspaper"
+  | "vote"
   | SocialIconName;
 
 export function navIconForHref(href: string): NavIconName {
+  if (href.startsWith("/admin/pagos") || href.startsWith("/mi-espacio/pagos")) {
+    return "bolt";
+  }
+
   if (href.startsWith("/admin/miembros")) {
     return "usersPlus";
   }
@@ -60,6 +65,10 @@ export function navIconForHref(href: string): NavIconName {
 
   if (href === "/profile") {
     return "user";
+  }
+
+  if (href.includes("/votaciones")) {
+    return "vote";
   }
 
   return "bolt";
