@@ -14,6 +14,7 @@ from app.modules.votaciones.domain.entities import (
     ElectionVoter,
     GuideStep,
     MemberPortal,
+    MessageDelivery,
     MessageTemplate,
     ReportListRow,
     ReportTimelineItem,
@@ -67,6 +68,8 @@ class MessageTemplateResponse(BaseModel):
     channel_email: bool
     channel_portal: bool
     channel_internal: bool
+    scheduled_at: datetime | None = None
+    last_sent_at: datetime | None = None
 
     @classmethod
     def from_domain(cls, item: MessageTemplate) -> "MessageTemplateResponse":
@@ -79,6 +82,8 @@ class MessageTemplateResponse(BaseModel):
             channel_email=item.channel_email,
             channel_portal=item.channel_portal,
             channel_internal=item.channel_internal,
+            scheduled_at=item.scheduled_at,
+            last_sent_at=item.last_sent_at,
         )
 
 
@@ -289,6 +294,7 @@ class ElectionWriteRequest(BaseModel):
     primary_color: str | None = None
     secondary_color: str | None = None
     election_type: str | None = None
+    one_vote_per_member: bool | None = None
     secret_vote: bool | None = None
     confirm_vote: bool | None = None
     allow_blank_vote: bool | None = None
@@ -361,6 +367,7 @@ class VoterResponse(BaseModel):
     has_voted: bool
     province: str
     city: str
+    type_profile: str = ""
 
     @classmethod
     def from_domain(cls, item: ElectionVoter) -> "VoterResponse":
@@ -374,6 +381,7 @@ class VoterListResponse(BaseModel):
     disabled_count: int
     pending_payment_count: int
     padro_total: int
+    provinces: list[str] = []
 
     @classmethod
     def from_domain(cls, item: VoterListResult) -> "VoterListResponse":
@@ -384,6 +392,7 @@ class VoterListResponse(BaseModel):
             disabled_count=item.disabled_count,
             pending_payment_count=item.pending_payment_count,
             padro_total=item.padro_total,
+            provinces=item.provinces,
         )
 
 
@@ -394,6 +403,30 @@ class MessagesWriteRequest(BaseModel):
 class MessageActionRequest(BaseModel):
     template_key: str
     email: str | None = None
+    scheduled_at: datetime | None = None
+    only_unsent: bool = False
+
+
+class MessageDeliveryResponse(BaseModel):
+    template_key: str
+    scheduled_at: datetime | None = None
+    last_sent_at: datetime | None = None
+    total: int
+    sent: int
+    pending: int
+    failed: int
+
+    @classmethod
+    def from_domain(cls, item: MessageDelivery) -> "MessageDeliveryResponse":
+        return cls(
+            template_key=item.template_key,
+            scheduled_at=item.scheduled_at,
+            last_sent_at=item.last_sent_at,
+            total=item.total,
+            sent=item.sent,
+            pending=item.pending,
+            failed=item.failed,
+        )
 
 
 class VoteChoiceRequest(BaseModel):

@@ -152,6 +152,19 @@ class MessageTemplate:
     channel_email: bool
     channel_portal: bool
     channel_internal: bool
+    scheduled_at: datetime | None = None
+    last_sent_at: datetime | None = None
+
+
+@dataclass
+class MessageDelivery:
+    template_key: str
+    scheduled_at: datetime | None
+    last_sent_at: datetime | None
+    total: int
+    sent: int
+    pending: int
+    failed: int
 
 
 @dataclass
@@ -233,6 +246,7 @@ class ElectionVoter:
     has_voted: bool
     province: str
     city: str
+    type_profile: str = ""
 
 
 @dataclass
@@ -243,6 +257,7 @@ class VoterListResult:
     disabled_count: int
     pending_payment_count: int
     padro_total: int
+    provinces: list[str] = field(default_factory=list)
 
 
 @dataclass

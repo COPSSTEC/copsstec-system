@@ -16,7 +16,23 @@ class SmtpOrLogEmailSender:
         message["To"] = to_email
         message["Subject"] = subject
         message.set_content(body)
+        self._deliver(settings, message)
 
+    def send_html(self, to_email: str, subject: str, text_body: str, html_body: str) -> None:
+        settings = get_settings()
+        if not settings.smtp_host:
+            print("MEMBERSHIP_EMAIL", {"to": to_email, "subject": subject, "body": html_body})
+            return
+
+        message = EmailMessage()
+        message["From"] = settings.smtp_from
+        message["To"] = to_email
+        message["Subject"] = subject
+        message.set_content(text_body or html_body)
+        message.add_alternative(html_body, subtype="html")
+        self._deliver(settings, message)
+
+    def _deliver(self, settings, message: EmailMessage) -> None:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
             smtp.starttls()
             if settings.smtp_user:

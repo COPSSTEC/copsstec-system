@@ -1,8 +1,9 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from app.modules.votaciones.application.use_cases import (
     CastVoteUseCase,
     CloseElectionUseCase,
+    SaveMessagesUseCase,
     StartElectionUseCase,
     build_guide,
 )
@@ -121,6 +122,7 @@ class FakeRepo:
         self.ballots: dict[tuple[int, int], bool] = {}
         self.votes = 0
         self.notices: list[tuple] = []
+        self.logs: list[dict] = []
 
     def list_summaries(self):
         return self.summaries
@@ -157,8 +159,39 @@ class FakeRepo:
     def add_notice(self, *args, **kwargs):
         self.notices.append(args)
 
-    def add_message_log(self, *args, **kwargs):
-        return None
+    def add_message_log(self, election_id, template_key, channel, recipient, user_id=None, status="enviado"):
+        self.logs.append(
+            {
+                "election_id": election_id,
+                "template_key": template_key,
+                "channel": channel,
+                "recipient": recipient,
+                "user_id": user_id,
+                "status": status,
+            }
+        )
+
+    def list_message_logs(self, election_id, template_key):
+        return [item for item in self.logs if item["template_key"] == template_key]
+
+    def mark_template_sent(self, election_id, template_key, sent_at):
+        for item in self.election.templates:
+            if item.template_key == template_key:
+                item.last_sent_at = sent_at
+
+    def member_emails(self, election_id, only_enabled, only_pending_vote):
+        result = []
+        for item in self.voters:
+            if only_enabled and not item.voting_enabled:
+                continue
+            if only_pending_vote and item.has_voted:
+                continue
+            result.append((item.user_id, f"{item.names} {item.lastname}".strip(), item.email))
+        return result
+
+    def replace_templates(self, election_id, templates):
+        self.election.templates = templates
+        return templates
 
     def list_lists(self, election_id: int):
         return []
@@ -189,6 +222,14 @@ class FakeRepo:
 class SilentNotifier:
     def send(self, to_email: str, subject: str, body: str) -> None:
         return None
+
+
+class RecordingNotifier:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, str, str]] = []
+
+    def send(self, to_email: str, subject: str, body: str) -> None:
+        self.sent.append((to_email, subject, body))
 
 
 def test_cannot_start_second_open_period() -> None:
@@ -294,3 +335,47 @@ def test_candidate_uses_configured_position() -> None:
         ],
     )
     validate_list_activation(election, lista)
+
+
+def test_schedule_status_and_resend_unsent() -> None:
+    repo = FakeRepo()
+    repo.election.status = "en_preparacion"
+    repo.election.templates = [
+        MessageTemplate(
+            1,
+            1,
+            "convocatoria",
+            "Convocatoria",
+            "Hola {nombre}",
+            "<p>Cuerpo {titulo}</p>",
+            True,
+            True,
+            False,
+        ),
+    ]
+    repo.voters.append(
+        ElectionVoter(11, "Luis", "Mora", "1101", "S-002", "SST", "luis@test.com", None, None, "al_dia", True, False, "Pichincha", "Quito"),
+    )
+    notifier = RecordingNotifier()
+    use_case = SaveMessagesUseCase(repo, notifier)
+
+    future = (datetime.now() + timedelta(days=2)).isoformat()
+    template = use_case.schedule(1, "convocatoria", future)
+    assert template.scheduled_at is not None
+    assert notifier.sent == []
+
+    past = (datetime.now() - timedelta(minutes=1)).isoformat()
+    use_case.schedule(1, "convocatoria", past)
+    assert {item[0] for item in notifier.sent} == {"ana@test.com", "luis@test.com"}
+
+    snapshot = use_case.status(1)
+    item = next(row for row in snapshot if row.template_key == "convocatoria")
+    assert item.sent == 2
+    assert item.pending == 0
+
+    repo.voters.append(
+        ElectionVoter(12, "Eva", "Ruiz", "1102", "S-003", "SST", "eva@test.com", None, None, "al_dia", True, False, "Pichincha", "Quito"),
+    )
+    sent = use_case.send(1, "convocatoria", only_unsent=True)
+    assert sent == 1
+    assert any(item[0] == "eva@test.com" for item in notifier.sent)

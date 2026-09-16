@@ -75,6 +75,7 @@ class SqlAlchemyElectionsRepository:
         return self.get_election(row["id"]) if row else None
 
     def get_election(self, election_id: int) -> Election | None:
+        self._ensure_message_schema()
         row = self.session.execute(
             text("SELECT * FROM elections WHERE id = :id"),
             {"id": election_id},
@@ -498,7 +499,8 @@ class SqlAlchemyElectionsRepository:
                         body = :body,
                         channel_email = :channel_email,
                         channel_portal = :channel_portal,
-                        channel_internal = :channel_internal
+                        channel_internal = :channel_internal,
+                        scheduled_at = :scheduled_at
                     WHERE election_id = :election_id AND template_key = :template_key
                     """
                 ),
@@ -511,6 +513,7 @@ class SqlAlchemyElectionsRepository:
                     "channel_email": item.channel_email,
                     "channel_portal": item.channel_portal,
                     "channel_internal": item.channel_internal,
+                    "scheduled_at": item.scheduled_at,
                 },
             )
         self.session.commit()
@@ -526,6 +529,8 @@ class SqlAlchemyElectionsRepository:
         page: int,
         page_size: int,
         today: date,
+        type_profile: str | None = None,
+        location: str | None = None,
     ) -> VoterListResult:
         all_voters = self.list_all_voters(election_id, today)
         filtered = all_voters
@@ -541,6 +546,14 @@ class SqlAlchemyElectionsRepository:
                 filtered = [item for item in filtered if item.payment_status in {SUBSCRIPTION_AL_DIA, SUBSCRIPTION_GRACIA}]
             elif payment_status == "pendiente":
                 filtered = [item for item in filtered if item.payment_status not in {SUBSCRIPTION_AL_DIA, SUBSCRIPTION_GRACIA}]
+        if type_profile:
+            filtered = [
+                item
+                for item in filtered
+                if type_profile in {part.strip() for part in (item.type_profile or "").split(",") if part.strip()}
+            ]
+        if location:
+            filtered = [item for item in filtered if item.province == location]
         if enabled is not None:
             filtered = [item for item in filtered if item.voting_enabled is enabled]
         page = max(page, 1)
@@ -550,6 +563,7 @@ class SqlAlchemyElectionsRepository:
         pending_payment = sum(
             1 for item in all_voters if item.payment_status not in {SUBSCRIPTION_AL_DIA, SUBSCRIPTION_GRACIA}
         )
+        provinces = sorted({item.province for item in all_voters if item.province})
         return VoterListResult(
             items=filtered[start : start + page_size],
             total=len(filtered),
@@ -557,6 +571,7 @@ class SqlAlchemyElectionsRepository:
             disabled_count=len(all_voters) - enabled_count,
             pending_payment_count=pending_payment,
             padro_total=len(all_voters),
+            provinces=provinces,
         )
 
     def get_voter(self, election_id: int, user_id: int, today: date) -> ElectionVoter | None:
@@ -644,6 +659,7 @@ class SqlAlchemyElectionsRepository:
                     has_voted=user_id in voted,
                     province=member["province"] or "",
                     city=member["city"] or "",
+                    type_profile=member["type_profile"] or "",
                 )
             )
         return voters
@@ -744,26 +760,52 @@ class SqlAlchemyElectionsRepository:
         rows.append(
             ReportListRow(
                 list_id=None,
-                name="Voto en blanco",
+                name="Votos en blanco",
                 slogan="",
                 color=None,
                 logo_url=None,
-                principal_name="—",
+                principal_name="-",
                 votes=blank_votes,
                 percentage=round((blank_votes / total_for_pct) * 100, 1) if votes_cast else 0.0,
                 result_status="N/A",
             )
         )
         timeline = [
-            ReportTimelineItem("apertura", "Apertura de votación", _as_dt(election.voting_starts_on), "Inicio del sufragio", "ok"),
-            ReportTimelineItem("cierre", "Cierre de votación", _as_dt(election.voting_ends_on), "Fin del sufragio", "ok"),
-            ReportTimelineItem("votos", "Total de votos registrados", datetime.now() if votes_cast else None, f"{votes_cast} votos", "ok"),
-            ReportTimelineItem("incidencias", "Incidencias", None, "Sin incidencias registradas", "warn"),
+            ReportTimelineItem(
+                "apertura",
+                "Apertura de votación",
+                _as_dt(election.voting_starts_on, hour=8),
+                "El proceso de votación fue iniciado correctamente.",
+                "ok",
+            ),
+            ReportTimelineItem(
+                "cierre",
+                "Cierre de votación",
+                _as_dt(election.voting_ends_on, hour=18),
+                "El proceso de votación fue cerrado.",
+                "ok",
+            ),
+            ReportTimelineItem(
+                "votos",
+                "Total de votos registrados",
+                datetime.now() if votes_cast else None,
+                f"Se registraron {votes_cast} votos en el sistema.",
+                "ok",
+            ),
+            ReportTimelineItem(
+                "incidencias",
+                "Incidencias",
+                None,
+                "No se reportaron incidencias durante el proceso.",
+                "warn",
+            ),
             ReportTimelineItem(
                 "validacion",
                 "Validación del escrutinio",
                 datetime.now() if election.status in {"cerrada", "finalizada"} else None,
-                "Cierre de actas" if election.status in {"cerrada", "finalizada"} else "Pendiente",
+                "Resultados validados por el comité electoral."
+                if election.status in {"cerrada", "finalizada"}
+                else "Pendiente de validación.",
                 "ok" if election.status in {"cerrada", "finalizada"} else "muted",
             ),
         ]
@@ -819,12 +861,22 @@ class SqlAlchemyElectionsRepository:
             for row in rows
         ]
 
-    def add_message_log(self, election_id: int, template_key: str, channel: str, recipient: str) -> None:
+    def add_message_log(
+        self,
+        election_id: int,
+        template_key: str,
+        channel: str,
+        recipient: str,
+        user_id: int | None = None,
+        status: str = "enviado",
+    ) -> None:
         self.session.execute(
             text(
                 """
-                INSERT INTO election_message_logs (election_id, template_key, channel, recipient)
-                VALUES (:election_id, :template_key, :channel, :recipient)
+                INSERT INTO election_message_logs (
+                    election_id, template_key, channel, recipient, user_id, status
+                )
+                VALUES (:election_id, :template_key, :channel, :recipient, :user_id, :status)
                 """
             ),
             {
@@ -832,7 +884,36 @@ class SqlAlchemyElectionsRepository:
                 "template_key": template_key,
                 "channel": channel,
                 "recipient": recipient,
+                "user_id": user_id,
+                "status": status,
             },
+        )
+        self.session.commit()
+
+    def list_message_logs(self, election_id: int, template_key: str) -> list[dict]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT template_key, channel, recipient, user_id, status, created_at
+                FROM election_message_logs
+                WHERE election_id = :election_id AND template_key = :template_key
+                ORDER BY created_at DESC
+                """
+            ),
+            {"election_id": election_id, "template_key": template_key},
+        ).mappings()
+        return [dict(row) for row in rows]
+
+    def mark_template_sent(self, election_id: int, template_key: str, sent_at) -> None:
+        self.session.execute(
+            text(
+                """
+                UPDATE election_message_templates
+                SET last_sent_at = :sent_at
+                WHERE election_id = :election_id AND template_key = :template_key
+                """
+            ),
+            {"election_id": election_id, "template_key": template_key, "sent_at": sent_at},
         )
         self.session.commit()
 
@@ -864,6 +945,7 @@ class SqlAlchemyElectionsRepository:
                         u.last_conexion,
                         p.province,
                         p.city,
+                        COALESCE(p.type_profile, '') AS type_profile,
                         s.coverage_until
                     FROM users u
                     INNER JOIN model_has_roles mhr
@@ -922,6 +1004,8 @@ class SqlAlchemyElectionsRepository:
                 channel_email=row["channel_email"],
                 channel_portal=row["channel_portal"],
                 channel_internal=row["channel_internal"],
+                scheduled_at=row.get("scheduled_at"),
+                last_sent_at=row.get("last_sent_at"),
             )
             for row in rows
         ]
@@ -983,6 +1067,30 @@ class SqlAlchemyElectionsRepository:
             visible_to_members=row["visible_to_members"],
         )
 
+    def _ensure_message_schema(self) -> None:
+        if getattr(self.session, "_votaciones_message_schema", False):
+            return
+        self.session.execute(
+            text(
+                """
+                ALTER TABLE election_message_templates
+                    ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITHOUT TIME ZONE,
+                    ADD COLUMN IF NOT EXISTS last_sent_at TIMESTAMP WITHOUT TIME ZONE
+                """
+            )
+        )
+        self.session.execute(
+            text(
+                """
+                ALTER TABLE election_message_logs
+                    ADD COLUMN IF NOT EXISTS user_id BIGINT,
+                    ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'enviado'
+                """
+            )
+        )
+        self.session.commit()
+        setattr(self.session, "_votaciones_message_schema", True)
+
     def _election_from_row(self, row: Any) -> Election:
         return Election(
             id=row["id"],
@@ -1024,10 +1132,10 @@ class SqlAlchemyElectionsRepository:
         )
 
 
-def _as_dt(value: date | None) -> datetime | None:
+def _as_dt(value: date | None, hour: int = 0) -> datetime | None:
     if value is None:
         return None
-    return datetime.combine(value, datetime.min.time())
+    return datetime.combine(value, datetime.min.time().replace(hour=hour))
 
 
 # Keep import used by sequence helpers if tables are created empty in tests.

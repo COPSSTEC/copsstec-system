@@ -54,6 +54,8 @@ from app.modules.votaciones.presentation.api.schemas import (
     MemberPortalResponse,
     MessageActionRequest,
     MessageCountResponse,
+    MessageDeliveryResponse,
+    MessageTemplateResponse,
     MessagesWriteRequest,
     PositionResponse,
     PositionWriteRequest,
@@ -477,6 +479,8 @@ def list_voters(
     q: str = "",
     payment_status: str | None = None,
     enabled: bool | None = None,
+    type_profile: str | None = None,
+    location: str | None = None,
     page: int = 1,
     page_size: int = 8,
 ) -> VoterListResponse:
@@ -489,6 +493,8 @@ def list_voters(
             enabled=enabled,
             page=page,
             page_size=page_size,
+            type_profile=type_profile,
+            location=location,
         )
     except Exception as exc:
         raise _http_error(exc) from exc
@@ -609,7 +615,54 @@ def send_message(
 ) -> MessageCountResponse:
     try:
         current, *_rest = loader.execute(election_id)
-        sent = use_case.send(current.id, payload.template_key)
+        sent = use_case.send(current.id, payload.template_key, only_unsent=payload.only_unsent)
+    except Exception as exc:
+        raise _http_error(exc) from exc
+    return MessageCountResponse(sent=sent)
+
+
+@router.get("/admin/messages/status", response_model=list[MessageDeliveryResponse])
+def message_status(
+    _: Annotated[User, Depends(require_access("admin"))],
+    loader: Annotated[GetOrCreateElectionUseCase, Depends(get_or_create_election_use_case)],
+    use_case: Annotated[SaveMessagesUseCase, Depends(get_messages_use_case)],
+    election_id: int | None = None,
+) -> list[MessageDeliveryResponse]:
+    try:
+        current, *_rest = loader.execute(election_id)
+        return [MessageDeliveryResponse.from_domain(item) for item in use_case.status(current.id)]
+    except Exception as exc:
+        raise _http_error(exc) from exc
+
+
+@router.post("/admin/messages/schedule", response_model=MessageTemplateResponse)
+def schedule_message(
+    payload: MessageActionRequest,
+    _: Annotated[User, Depends(require_access("admin"))],
+    loader: Annotated[GetOrCreateElectionUseCase, Depends(get_or_create_election_use_case)],
+    use_case: Annotated[SaveMessagesUseCase, Depends(get_messages_use_case)],
+    election_id: int | None = None,
+) -> MessageTemplateResponse:
+    try:
+        current, *_rest = loader.execute(election_id)
+        scheduled = payload.scheduled_at.isoformat() if payload.scheduled_at else None
+        template = use_case.schedule(current.id, payload.template_key, scheduled)
+    except Exception as exc:
+        raise _http_error(exc) from exc
+    return MessageTemplateResponse.from_domain(template)
+
+
+@router.post("/admin/messages/resend", response_model=MessageCountResponse)
+def resend_message(
+    payload: MessageActionRequest,
+    _: Annotated[User, Depends(require_access("admin"))],
+    loader: Annotated[GetOrCreateElectionUseCase, Depends(get_or_create_election_use_case)],
+    use_case: Annotated[SaveMessagesUseCase, Depends(get_messages_use_case)],
+    election_id: int | None = None,
+) -> MessageCountResponse:
+    try:
+        current, *_rest = loader.execute(election_id)
+        sent = use_case.send(current.id, payload.template_key, only_unsent=True)
     except Exception as exc:
         raise _http_error(exc) from exc
     return MessageCountResponse(sent=sent)

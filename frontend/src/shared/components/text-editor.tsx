@@ -10,9 +10,10 @@ interface TextEditorProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   id?: string;
+  height?: number;
 }
 
-export function TextEditor({ value, onChange, disabled = false, id }: TextEditorProps) {
+export function TextEditor({ value, onChange, disabled = false, id, height = 360 }: TextEditorProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -40,13 +41,13 @@ export function TextEditor({ value, onChange, disabled = false, id }: TextEditor
   }
 
   return (
-    <div className="text-editor" onClick={(event) => event.stopPropagation()}>
+    <div className="text-editor" onClick={(event) => event.stopPropagation()} style={{ minHeight: height }}>
       <Editor
         apiKey={API_KEY}
         disabled={disabled}
         id={id}
         init={{
-          height: 360,
+          height,
           menubar: true,
           branding: false,
           plugins: [

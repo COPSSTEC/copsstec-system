@@ -94,6 +94,8 @@ class ElectionsRepository(Protocol):
         page: int,
         page_size: int,
         today: date,
+        type_profile: str | None = None,
+        location: str | None = None,
     ) -> VoterListResult:
         ...
 
@@ -133,7 +135,21 @@ class ElectionsRepository(Protocol):
     def list_notices(self, election_id: int, user_id: int) -> list[ElectionNotice]:
         ...
 
-    def add_message_log(self, election_id: int, template_key: str, channel: str, recipient: str) -> None:
+    def add_message_log(
+        self,
+        election_id: int,
+        template_key: str,
+        channel: str,
+        recipient: str,
+        user_id: int | None = None,
+        status: str = "enviado",
+    ) -> None:
+        ...
+
+    def list_message_logs(self, election_id: int, template_key: str) -> list[dict]:
+        ...
+
+    def mark_template_sent(self, election_id: int, template_key: str, sent_at) -> None:
         ...
 
     def member_emails(self, election_id: int, only_enabled: bool, only_pending_vote: bool) -> list[tuple[int, str, str]]:

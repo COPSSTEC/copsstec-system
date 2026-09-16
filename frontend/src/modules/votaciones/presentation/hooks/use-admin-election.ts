@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
-import type { Election, ElectionList, ElectionReport, VoterListResult } from "@/modules/votaciones/domain/types";
+import type { Election, ElectionList, ElectionReport, MessageDelivery, VoterListResult } from "@/modules/votaciones/domain/types";
 import {
   closeElection,
   createList,
@@ -15,12 +15,16 @@ import {
   exportReport,
   exportVoters,
   getAdminElection,
+  getMessageStatus,
   getReports,
   listAdminLists,
   listVoters,
   publishCalendar,
+  reorderPositions,
+  resendMessage,
   saveCalendar,
   saveMessages,
+  scheduleMessage,
   sendMessage,
   startElection,
   syncVoters,
@@ -36,15 +40,40 @@ export function useAdminElection(initialElectionId?: number) {
   const [lists, setLists] = useState<ElectionList[]>([]);
   const [voters, setVoters] = useState<VoterListResult | null>(null);
   const [report, setReport] = useState<ElectionReport | null>(null);
+  const [messageStatus, setMessageStatus] = useState<MessageDelivery[]>([]);
   const [electionId, setElectionId] = useState<number | undefined>(initialElectionId);
   const [voterQuery, setVoterQuery] = useState("");
+  const [voterPayment, setVoterPayment] = useState("");
+  const [voterType, setVoterType] = useState("");
+  const [voterLocation, setVoterLocation] = useState("");
+  const [voterPage, setVoterPage] = useState(1);
+  const [voterPageSize, setVoterPageSize] = useState(8);
   const [isLoading, setIsLoading] = useState(true);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const loadGeneration = useRef(0);
-  const voterQueryRef = useRef(voterQuery);
-  voterQueryRef.current = voterQuery;
+  const voterFiltersRef = useRef({
+    q: "",
+    payment_status: "",
+    type_profile: "",
+    location: "",
+    page: 1,
+    page_size: 8,
+  });
+
+  function currentVoterQuery(overrides?: Partial<typeof voterFiltersRef.current>) {
+    const next = { ...voterFiltersRef.current, ...overrides };
+    voterFiltersRef.current = next;
+    return {
+      q: next.q || undefined,
+      payment_status: next.payment_status || undefined,
+      type_profile: next.type_profile || undefined,
+      location: next.location || undefined,
+      page: next.page,
+      page_size: next.page_size,
+    };
+  }
 
   const token = () => {
     const value = getStoredToken();
@@ -72,7 +101,7 @@ export function useAdminElection(initialElectionId?: number) {
       }
       setLists(items);
       const [padro, snapshot] = await Promise.all([
-        listVoters(session, { q: voterQueryRef.current, page: 1, page_size: 8 }, current.id).catch(() => null),
+        listVoters(session, currentVoterQuery(), current.id).catch(() => null),
         getReports(session, current.id).catch(() => null),
       ]);
       if (generation !== loadGeneration.current) {
@@ -122,6 +151,7 @@ export function useAdminElection(initialElectionId?: number) {
     lists,
     voters,
     report,
+    messageStatus,
     electionId,
     isLoading,
     isMutating,
@@ -129,6 +159,11 @@ export function useAdminElection(initialElectionId?: number) {
     notice,
     voterQuery,
     setVoterQuery,
+    voterPayment,
+    voterType,
+    voterLocation,
+    voterPage,
+    voterPageSize,
     reload: () => load(electionId),
     selectPeriod: (id: number) => load(id),
     saveElection: (payload: Partial<Election>) =>
@@ -169,6 +204,12 @@ export function useAdminElection(initialElectionId?: number) {
         await deletePosition(token(), id, electionId);
         await load(electionId);
       }, "Cargo eliminado."),
+    reorderPositions: (ids: number[]) =>
+      run(async () => {
+        const updated = await reorderPositions(token(), ids, electionId);
+        setElection(updated);
+        return updated;
+      }),
     saveCalendarEvents: (events: Election["calendar"]) =>
       run(async () => {
         const updated = await saveCalendar(
@@ -208,20 +249,39 @@ export function useAdminElection(initialElectionId?: number) {
         await deleteList(token(), listId, electionId);
         setLists((current) => current.filter((item) => item.id !== listId));
       }, "Lista eliminada."),
-    loadVoters: (q?: string) =>
+    loadVoters: (overrides?: {
+      q?: string;
+      payment_status?: string;
+      type_profile?: string;
+      location?: string;
+      page?: number;
+      page_size?: number;
+    }) =>
       run(async () => {
-        const result = await listVoters(token(), { q: q ?? voterQuery, page: 1, page_size: 8 }, electionId);
+        if (overrides?.q !== undefined) setVoterQuery(overrides.q);
+        if (overrides?.payment_status !== undefined) setVoterPayment(overrides.payment_status);
+        if (overrides?.type_profile !== undefined) setVoterType(overrides.type_profile);
+        if (overrides?.location !== undefined) setVoterLocation(overrides.location);
+        if (overrides?.page !== undefined) setVoterPage(overrides.page);
+        if (overrides?.page_size !== undefined) setVoterPageSize(overrides.page_size);
+        const result = await listVoters(token(), currentVoterQuery(overrides), electionId);
         setVoters(result);
         return result;
       }),
-    toggleVote: (userId: number, enabled: boolean) =>
+    toggleVote: (userId: number, enabled: boolean, fullName?: string) =>
       run(async () => {
-        const result = await toggleVoter(token(), userId, enabled, electionId);
+        await toggleVoter(token(), userId, enabled, electionId);
+        const result = await listVoters(token(), currentVoterQuery(), electionId);
         setVoters(result);
-      }),
+        return result;
+      }, enabled
+        ? `${fullName || "El miembro"} ya puede votar.`
+        : `Se retiró el derecho a voto${fullName ? ` de ${fullName}` : ""}.`),
     syncPadron: () =>
       run(async () => {
-        const result = await syncVoters(token(), electionId);
+        await syncVoters(token(), electionId);
+        const result = await listVoters(token(), currentVoterQuery({ page: 1 }), electionId);
+        setVoterPage(1);
         setVoters(result);
       }, "Padrón sincronizado."),
     exportPadron: () => run(() => exportVoters(token(), electionId)),
@@ -229,9 +289,41 @@ export function useAdminElection(initialElectionId?: number) {
       run(async () => {
         const updated = await saveMessages(token(), templates, electionId);
         setElection(updated);
+        const rows = await getMessageStatus(token(), electionId);
+        setMessageStatus(rows);
       }, "Plantillas guardadas."),
     sendTest: (key: string, email: string) => run(() => testMessage(token(), key, email, electionId), "Mensaje de prueba enviado."),
-    dispatchMessage: (key: string) => run(() => sendMessage(token(), key, electionId), "Mensajes enviados."),
+    dispatchMessage: (key: string) =>
+      run(async () => {
+        const result = await sendMessage(token(), key, electionId);
+        const rows = await getMessageStatus(token(), electionId);
+        setMessageStatus(rows);
+        return result;
+      }, "Mensajes enviados."),
+    refreshMessageStatus: async () => {
+      try {
+        const rows = await getMessageStatus(token(), electionId);
+        setMessageStatus(rows);
+        return rows;
+      } catch {
+        return [];
+      }
+    },
+    scheduleDispatch: (key: string, scheduledAt: string | null) =>
+      run(async () => {
+        await scheduleMessage(token(), key, scheduledAt, electionId);
+        const updated = await getAdminElection(token(), electionId);
+        setElection(updated);
+        const rows = await getMessageStatus(token(), electionId);
+        setMessageStatus(rows);
+      }, scheduledAt ? "Envío programado para este mensaje." : "Se quitó la programación."),
+    resendUnsent: (key: string) =>
+      run(async () => {
+        const result = await resendMessage(token(), key, electionId);
+        const rows = await getMessageStatus(token(), electionId);
+        setMessageStatus(rows);
+        return result;
+      }, "Se reenvió el mensaje a los destinatarios pendientes."),
     exportPdf: () => run(() => exportReport(token(), "pdf", electionId)),
     exportExcel: () => run(() => exportReport(token(), "xlsx", electionId)),
     generateActa: () => run(() => downloadActa(token(), electionId)),

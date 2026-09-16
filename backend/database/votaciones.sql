@@ -149,6 +149,8 @@ CREATE TABLE IF NOT EXISTS election_message_templates (
     channel_email BOOLEAN NOT NULL DEFAULT TRUE,
     channel_portal BOOLEAN NOT NULL DEFAULT TRUE,
     channel_internal BOOLEAN NOT NULL DEFAULT FALSE,
+    scheduled_at TIMESTAMP WITHOUT TIME ZONE,
+    last_sent_at TIMESTAMP WITHOUT TIME ZONE,
     UNIQUE (election_id, template_key)
 );
 
@@ -171,5 +173,7 @@ CREATE TABLE IF NOT EXISTS election_message_logs (
     template_key VARCHAR(40) NOT NULL,
     channel VARCHAR(20) NOT NULL,
     recipient VARCHAR(180) NOT NULL,
+    user_id BIGINT,
+    status VARCHAR(20) NOT NULL DEFAULT 'enviado',
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
 );

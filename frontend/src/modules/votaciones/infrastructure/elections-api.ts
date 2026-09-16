@@ -3,6 +3,7 @@ import type {
   ElectionList,
   ElectionReport,
   MemberPortal,
+  MessageDelivery,
   VoterListResult,
 } from "@/modules/votaciones/domain/types";
 
@@ -148,6 +149,15 @@ export async function deletePosition(token: string, positionId: number, election
   return parseResponse(response);
 }
 
+export async function reorderPositions(token: string, ids: number[], electionId?: number): Promise<Election> {
+  const response = await fetch(withElection("/api/votaciones/admin/positions/reorder", electionId), {
+    method: "PUT",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify({ ids }),
+  });
+  return parseResponse<Election>(response);
+}
+
 export async function saveCalendar(
   token: string,
   events: Array<{ event_key: string; title: string; starts_on: string | null; ends_on: string | null }>,
@@ -288,13 +298,23 @@ export async function uploadCandidatePhoto(
 
 export async function listVoters(
   token: string,
-  query: { q?: string; payment_status?: string; enabled?: boolean; page?: number; page_size?: number },
+  query: {
+    q?: string;
+    payment_status?: string;
+    enabled?: boolean;
+    type_profile?: string;
+    location?: string;
+    page?: number;
+    page_size?: number;
+  },
   electionId?: number,
 ): Promise<VoterListResult> {
   const params = new URLSearchParams();
   if (query.q) params.set("q", query.q);
   if (query.payment_status) params.set("payment_status", query.payment_status);
   if (query.enabled !== undefined) params.set("enabled", String(query.enabled));
+  if (query.type_profile) params.set("type_profile", query.type_profile);
+  if (query.location) params.set("location", query.location);
   params.set("page", String(query.page ?? 1));
   params.set("page_size", String(query.page_size ?? 8));
   const response = await fetch(withElection(`/api/votaciones/admin/voters?${params}`, electionId), {
@@ -348,7 +368,32 @@ export async function sendMessage(token: string, templateKey: string, electionId
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ template_key: templateKey }),
   });
-  return parseResponse(response);
+  return parseResponse<{ sent: number }>(response);
+}
+
+export async function getMessageStatus(token: string, electionId?: number) {
+  const response = await fetch(withElection("/api/votaciones/admin/messages/status", electionId), {
+    headers: authHeaders(token),
+  });
+  return parseResponse<MessageDelivery[]>(response);
+}
+
+export async function scheduleMessage(token: string, templateKey: string, scheduledAt: string | null, electionId?: number) {
+  const response = await fetch(withElection("/api/votaciones/admin/messages/schedule", electionId), {
+    method: "POST",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify({ template_key: templateKey, scheduled_at: scheduledAt }),
+  });
+  return parseResponse<Election["templates"][number]>(response);
+}
+
+export async function resendMessage(token: string, templateKey: string, electionId?: number) {
+  const response = await fetch(withElection("/api/votaciones/admin/messages/resend", electionId), {
+    method: "POST",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify({ template_key: templateKey }),
+  });
+  return parseResponse<{ sent: number }>(response);
 }
 
 export async function getReports(token: string, electionId?: number): Promise<ElectionReport> {

@@ -57,6 +57,18 @@ export interface MessageTemplate {
   channel_email: boolean;
   channel_portal: boolean;
   channel_internal: boolean;
+  scheduled_at: string | null;
+  last_sent_at: string | null;
+}
+
+export interface MessageDelivery {
+  template_key: string;
+  scheduled_at: string | null;
+  last_sent_at: string | null;
+  total: number;
+  sent: number;
+  pending: number;
+  failed: number;
 }
 
 export interface ElectionCandidate {
@@ -145,6 +157,7 @@ export interface ElectionVoter {
   has_voted: boolean;
   province: string;
   city: string;
+  type_profile?: string;
 }
 
 export interface VoterListResult {
@@ -154,6 +167,7 @@ export interface VoterListResult {
   disabled_count: number;
   pending_payment_count: number;
   padro_total: number;
+  provinces?: string[];
 }
 
 export interface ReportRow {
@@ -208,7 +222,7 @@ export interface MemberPortal {
 }
 
 export type AdminTab = "listas" | "calendario" | "configuracion" | "votantes" | "reportes";
-export type ConfigPanel = "general" | "cargos" | "diseno" | "opciones" | "mensajes";
+export type ConfigPanel = "cargos" | "diseno" | "opciones" | "mensajes";
 
 export const ELECTION_STATUS_LABELS: Record<ElectionStatus, string> = {
   en_preparacion: "En preparación",
@@ -245,6 +259,21 @@ export function formatDate(value: string | null | undefined): string {
     return value;
   }
   return `${day}/${month}/${year}`;
+}
+
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) {
+    return "—";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${day}/${month}/${date.getFullYear()} ${hours}:${minutes}`;
 }
 
 export const SINGLE_DATE_CALENDAR_KEYS = [

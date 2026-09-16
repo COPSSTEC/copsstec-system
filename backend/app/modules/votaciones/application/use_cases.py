@@ -1,5 +1,7 @@
-from datetime import date
+import re
+from datetime import date, datetime
 from hashlib import sha256
+from html import unescape
 from uuid import uuid4
 
 from app.modules.votaciones.application.ports import (
@@ -23,6 +25,7 @@ from app.modules.votaciones.domain.entities import (
     ElectionVoter,
     GuideStep,
     MemberPortal,
+    MessageDelivery,
     MessageTemplate,
     VoteChoice,
     VoterListResult,
@@ -62,7 +65,7 @@ def build_guide(election: Election, lists_count: int, voters_count: int, votes_c
         GuideStep("calendar", "Carga las 9 fechas del calendario", "/admin/votaciones/calendario", calendar_ready),
         GuideStep("lists", "Registra las listas con los cargos definidos", "/admin/votaciones/listas", lists_count > 0),
         GuideStep("voters", "Sincroniza el padrón de votantes", "/admin/votaciones/votantes", voters_count > 0),
-        GuideStep("open", "Publica o abre la votación", "/admin/votaciones/configuracion?panel=general", election.status in {"publicada", "en_votacion"}),
+        GuideStep("open", "Publica o abre la votación", "/admin/votaciones/configuracion?panel=diseno", election.status in {"publicada", "en_votacion"}),
         GuideStep("reports", "Consulta reportes y cierra el periodo", "/admin/votaciones/reportes", votes_count > 0 or election.status in CLOSED_STATUSES),
     ]
 
@@ -441,6 +444,8 @@ class ManageVotersUseCase:
         enabled: bool | None = None,
         page: int = 1,
         page_size: int = 8,
+        type_profile: str | None = None,
+        location: str | None = None,
     ) -> VoterListResult:
         _require_election(self.repository, election_id)
         return self.repository.list_voters(
@@ -451,6 +456,8 @@ class ManageVotersUseCase:
             page=page,
             page_size=page_size,
             today=_today(),
+            type_profile=type_profile,
+            location=location,
         )
 
     def toggle(self, election_id: int, user_id: int, enabled: bool) -> Election:
@@ -488,10 +495,14 @@ class SaveMessagesUseCase:
                     template_key=key,
                     title=str(data.get("title") or title),
                     subject=str(data.get("subject") or subject)[:180],
-                    body=str(data.get("body") or body)[:500],
+                    body=str(data.get("body") or body)[:20000],
                     channel_email=bool(data.get("channel_email", True)),
                     channel_portal=bool(data.get("channel_portal", True)),
                     channel_internal=bool(data.get("channel_internal", False)),
+                    scheduled_at=_parse_dt(data.get("scheduled_at"))
+                    if data.get("scheduled_at") is not None
+                    else next((item.scheduled_at for item in election.templates if item.template_key == key), None),
+                    last_sent_at=next((item.last_sent_at for item in election.templates if item.template_key == key), None),
                 )
             )
         return self.repository.replace_templates(election.id, mapped)
@@ -515,26 +526,108 @@ class SaveMessagesUseCase:
             fecha_fin=_fmt(end),
         )
         self.notifier.send(email, subject, body)
-        self.repository.add_message_log(election.id, template_key, "email", email)
+        self.repository.add_message_log(election.id, template_key, "email", email, None, "enviado")
 
-    def send(self, election_id: int, template_key: str) -> int:
+    def send(self, election_id: int, template_key: str, only_unsent: bool = False) -> int:
         election = _require_election(self.repository, election_id)
         assert_writable(election)
+        return self._deliver(election, template_key, only_unsent=only_unsent)
+
+    def schedule(self, election_id: int, template_key: str, scheduled_at: str | None) -> MessageTemplate:
+        election = _require_election(self.repository, election_id)
+        assert_writable(election)
+        when = _parse_dt(scheduled_at)
+        mapped = []
+        for item in election.templates:
+            mapped.append(
+                MessageTemplate(
+                    id=item.id,
+                    election_id=item.election_id,
+                    template_key=item.template_key,
+                    title=item.title,
+                    subject=item.subject,
+                    body=item.body,
+                    channel_email=item.channel_email,
+                    channel_portal=item.channel_portal,
+                    channel_internal=item.channel_internal,
+                    scheduled_at=when if item.template_key == template_key else item.scheduled_at,
+                    last_sent_at=item.last_sent_at,
+                )
+            )
+        saved = self.repository.replace_templates(election.id, mapped)
+        if when and when <= datetime.now():
+            self._deliver(election, template_key, only_unsent=False)
+            election = _require_election(self.repository, election_id)
+            return _template(election, template_key)
+        return next(item for item in saved if item.template_key == template_key)
+
+    def status(self, election_id: int) -> list[MessageDelivery]:
+        election = _require_election(self.repository, election_id)
+        self.process_due(election_id)
+        election = _require_election(self.repository, election_id)
+        result: list[MessageDelivery] = []
+        for template in election.templates:
+            only_pending = template.template_key == "recordatorio"
+            recipients = self.repository.member_emails(election.id, only_enabled=True, only_pending_vote=only_pending)
+            logs = self.repository.list_message_logs(election.id, template.template_key)
+            sent_ids, sent_emails = _sent_recipients(logs)
+            failed = sum(1 for item in logs if item.get("status") == "fallido")
+            sent = 0
+            pending = 0
+            for user_id, _name, email in recipients:
+                if user_id in sent_ids or (email and email.lower() in sent_emails):
+                    sent += 1
+                else:
+                    pending += 1
+            result.append(
+                MessageDelivery(
+                    template_key=template.template_key,
+                    scheduled_at=template.scheduled_at,
+                    last_sent_at=template.last_sent_at,
+                    total=len(recipients),
+                    sent=sent,
+                    pending=pending,
+                    failed=failed,
+                )
+            )
+        return result
+
+    def process_due(self, election_id: int) -> None:
+        election = self.repository.get_election(election_id)
+        if election is None or election.status in {"cerrada", "finalizada"}:
+            return
+        now = datetime.now()
+        for template in election.templates:
+            if not template.scheduled_at or template.scheduled_at > now:
+                continue
+            if template.last_sent_at and template.last_sent_at >= template.scheduled_at:
+                continue
+            self._deliver(election, template.template_key, only_unsent=True)
+
+    def _deliver(self, election: Election, template_key: str, only_unsent: bool) -> int:
         template = _template(election, template_key)
         only_pending = template_key == "recordatorio"
         recipients = self.repository.member_emails(election.id, only_enabled=True, only_pending_vote=only_pending)
+        logs = self.repository.list_message_logs(election.id, template_key) if only_unsent else []
+        sent_ids, sent_emails = _sent_recipients(logs)
         start, end = voting_window(election)
         sent = 0
         for user_id, name, email in recipients:
+            if only_unsent and (user_id in sent_ids or (email and email.lower() in sent_emails)):
+                continue
             subject = render_template(template.subject, nombre=name, titulo=election.title, fecha_inicio=_fmt(start), fecha_fin=_fmt(end))
             body = render_template(template.body, nombre=name, titulo=election.title, fecha_inicio=_fmt(start), fecha_fin=_fmt(end))
             if template.channel_email and email:
-                self.notifier.send(email, subject, body)
-                self.repository.add_message_log(election.id, template_key, "email", email)
+                try:
+                    self.notifier.send(email, subject, body)
+                    self.repository.add_message_log(election.id, template_key, "email", email, user_id, "enviado")
+                except Exception:
+                    self.repository.add_message_log(election.id, template_key, "email", email, user_id, "fallido")
             if template.channel_portal or template.channel_internal:
-                self.repository.add_notice(election.id, user_id, template_key, subject, body)
-                self.repository.add_message_log(election.id, template_key, "portal", email or str(user_id))
+                self.repository.add_notice(election.id, user_id, template_key, subject, _html_to_text(body))
+                self.repository.add_message_log(election.id, template_key, "portal", email or str(user_id), user_id, "enviado")
             sent += 1
+        self.repository.mark_template_sent(election.id, template_key, datetime.now())
         return sent
 
 
@@ -668,6 +761,43 @@ def _template(election: Election, template_key: str) -> MessageTemplate:
         if item.template_key == template_key:
             return item
     raise ElectionValidationError("Plantilla no encontrada.")
+
+
+def _parse_dt(value: object) -> datetime | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None) if value.tzinfo else value
+    text = str(value).strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ElectionValidationError("La fecha programada no es válida.") from exc
+    return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+
+
+def _html_to_text(value: str) -> str:
+    text = re.sub(r"(?i)<br\s*/?>", "\n", value)
+    text = re.sub(r"(?i)</p>", "\n\n", text)
+    text = re.sub(r"(?i)</div>", "\n", text)
+    text = re.sub(r"(?i)</li>", "\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    return unescape(re.sub(r"\n{3,}", "\n\n", text)).strip()
+
+
+def _sent_recipients(logs: list[dict]) -> tuple[set[int], set[str]]:
+    user_ids: set[int] = set()
+    emails: set[str] = set()
+    for item in logs:
+        if item.get("status") != "enviado":
+            continue
+        user_id = item.get("user_id")
+        if user_id:
+            user_ids.add(int(user_id))
+        recipient = str(item.get("recipient") or "").strip().lower()
+        if "@" in recipient:
+            emails.add(recipient)
+    return user_ids, emails
 
 
 def _parse_date(value: object) -> date | None:

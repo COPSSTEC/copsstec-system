@@ -17,16 +17,11 @@ import {
   type Election,
 } from "@/modules/votaciones/domain/types";
 import { AdminCalendarPanel } from "@/modules/votaciones/presentation/components/admin-calendar-panel";
+import { AdminReportsPanel } from "@/modules/votaciones/presentation/components/admin-reports-panel";
+import { AdminSettingsPanel } from "@/modules/votaciones/presentation/components/admin-settings-panel";
+import { AdminVotersPanel } from "@/modules/votaciones/presentation/components/admin-voters-panel";
 import { ListMemberPreview } from "@/modules/votaciones/presentation/components/list-member-preview";
 import { useAdminElection } from "@/modules/votaciones/presentation/hooks/use-admin-election";
-
-const CONFIG_PANELS: Array<{ id: ConfigPanel; label: string }> = [
-  { id: "general", label: "Información general" },
-  { id: "cargos", label: "Cargos y requisitos" },
-  { id: "diseno", label: "Diseño y visibilidad" },
-  { id: "opciones", label: "Opciones de votación" },
-  { id: "mensajes", label: "Mensajes y notificaciones" },
-];
 
 const SECTION_META: Record<AdminTab, { title: string; description: string }> = {
   listas: {
@@ -55,14 +50,16 @@ export function AdminElectionsPage({ section }: { section: AdminTab }) {
   const params = useSearchParams();
   const router = useRouter();
   const admin = useAdminElection();
-  const panel = (params.get("panel") as ConfigPanel) || "cargos";
+  const requestedPanel = params.get("panel");
+  const panel: ConfigPanel =
+    requestedPanel === "diseno" || requestedPanel === "opciones" || requestedPanel === "mensajes" || requestedPanel === "cargos"
+      ? requestedPanel
+      : "cargos";
   const [showGuide, setShowGuide] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("votaciones-guide") !== "hidden";
   });
   const [newListName, setNewListName] = useState("");
-  const [newPosition, setNewPosition] = useState("");
-  const [testEmail, setTestEmail] = useState("");
 
   const election = admin.election;
   const meta = SECTION_META[section];
@@ -83,23 +80,25 @@ export function AdminElectionsPage({ section }: { section: AdminTab }) {
   return (
     <RoleGate requiredAccess="admin">
       <section className="votaciones-admin">
-        <header className="page-heading page-heading-actions">
-          <div>
-            <h1>{meta.title}</h1>
-            <p>{meta.description}</p>
-          </div>
-          <div className="votaciones-heading-tools">
-            {election ? (
-              <button className="votaciones-guide-trigger" onClick={() => setShowGuide(true)} type="button">
-                Guía de inicio
-                <em>
-                  {guideDone}/{guideTotal}
-                </em>
-              </button>
-            ) : null}
-            <span className="muted">Rol: Administrador</span>
-          </div>
-        </header>
+        {section === "votantes" || section === "reportes" || section === "configuracion" ? null : (
+          <header className="page-heading page-heading-actions">
+            <div>
+              <h1>{meta.title}</h1>
+              <p>{meta.description}</p>
+            </div>
+            <div className="votaciones-heading-tools">
+              {election ? (
+                <button className="votaciones-guide-trigger" onClick={() => setShowGuide(true)} type="button">
+                  Guía de inicio
+                  <em>
+                    {guideDone}/{guideTotal}
+                  </em>
+                </button>
+              ) : null}
+              <span className="muted">Rol: Administrador</span>
+            </div>
+          </header>
+        )}
 
         {admin.error ? (
           <div className="action-alert action-alert-error">
@@ -116,7 +115,7 @@ export function AdminElectionsPage({ section }: { section: AdminTab }) {
 
         {election ? (
           <>
-            {section === "calendario" ? null : (
+            {section === "calendario" || section === "votantes" || section === "reportes" || section === "configuracion" ? null : (
               <PeriodBar admin={admin} election={election} showPeriodActions={section === "configuracion"} />
             )}
             {showGuide ? <GuideModal election={election} onClose={closeGuide} /> : null}
@@ -133,20 +132,16 @@ export function AdminElectionsPage({ section }: { section: AdminTab }) {
             ) : null}
             {section === "calendario" ? <AdminCalendarPanel admin={admin} election={election} key={election.id} /> : null}
             {section === "configuracion" ? (
-              <SettingsPanel
+              <AdminSettingsPanel
                 key={election.id}
                 admin={admin}
                 election={election}
-                newPosition={newPosition}
-                onNewPosition={setNewPosition}
                 panel={panel}
                 setPanel={setPanel}
-                testEmail={testEmail}
-                setTestEmail={setTestEmail}
               />
             ) : null}
-            {section === "votantes" ? <VotersPanel admin={admin} /> : null}
-            {section === "reportes" ? <ReportsPanel admin={admin} /> : null}
+            {section === "votantes" ? <AdminVotersPanel admin={admin} election={election} /> : null}
+            {section === "reportes" ? <AdminReportsPanel admin={admin} election={election} /> : null}
           </>
         ) : admin.isLoading ? null : (
           <p className="muted">No se pudo cargar el periodo.</p>
@@ -426,408 +421,3 @@ function ListsPanel({
   );
 }
 
-function SettingsPanel({
-  admin,
-  election,
-  panel,
-  setPanel,
-  newPosition,
-  onNewPosition,
-  testEmail,
-  setTestEmail,
-}: {
-  admin: ReturnType<typeof useAdminElection>;
-  election: Election;
-  panel: ConfigPanel;
-  setPanel: (value: ConfigPanel) => void;
-  newPosition: string;
-  onNewPosition: (value: string) => void;
-  testEmail: string;
-  setTestEmail: (value: string) => void;
-}) {
-  const [draft, setDraft] = useState(election);
-  const [templates, setTemplates] = useState(election.templates);
-  const readonly = election.is_readonly;
-
-  function patch<K extends keyof Election>(key: K, value: Election[K]) {
-    setDraft((current) => ({ ...current, [key]: value }));
-  }
-
-  return (
-    <section className="votaciones-settings">
-      <div className="page-heading page-heading-actions">
-        <button className="primary-button" disabled={readonly} onClick={() => void admin.saveElection(draft)} type="button">
-          Guardar cambios
-        </button>
-      </div>
-      <nav className="votaciones-subtabs">
-        {CONFIG_PANELS.map((item) => (
-          <button className={panel === item.id ? "is-active" : ""} key={item.id} onClick={() => setPanel(item.id)} type="button">
-            {item.label}
-          </button>
-        ))}
-      </nav>
-
-      {panel === "general" ? (
-        <div className="votaciones-form-grid">
-          <label>Título<input disabled={readonly} onChange={(e) => patch("title", e.target.value)} value={draft.title} /></label>
-          <label>Mensaje principal<input disabled={readonly} onChange={(e) => patch("subtitle", e.target.value)} value={draft.subtitle} /></label>
-          <label>Frase institucional<input disabled={readonly} onChange={(e) => patch("tagline", e.target.value)} value={draft.tagline} /></label>
-          <label>Estado
-            <select disabled={readonly} onChange={(e) => patch("status", e.target.value as Election["status"])} value={draft.status}>
-              {Object.entries(ELECTION_STATUS_LABELS).filter(([key]) => key !== "cerrada" && key !== "finalizada").map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-      ) : null}
-
-      {panel === "cargos" ? (
-        <div className="votaciones-settings-grid">
-          <section className="card">
-            <div className="page-heading page-heading-actions">
-              <h3>Cargos de la lista</h3>
-              <form
-                className="votaciones-inline-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!newPosition.trim()) return;
-                  void admin.addPosition(newPosition).then(() => onNewPosition(""));
-                }}
-              >
-                <input onChange={(e) => onNewPosition(e.target.value)} placeholder="Nuevo cargo" value={newPosition} />
-                <button className="primary-button" disabled={readonly} type="submit">Agregar cargo</button>
-              </form>
-            </div>
-            <table className="votaciones-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Cargo</th>
-                  <th>Activo</th>
-                  <th>Foto</th>
-                  <th>Nombre</th>
-                  <th>Perfil</th>
-                  <th>Profesión</th>
-                  <th>Visible</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {election.positions.map((position) => (
-                  <tr key={position.id}>
-                    <td>{position.sort_order}</td>
-                    <td>{position.name}</td>
-                    {(["is_active", "photo_required", "full_name_required", "short_profile_required", "profession_required", "visible_to_members"] as const).map((flag) => (
-                      <td key={flag}>
-                        <input
-                          checked={position[flag]}
-                          disabled={readonly}
-                          onChange={(event) => void admin.patchPosition(position.id, { [flag]: event.target.checked })}
-                          type="checkbox"
-                        />
-                      </td>
-                    ))}
-                    <td>
-                      <button className="secondary-button" disabled={readonly} onClick={() => void admin.removePosition(position.id)} type="button">
-                        Quitar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-          <aside className="card">
-            <h3>Requisitos para inscripción</h3>
-            {([
-              ["work_plan_required", "Plan de trabajo obligatorio"],
-              ["photo_required", "Foto de cada integrante"],
-              ["accept_position_required", "Aceptación de cargo"],
-              ["list_logo_enabled", "Logo de la lista"],
-              ["list_color_required", "Color distintivo"],
-              ["backing_document_required", "Documento de respaldo"],
-            ] as const).map(([key, label]) => (
-              <label className="votaciones-switch" key={key}>
-                <input checked={Boolean(draft[key])} disabled={readonly} onChange={(e) => patch(key, e.target.checked)} type="checkbox" />
-                {label}
-              </label>
-            ))}
-            <label>Fecha límite
-              <input disabled={readonly} onChange={(e) => patch("registration_deadline", e.target.value)} type="date" value={draft.registration_deadline ?? ""} />
-            </label>
-            <label>Tamaño máximo (MB)
-              <input disabled={readonly} max={20} min={1} onChange={(e) => patch("max_file_mb", Number(e.target.value))} type="number" value={draft.max_file_mb} />
-            </label>
-          </aside>
-        </div>
-      ) : null}
-
-      {panel === "diseno" ? (
-        <div className="votaciones-settings-grid">
-          <section className="card">
-            <label>Logo del proceso
-              <input disabled={readonly} onChange={(e) => e.target.files?.[0] && void admin.uploadMedia("logo", e.target.files[0])} type="file" />
-            </label>
-            <label>Banner
-              <input disabled={readonly} onChange={(e) => e.target.files?.[0] && void admin.uploadMedia("banner", e.target.files[0])} type="file" />
-            </label>
-            <label>Color principal<input disabled={readonly} onChange={(e) => patch("primary_color", e.target.value)} type="color" value={draft.primary_color} /></label>
-            <label>Color secundario<input disabled={readonly} onChange={(e) => patch("secondary_color", e.target.value)} type="color" value={draft.secondary_color} /></label>
-            {([
-              ["show_work_plan", "Mostrar plan de trabajo"],
-              ["show_all_photos", "Mostrar fotos de integrantes"],
-              ["show_process_status", "Mostrar estado del proceso"],
-              ["auto_publish_on_vote_start", "Publicar automáticamente al iniciar votación"],
-            ] as const).map(([key, label]) => (
-              <label className="votaciones-switch" key={key}>
-                <input checked={Boolean(draft[key])} disabled={readonly} onChange={(e) => patch(key, e.target.checked)} type="checkbox" />
-                {label}
-              </label>
-            ))}
-          </section>
-          <aside className="votaciones-design-preview" style={{ background: draft.primary_color }}>
-            <p>Vista previa para miembros</p>
-            <h3>{draft.title}</h3>
-            <span>{draft.subtitle}</span>
-          </aside>
-        </div>
-      ) : null}
-
-      {panel === "opciones" ? (
-        <div className="votaciones-settings-grid">
-          <section className="card">
-            <h3>Tipo de elección</h3>
-            <label className="votaciones-choice">
-              <input checked={draft.election_type === "lista_completa"} disabled={readonly} onChange={() => patch("election_type", "lista_completa")} type="radio" />
-              Lista completa
-            </label>
-            <label className="votaciones-choice">
-              <input checked={draft.election_type === "voto_por_cargos"} disabled={readonly} onChange={() => patch("election_type", "voto_por_cargos")} type="radio" />
-              Voto por cargos
-            </label>
-            <h3>Reglas</h3>
-            {([
-              ["secret_vote", "Voto secreto"],
-              ["confirm_vote", "Confirmación de voto"],
-              ["allow_blank_vote", "Permitir voto en blanco"],
-              ["show_work_plan", "Mostrar plan de trabajo de las listas"],
-            ] as const).map(([key, label]) => (
-              <label className="votaciones-switch" key={key}>
-                <input checked={Boolean(draft[key])} disabled={readonly} onChange={(e) => patch(key, e.target.checked)} type="checkbox" />
-                {label}
-              </label>
-            ))}
-            <p className="muted">La votación es siempre virtual. La autenticación usa el usuario y contraseña del portal.</p>
-          </section>
-          <aside className="card">
-            <h3>Vista previa de la boleta</h3>
-            {admin.lists.filter((item) => item.status === "activa").map((lista) => (
-              <p key={lista.id}>{lista.name}</p>
-            ))}
-            {draft.allow_blank_vote ? <p>Voto en blanco</p> : null}
-          </aside>
-        </div>
-      ) : null}
-
-      {panel === "mensajes" ? (
-        <div className="votaciones-settings-grid">
-          <section className="card">
-            {templates.map((template, index) => (
-              <article className="votaciones-message" key={template.template_key}>
-                <strong>{template.title}</strong>
-                <label>Asunto
-                  <input
-                    disabled={readonly}
-                    onChange={(e) => {
-                      const next = templates.map((item, itemIndex) => itemIndex === index ? { ...item, subject: e.target.value } : item);
-                      setTemplates(next);
-                    }}
-                    value={template.subject}
-                  />
-                </label>
-                <textarea
-                  disabled={readonly}
-                  onChange={(e) => {
-                    const next = templates.map((item, itemIndex) => itemIndex === index ? { ...item, body: e.target.value } : item);
-                    setTemplates(next);
-                  }}
-                  value={template.body}
-                />
-                <div className="votaciones-channels">
-                  <label><input checked={template.channel_email} disabled={readonly} onChange={(e) => {
-                    const next = templates.map((item, itemIndex) => itemIndex === index ? { ...item, channel_email: e.target.checked } : item);
-                    setTemplates(next);
-                  }} type="checkbox" /> Correo</label>
-                  <label><input checked={template.channel_portal} disabled={readonly} onChange={(e) => {
-                    const next = templates.map((item, itemIndex) => itemIndex === index ? { ...item, channel_portal: e.target.checked } : item);
-                    setTemplates(next);
-                  }} type="checkbox" /> Notificación en portal</label>
-                </div>
-                <button className="secondary-button" disabled={readonly} onClick={() => void admin.dispatchMessage(template.template_key)} type="button">
-                  Enviar ahora
-                </button>
-              </article>
-            ))}
-            <button className="primary-button" disabled={readonly} onClick={() => void admin.saveTemplates(templates)} type="button">
-              Guardar plantillas
-            </button>
-          </section>
-          <aside className="card">
-            <h3>Enviar prueba</h3>
-            <input onChange={(e) => setTestEmail(e.target.value)} placeholder="correo@copsstec.com" value={testEmail} />
-            <button className="secondary-button" disabled={!testEmail} onClick={() => void admin.sendTest(templates[0]?.template_key || "convocatoria", testEmail)} type="button">
-              Enviar prueba
-            </button>
-          </aside>
-        </div>
-      ) : null}
-    </section>
-  );
-}
-
-function VotersPanel({ admin }: { admin: ReturnType<typeof useAdminElection> }) {
-  const voters = admin.voters;
-  return (
-    <section className="votaciones-panel">
-      <div className="votaciones-kpis">
-        <article><strong>{voters?.enabled_count ?? 0}</strong><span>Habilitados</span></article>
-        <article><strong>{voters?.disabled_count ?? 0}</strong><span>No habilitados</span></article>
-        <article><strong>{voters?.pending_payment_count ?? 0}</strong><span>Pendientes de pago</span></article>
-        <article><strong>{voters?.padro_total ?? 0}</strong><span>Total padrón</span></article>
-      </div>
-      <div className="page-heading page-heading-actions">
-        <input
-          onChange={(event) => {
-            admin.setVoterQuery(event.target.value);
-            void admin.loadVoters(event.target.value);
-          }}
-          placeholder="Buscar socio"
-          value={admin.voterQuery}
-        />
-        <div className="votaciones-inline-form">
-          <button className="secondary-button" onClick={() => void admin.syncPadron()} type="button">Sincronizar padrón</button>
-          <button className="secondary-button" onClick={() => void admin.exportPadron()} type="button">Exportar a Excel</button>
-        </div>
-      </div>
-      <table className="votaciones-table">
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>N° socio</th>
-            <th>Profesión</th>
-            <th>Estado de pago</th>
-            <th>Habilitado</th>
-            <th>Correo</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {voters?.items.map((item) => (
-            <tr key={item.user_id}>
-              <td>{item.names} {item.lastname}</td>
-              <td>{item.member_code}</td>
-              <td>{item.profession || "—"}</td>
-              <td>{item.payment_status === "al_dia" || item.payment_status === "gracia" ? "Al día" : "Pendiente"}</td>
-              <td>{item.voting_enabled ? "Habilitado" : "No habilitado"}</td>
-              <td>{item.email}</td>
-              <td>
-                <button
-                  className="secondary-button"
-                  onClick={() => void admin.toggleVote(item.user_id, !item.voting_enabled)}
-                  type="button"
-                >
-                  {item.voting_enabled ? "Quitar voto" : "Habilitar voto"}
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-function ReportsPanel({ admin }: { admin: ReturnType<typeof useAdminElection> }) {
-  const report = admin.report;
-  if (!report) {
-    return <p className="muted">Cargando reportes...</p>;
-  }
-  const maxVotes = Math.max(...report.rows.map((row) => row.votes), 1);
-  const votedPct = report.participation;
-  return (
-    <section className="votaciones-reports">
-      <div className="page-heading page-heading-actions">
-        <div className="votaciones-inline-form">
-          <button className="secondary-button" onClick={() => void admin.exportPdf()} type="button">Exportar PDF</button>
-          <button className="secondary-button" onClick={() => void admin.exportExcel()} type="button">Exportar Excel</button>
-          <button className="primary-button" onClick={() => void admin.generateActa()} type="button">Generar acta</button>
-        </div>
-      </div>
-      <div className="votaciones-kpis">
-        <article><strong>{report.eligible}</strong><span>Votantes habilitados</span></article>
-        <article><strong>{report.votes_cast}</strong><span>Votos emitidos</span></article>
-        <article><strong>{report.participation.toFixed(1)}%</strong><span>Participación</span></article>
-        <article><strong>{report.blank_votes}</strong><span>Votos en blanco</span></article>
-        <article><strong>{report.lists_count}</strong><span>Listas participantes</span></article>
-      </div>
-      <div className="votaciones-report-grid">
-        <section className="card">
-          <h3>Votos por lista</h3>
-          <div className="votaciones-bars">
-            {report.rows.map((row) => (
-              <div key={row.name}>
-                <span>{row.name}</span>
-                <i style={{ width: `${(row.votes / maxVotes) * 100}%`, background: row.color || "var(--primary)" }} />
-                <em>{row.votes}</em>
-              </div>
-            ))}
-          </div>
-        </section>
-        <section className="card votaciones-donut-card">
-          <h3>Participación electoral</h3>
-          <div
-            className="votaciones-donut"
-            style={{ background: `conic-gradient(var(--primary) ${votedPct * 3.6}deg, #e2e8f0 0)` }}
-          >
-            <strong>{votedPct.toFixed(1)}%</strong>
-          </div>
-        </section>
-        <section className="card">
-          <h3>Resultados por lista</h3>
-          <table className="votaciones-table">
-            <thead>
-              <tr>
-                <th>Lista</th>
-                <th>Candidato principal</th>
-                <th>Votos</th>
-                <th>%</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {report.rows.map((row) => (
-                <tr key={row.name}>
-                  <td>{row.name}</td>
-                  <td>{row.principal_name}</td>
-                  <td>{row.votes}</td>
-                  <td>{row.percentage.toFixed(1)}%</td>
-                  <td>{row.result_status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      </div>
-      <ol className="votaciones-trace">
-        {report.timeline.map((item) => (
-          <li className={`is-${item.tone}`} key={item.key}>
-            <strong>{item.title}</strong>
-            <span>{item.detail}</span>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-}
