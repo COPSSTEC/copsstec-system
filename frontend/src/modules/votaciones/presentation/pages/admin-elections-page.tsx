@@ -116,7 +116,9 @@ export function AdminElectionsPage({ section }: { section: AdminTab }) {
 
         {election ? (
           <>
-            {section === "calendario" ? null : <PeriodBar admin={admin} election={election} />}
+            {section === "calendario" ? null : (
+              <PeriodBar admin={admin} election={election} showPeriodActions={section === "configuracion"} />
+            )}
             {showGuide ? <GuideModal election={election} onClose={closeGuide} /> : null}
 
             {admin.isLoading ? <p className="muted">Cargando módulo...</p> : null}
@@ -157,9 +159,11 @@ export function AdminElectionsPage({ section }: { section: AdminTab }) {
 function PeriodBar({
   admin,
   election,
+  showPeriodActions = false,
 }: {
   admin: ReturnType<typeof useAdminElection>;
   election: Election;
+  showPeriodActions?: boolean;
 }) {
   const voting = election.calendar.find((item) => item.event_key === "votacion");
   const termStart = election.calendar.find((item) => item.event_key === "inicio_gestion");
@@ -214,27 +218,29 @@ function PeriodBar({
           </div>
         </article>
       </div>
-      <div className="votaciones-period-toolbar">
-        <label>
-          Periodo
-          <select onChange={(event) => admin.selectPeriod(Number(event.target.value))} value={election.id}>
-            {election.periods.map((period) => (
-              <option key={period.id} value={period.id}>
-                #{period.id} · {period.title} · {ELECTION_STATUS_LABELS[period.status]}
-              </option>
-            ))}
-          </select>
-        </label>
-        {election.is_readonly ? (
-          <button className="primary-button" disabled={admin.isMutating} onClick={() => void admin.startPeriod()} type="button">
-            Iniciar nuevo periodo
-          </button>
-        ) : (
-          <button className="secondary-button" disabled={admin.isMutating} onClick={() => void admin.closePeriod()} type="button">
-            Cerrar periodo
-          </button>
-        )}
-      </div>
+      {showPeriodActions ? (
+        <div className="votaciones-period-toolbar">
+          <label>
+            Periodo
+            <select onChange={(event) => admin.selectPeriod(Number(event.target.value))} value={election.id}>
+              {election.periods.map((period) => (
+                <option key={period.id} value={period.id}>
+                  #{period.id} · {period.title} · {ELECTION_STATUS_LABELS[period.status]}
+                </option>
+              ))}
+            </select>
+          </label>
+          {election.is_readonly ? (
+            <button className="primary-button" disabled={admin.isMutating} onClick={() => void admin.startPeriod()} type="button">
+              Iniciar nuevo periodo
+            </button>
+          ) : (
+            <button className="secondary-button" disabled={admin.isMutating} onClick={() => void admin.closePeriod()} type="button">
+              Cerrar periodo
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
