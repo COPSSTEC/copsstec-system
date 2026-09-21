@@ -11,7 +11,9 @@ from app.core.security import (
 from app.modules.auth.application.rbac import resolve_access_level, resolve_access_policy
 from app.modules.auth.domain.entities import AccessPolicy, User
 from app.modules.auth.infrastructure.repository import AuthRepository
+from app.modules.membership.application.ports import EmailPort
 from app.modules.membership.domain.corporate_email import is_corporate_email
+from app.shared.infrastructure.email import reset_url_for
 
 
 class InvalidCredentialsError(Exception):
@@ -99,8 +101,9 @@ class GetCurrentUserUseCase:
 
 
 class ForgotPasswordUseCase:
-    def __init__(self, repository: AuthRepository) -> None:
+    def __init__(self, repository: AuthRepository, email_sender: EmailPort | None = None) -> None:
         self.repository = repository
+        self.email_sender = email_sender
 
     def execute(self, email: str) -> str | None:
         user = self.repository.get_user_by_email(email)
@@ -113,6 +116,17 @@ class ForgotPasswordUseCase:
             email=email,
             token_hash=hash_reset_token(reset_token),
         )
+
+        if self.email_sender:
+            self.email_sender.send_template(
+                user.email,
+                "password_reset",
+                {
+                    "nombres": user.name,
+                    "token": reset_token,
+                    "reset_url": reset_url_for(user.email, reset_token),
+                },
+            )
 
         settings = get_settings()
         if settings.app_env.lower() in {"local", "development", "dev"}:

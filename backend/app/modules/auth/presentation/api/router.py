@@ -23,6 +23,7 @@ from app.modules.auth.presentation.api.dependencies import (
     get_current_user,
     require_access,
 )
+from app.modules.membership.infrastructure.email import SmtpOrLogEmailSender
 from app.modules.auth.presentation.api.schemas import (
     AccessPolicyResponse,
     ChangePasswordRequest,
@@ -94,7 +95,10 @@ def forgot_password(
     request: ForgotPasswordRequest,
     repository: Annotated[AuthRepository, Depends(get_auth_repository)],
 ) -> ForgotPasswordResponse:
-    reset_token = ForgotPasswordUseCase(repository).execute(request.email)
+    reset_token = ForgotPasswordUseCase(
+        repository,
+        email_sender=SmtpOrLogEmailSender(),
+    ).execute(request.email)
 
     return ForgotPasswordResponse(
         message="Si el correo existe, se generó una solicitud de recuperación.",

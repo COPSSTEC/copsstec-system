@@ -362,6 +362,9 @@ class FakeEmailSender:
     def send(self, to_email: str, subject: str, body: str) -> None:
         self.sent.append((to_email, subject))
 
+    def send_template(self, to_email: str, template_key: str, context: dict | None = None) -> None:
+        self.sent.append((to_email, template_key))
+
 
 def test_resend_credentials_updates_mailbox_for_enabled_member() -> None:
     repository = FakeMemberRepository()

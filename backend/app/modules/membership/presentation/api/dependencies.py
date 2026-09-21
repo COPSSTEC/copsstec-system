@@ -35,7 +35,7 @@ def get_register_membership_use_case(
     repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
     storage: Annotated[LocalMembershipFileStorage, Depends(get_membership_storage)],
 ) -> RegisterMembershipUseCase:
-    return RegisterMembershipUseCase(repository, storage)
+    return RegisterMembershipUseCase(repository, storage, SmtpOrLogEmailSender())
 
 
 def get_membership_status_use_case(

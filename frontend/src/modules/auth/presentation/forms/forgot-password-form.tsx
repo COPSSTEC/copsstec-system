@@ -44,7 +44,11 @@ export function ForgotPasswordForm() {
       </div>
 
       {error && <p className="form-error">{error}</p>}
-      {message && <p className="form-success">{message}</p>}
+      {message && (
+        <p className="form-success">
+          {message} Si el correo existe, te enviamos un mensaje con el enlace para restablecer la contraseña.
+        </p>
+      )}
       {resetToken && (
         <p className="muted">
           Token local de prueba: <strong>{resetToken}</strong>

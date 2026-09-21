@@ -82,9 +82,15 @@ def _validate_registration(data: MembershipRegistrationData) -> None:
 
 
 class RegisterMembershipUseCase:
-    def __init__(self, repository: MembershipRepository, storage: MembershipFileStorage) -> None:
+    def __init__(
+        self,
+        repository: MembershipRepository,
+        storage: MembershipFileStorage,
+        email_sender: EmailPort | None = None,
+    ) -> None:
         self.repository = repository
         self.storage = storage
+        self.email_sender = email_sender
 
     def execute(
         self,
@@ -129,6 +135,17 @@ class RegisterMembershipUseCase:
             roles=["miembro"],
             access_level="member",
         )
+        if self.email_sender:
+            admin = get_settings().mail_admin_notifications
+            if admin:
+                self.email_sender.send_template(
+                    admin,
+                    "new_member_admin",
+                    {
+                        "nombres": f"{data.names} {data.lastname}".strip(),
+                        "email": data.email,
+                    },
+                )
         return member, access_token
 
 
@@ -356,24 +373,14 @@ class ApproveMembershipUseCase:
             )
 
         personal = str(preview["personal_email"])
-        self.email_sender.send(
+        self.email_sender.send_template(
             personal,
-            "Tu correo corporativo COPSSTEC",
-            (
-                f"Hola {full_name},\n\n"
-                f"Tu afiliación fue aprobada. Tu correo corporativo es {corporate}\n"
-                f"Contraseña temporal: {password}\n\n"
-                "Ingresa al sistema con ese correo corporativo.\n"
-            ),
+            "corporate_mailbox",
+            {"nombres": full_name, "email": corporate, "password": password},
         )
-        self.email_sender.send(
+        self.email_sender.send_template(
             corporate,
-            "Bienvenido a COPSSTEC",
-            (
-                f"Hola {full_name},\n\n"
-                f"Tu cuenta corporativa fue creada.\n"
-                f"Usuario: {corporate}\n"
-                f"Contraseña temporal: {password}\n"
-            ),
+            "access_credentials",
+            {"nombres": full_name, "email": corporate, "password": password},
         )
         return member

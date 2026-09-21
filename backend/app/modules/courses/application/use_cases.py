@@ -29,6 +29,51 @@ def course_requires_payment(course: Course) -> bool:
         return False
 
 
+def _course_email_context(course: Course, inscription: CourseInscription, extra: dict | None = None) -> dict:
+    dates = course.date_course
+    if course.date_course_final:
+        dates = f"{course.date_course} - {course.date_course_final}"
+    payload = {
+        "nombres": inscription.names,
+        "course_title": course.title,
+        "course_description": course.about,
+        "capacitator": course.capacitator,
+        "modality": course.type_modality or course.location,
+        "date_course": dates,
+        "hour_init": course.hour_init,
+        "hour_final": course.hour_final,
+        "course_link": course.link or "",
+        "detail_url": f"{get_settings().frontend_origin}/cursos/{course.id}",
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def _course_email(
+    *,
+    inscription: CourseInscription,
+    course: Course | None,
+    template_key: str,
+    subject: str,
+    body: str,
+    extra: dict | None = None,
+    attachment_path: str | None = None,
+) -> EmailMessage:
+    context = _course_email_context(course, inscription, extra) if course else {
+        "nombres": inscription.names,
+        **(extra or {}),
+    }
+    return EmailMessage(
+        to=inscription.email,
+        subject=subject,
+        body=body,
+        attachment_path=attachment_path,
+        template_key=template_key,
+        context=context,
+    )
+
+
 @dataclass(frozen=True)
 class BulkResult:
     processed: int
@@ -121,13 +166,12 @@ class CreateGuestInscriptionUseCase:
             raise DuplicateInscriptionError(str(exc)) from exc
 
         self.notifier.send(
-            EmailMessage(
-                to=inscription.email,
+            _course_email(
+                inscription=inscription,
+                course=course,
+                template_key="course_inscription_received",
                 subject=f"Inscripción recibida: {course.title}",
-                body=(
-                    "Tu inscripción fue recibida. "
-                    "Si el curso requiere pago, será validado por administración."
-                ),
+                body="Tu inscripción fue recibida. Si el curso requiere pago, será validado por administración.",
             ),
         )
 
@@ -157,8 +201,10 @@ class CreateMemberInscriptionsUseCase:
                 inscription = self.repository.create_member_inscription(course_id, user_id)
                 processed += 1
                 self.notifier.send(
-                    EmailMessage(
-                        to=inscription.email,
+                    _course_email(
+                        inscription=inscription,
+                        course=course,
+                        template_key="course_inscription_confirmed",
                         subject=f"Inscripción confirmada: {course.title}",
                         body="Tu inscripción como miembro fue confirmada sin costo.",
                     ),
@@ -196,8 +242,10 @@ class MemberCoursesUseCase:
             raise DuplicateInscriptionError(str(exc)) from exc
 
         self.notifier.send(
-            EmailMessage(
-                to=inscription.email,
+            _course_email(
+                inscription=inscription,
+                course=course,
+                template_key="course_inscription_confirmed",
                 subject=f"Inscripción confirmada: {course.title}",
                 body="Tu inscripción como miembro fue confirmada sin costo.",
             ),
@@ -232,8 +280,10 @@ class ManageCourseInscriptionsUseCase:
 
         course = self.repository.get_course(inscription.course_id)
         self.notifier.send(
-            EmailMessage(
-                to=inscription.email,
+            _course_email(
+                inscription=inscription,
+                course=course,
+                template_key="course_inscription_confirmed",
                 subject="Pago aprobado",
                 body=f"Tu pago fue aprobado para el curso {course.title if course else ''}.",
             ),
@@ -258,11 +308,15 @@ class ManageCourseInscriptionsUseCase:
         if inscription is None:
             raise InvalidPaymentReviewError()
 
+        course = self.repository.get_course(inscription.course_id)
         self.notifier.send(
-            EmailMessage(
-                to=inscription.email,
+            _course_email(
+                inscription=inscription,
+                course=course,
+                template_key="course_payment_rejected",
                 subject="Pago no validado",
                 body=f"No fue posible validar tu pago. Observación: {observation.strip()}",
+                extra={"observation": observation.strip()},
             ),
         )
 
@@ -319,9 +373,12 @@ class ManageCourseInscriptionsUseCase:
                     skipped += 1
                     continue
 
+                course = self.repository.get_course(course_id)
                 self.notifier.send(
-                    EmailMessage(
-                        to=inscription.email,
+                    _course_email(
+                        inscription=inscription,
+                        course=course,
+                        template_key="course_certificate",
                         subject="Certificado de curso COPSSTEC",
                         body="Adjuntamos tu certificado de participación.",
                         attachment_path=certificate.pdf_path,
@@ -365,11 +422,15 @@ class ManageCourseInscriptionsUseCase:
 
                 token = self.repository.create_feedback_token(inscription_id)
                 url = f"{settings.frontend_origin}/cursos/feedback/{token}"
+                course = self.repository.get_course(course_id)
                 self.notifier.send(
-                    EmailMessage(
-                        to=inscription.email,
+                    _course_email(
+                        inscription=inscription,
+                        course=course,
+                        template_key="course_feedback",
                         subject="Califica tu experiencia en el curso",
                         body=f"Gracias por asistir. Califica tu experiencia aquí: {url}",
+                        extra={"url": url},
                     ),
                 )
                 processed += 1

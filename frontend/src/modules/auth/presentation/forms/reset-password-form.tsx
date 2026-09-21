@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { resetPassword } from "@/modules/auth/infrastructure/auth-api";
 
 export function ResetPasswordForm() {
-  const [email, setEmail] = useState("");
-  const [token, setToken] = useState("");
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get("email") ?? "");
+  const [token, setToken] = useState(searchParams.get("token") ?? "");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState<string | null>(null);

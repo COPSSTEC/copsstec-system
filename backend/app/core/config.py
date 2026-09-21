@@ -50,7 +50,18 @@ class Settings:
     smtp_port: int = int(getenv("SMTP_PORT", "587"))
     smtp_user: str = getenv("SMTP_USER", "")
     smtp_password: str = getenv("SMTP_PASSWORD", "")
-    smtp_from: str = getenv("SMTP_FROM", "no-reply@copsstec.com")
+    smtp_from: str = getenv("SMTP_FROM", "COPSSTEC <no-reply@copsstec.com>")
+    smtp_use_tls: bool = getenv("SMTP_USE_TLS", "true").lower() in {"1", "true", "yes"}
+    mail_logo_url: str = getenv(
+        "MAIL_LOGO_URL",
+        "https://www.copsstec.com/assets/logos/coppstec.png",
+    )
+    mail_support_email: str = getenv("MAIL_SUPPORT_EMAIL", "soporte@copsstec.com")
+    mail_admin_notifications: str = getenv(
+        "MAIL_ADMIN_NOTIFICATIONS",
+        "administrator@copsstec.com",
+    )
+    mailbox_web_url: str = getenv("MAILBOX_WEB_URL", "https://box.copsstec.com/mail/")
     corporate_email_domain: str = getenv("CORPORATE_EMAIL_DOMAIN", "copsstec.com")
 
 

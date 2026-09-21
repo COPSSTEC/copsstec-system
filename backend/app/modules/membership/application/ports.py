@@ -78,6 +78,9 @@ class EmailPort(Protocol):
     def send(self, to_email: str, subject: str, body: str) -> None:
         ...
 
+    def send_template(self, to_email: str, template_key: str, context: dict | None = None) -> None:
+        ...
+
 
 class InvoiceGenerator(Protocol):
     def generate(self, *, number: str, member_name: str, identifier: str, amount: str) -> bytes:

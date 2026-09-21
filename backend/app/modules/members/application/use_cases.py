@@ -136,28 +136,14 @@ class ResendMemberCredentialsUseCase:
         member = self.repository.update_password(user_id, hash_password(password))
 
         personal = (member.email or "").strip()
+        context = {
+            "nombres": member.name,
+            "email": member.login_email,
+            "password": password,
+        }
         if personal:
-            self.email_sender.send(
-                personal,
-                "Tus credenciales COPSSTEC",
-                (
-                    f"Hola {member.name},\n\n"
-                    f"Se generó una nueva contraseña temporal.\n"
-                    f"Correo corporativo: {member.login_email}\n"
-                    f"Contraseña temporal: {password}\n\n"
-                    "Ingresa al sistema con ese correo corporativo y cámbiala en el primer acceso.\n"
-                ),
-            )
-        self.email_sender.send(
-            member.login_email,
-            "Bienvenido a COPSSTEC",
-            (
-                f"Hola {member.name},\n\n"
-                f"Tu cuenta corporativa fue actualizada.\n"
-                f"Usuario: {member.login_email}\n"
-                f"Contraseña temporal: {password}\n"
-            ),
-        )
+            self.email_sender.send_template(personal, "corporate_mailbox", context)
+        self.email_sender.send_template(member.login_email, "access_credentials", context)
         return member, password
 
 

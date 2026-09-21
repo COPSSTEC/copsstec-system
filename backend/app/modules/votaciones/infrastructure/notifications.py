@@ -1,20 +1,27 @@
 import re
 from html import unescape
 
-from app.modules.membership.infrastructure.email import SmtpOrLogEmailSender
+from app.shared.infrastructure.email import MailtrapEmailSender, render_email
 
 
 class ElectionEmailNotifier:
     def __init__(self) -> None:
-        self.sender = SmtpOrLogEmailSender()
+        self.sender = MailtrapEmailSender()
+        self.sender.raise_on_error = True
 
     def send(self, to_email: str, subject: str, body: str) -> None:
         if not to_email:
             return
-        if _looks_like_html(body):
-            self.sender.send_html(to_email, subject, _html_to_text(body), body)
+        text = _html_to_text(body) if _looks_like_html(body) else body
+        content = body if _looks_like_html(body) else body.replace("\n", "<br />")
+        if "copsstec-email-root" in content:
+            self.sender.send_html(to_email, subject, text, content)
             return
-        self.sender.send(to_email, subject, body)
+        _, rendered_text, html = render_email(
+            "branded_content",
+            {"subject": subject, "content": content, "text": text},
+        )
+        self.sender.send_html(to_email, subject, rendered_text or text, html)
 
 
 def _looks_like_html(value: str) -> bool:

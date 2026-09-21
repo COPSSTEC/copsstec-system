@@ -1,40 +1,16 @@
-import smtplib
-from email.message import EmailMessage
-
-from app.core.config import get_settings
+from app.shared.infrastructure.email import MailtrapEmailSender
 
 
 class SmtpOrLogEmailSender:
-    def send(self, to_email: str, subject: str, body: str) -> None:
-        settings = get_settings()
-        if not settings.smtp_host:
-            print("MEMBERSHIP_EMAIL", {"to": to_email, "subject": subject, "body": body})
-            return
+    def __init__(self, *, raise_on_error: bool = False) -> None:
+        self._sender = MailtrapEmailSender()
+        self._sender.raise_on_error = raise_on_error
 
-        message = EmailMessage()
-        message["From"] = settings.smtp_from
-        message["To"] = to_email
-        message["Subject"] = subject
-        message.set_content(body)
-        self._deliver(settings, message)
+    def send(self, to_email: str, subject: str, body: str) -> None:
+        self._sender.send(to_email, subject, body)
 
     def send_html(self, to_email: str, subject: str, text_body: str, html_body: str) -> None:
-        settings = get_settings()
-        if not settings.smtp_host:
-            print("MEMBERSHIP_EMAIL", {"to": to_email, "subject": subject, "body": html_body})
-            return
+        self._sender.send_html(to_email, subject, text_body, html_body)
 
-        message = EmailMessage()
-        message["From"] = settings.smtp_from
-        message["To"] = to_email
-        message["Subject"] = subject
-        message.set_content(text_body or html_body)
-        message.add_alternative(html_body, subtype="html")
-        self._deliver(settings, message)
-
-    def _deliver(self, settings, message: EmailMessage) -> None:
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
-            smtp.starttls()
-            if settings.smtp_user:
-                smtp.login(settings.smtp_user, settings.smtp_password)
-            smtp.send_message(message)
+    def send_template(self, to_email: str, template_key: str, context: dict | None = None) -> None:
+        self._sender.send_template(to_email, template_key, context)
