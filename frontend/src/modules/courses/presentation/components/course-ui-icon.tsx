@@ -23,7 +23,14 @@ type CourseIconName =
   | "cloud"
   | "user"
   | "book"
-  | "xCircle";
+  | "xCircle"
+  | "star"
+  | "barChart"
+  | "faceBad"
+  | "facePoor"
+  | "faceOk"
+  | "faceGood"
+  | "faceGreat";
 
 const PATHS: Record<CourseIconName, string[]> = {
   users: [
@@ -73,6 +80,38 @@ const PATHS: Record<CourseIconName, string[]> = {
   user: ["M8 7a4 4 0 108 0 4 4 0 10-8 0", "M6 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"],
   book: ["M5 5a2 2 0 012-2h11v16H7a2 2 0 00-2 2V5z", "M7 3v16"],
   xCircle: ["M21 12a9 9 0 11-18 0 9 9 0 0118 0z", "M9 9l6 6", "M15 9l-6 6"],
+  star: ["M12 3l2.6 5.6L21 9.2l-4.5 4.2L17.6 21 12 17.8 6.4 21l1.1-7.6L3 9.2l6.4-.6L12 3z"],
+  barChart: ["M4 19h16", "M7 16V10", "M12 16V6", "M17 16v-8"],
+  faceBad: [
+    "M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    "M9 10h.01",
+    "M15 10h.01",
+    "M8 16c1.2-1.6 2.6-2.4 4-2.4s2.8.8 4 2.4",
+  ],
+  facePoor: [
+    "M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    "M9 10h.01",
+    "M15 10h.01",
+    "M9 16h6",
+  ],
+  faceOk: [
+    "M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    "M9 10h.01",
+    "M15 10h.01",
+    "M8 15h8",
+  ],
+  faceGood: [
+    "M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    "M9 10h.01",
+    "M15 10h.01",
+    "M8 14c1.2 1.6 2.6 2.4 4 2.4s2.8-.8 4-2.4",
+  ],
+  faceGreat: [
+    "M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+    "M8 10h.01",
+    "M16 10h.01",
+    "M8 14c1.3 2 2.8 3 4 3s2.7-1 4-3",
+  ],
 };
 
 interface CourseUiIconProps {

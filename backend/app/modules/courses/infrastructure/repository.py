@@ -703,7 +703,21 @@ class CourseRepository:
         row = self.session.execute(
             text(
                 """
-                SELECT c.title, c.date_course, ci.names, cft.used_at, cft.expires_at
+                SELECT
+                    c.title,
+                    c.date_course,
+                    c.date_course_final,
+                    c.hour_init,
+                    c.hour_final,
+                    c.location,
+                    c.capacitator,
+                    c.type_modality,
+                    c.image,
+                    c.about,
+                    c.value,
+                    ci.names,
+                    cft.used_at,
+                    cft.expires_at
                 FROM course_feedback_tokens cft
                 INNER JOIN courses c ON c.id = cft.course_id
                 INNER JOIN course_inscriptions ci ON ci.id = cft.course_inscription_id
@@ -768,6 +782,115 @@ class CourseRepository:
         self.session.commit()
 
         return True
+
+    def get_feedback_stats(self, course_id: int) -> dict[str, Any] | None:
+        course = self.session.execute(
+            text(
+                """
+                SELECT id, title
+                FROM courses
+                WHERE id = :course_id
+                  AND deleted_at IS NULL
+                LIMIT 1
+                """,
+            ),
+            {"course_id": course_id},
+        ).mappings().first()
+        if course is None:
+            return None
+
+        counts = self.session.execute(
+            text(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM course_feedbacks WHERE course_id = :course_id) AS responses,
+                    (SELECT COUNT(*) FROM course_feedback_tokens WHERE course_id = :course_id) AS surveys_sent,
+                    (
+                        SELECT COUNT(*)
+                        FROM course_inscriptions
+                        WHERE course_id = :course_id
+                          AND attended_at IS NOT NULL
+                          AND deleted_at IS NULL
+                    ) AS attendees
+                """,
+            ),
+            {"course_id": course_id},
+        ).mappings().one()
+
+        averages = self.session.execute(
+            text(
+                """
+                SELECT
+                    AVG(rating) AS rating,
+                    AVG(content_rating) AS content_rating,
+                    AVG(instructor_rating) AS instructor_rating,
+                    AVG(platform_rating) AS platform_rating,
+                    AVG(CASE WHEN rating >= 4 THEN 100.0 ELSE 0 END) AS satisfaction_rate
+                FROM course_feedbacks
+                WHERE course_id = :course_id
+                """,
+            ),
+            {"course_id": course_id},
+        ).mappings().one()
+
+        distributions: dict[str, dict[int, int]] = {}
+        for field in ("rating", "content_rating", "instructor_rating", "platform_rating"):
+            rows = self.session.execute(
+                text(
+                    f"""
+                    SELECT {field} AS score, COUNT(*) AS total
+                    FROM course_feedbacks
+                    WHERE course_id = :course_id
+                      AND {field} IS NOT NULL
+                    GROUP BY {field}
+                    """,
+                ),
+                {"course_id": course_id},
+            ).mappings().all()
+            buckets = {score: 0 for score in range(1, 6)}
+            for row in rows:
+                buckets[int(row["score"])] = int(row["total"])
+            distributions[field] = buckets
+
+        comments = self.session.execute(
+            text(
+                """
+                SELECT comments
+                FROM course_feedbacks
+                WHERE course_id = :course_id
+                  AND comments IS NOT NULL
+                  AND BTRIM(comments) <> ''
+                ORDER BY created_at DESC
+                """,
+            ),
+            {"course_id": course_id},
+        ).scalars().all()
+
+        responses = int(counts["responses"] or 0)
+        surveys_sent = int(counts["surveys_sent"] or 0)
+
+        def _avg(value: Any) -> float | None:
+            if value is None:
+                return None
+            return round(float(value), 2)
+
+        return {
+            "course_id": course_id,
+            "course_title": course["title"],
+            "responses": responses,
+            "surveys_sent": surveys_sent,
+            "attendees": int(counts["attendees"] or 0),
+            "response_rate": round((responses / surveys_sent) * 100, 1) if surveys_sent else 0.0,
+            "satisfaction_rate": _avg(averages["satisfaction_rate"]) or 0.0,
+            "averages": {
+                "rating": _avg(averages["rating"]),
+                "content_rating": _avg(averages["content_rating"]),
+                "instructor_rating": _avg(averages["instructor_rating"]),
+                "platform_rating": _avg(averages["platform_rating"]),
+            },
+            "distributions": distributions,
+            "comments": [str(comment).strip() for comment in comments],
+        }
 
     def _find_duplicate_member_inscription(
         self,

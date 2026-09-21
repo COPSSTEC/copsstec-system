@@ -4,6 +4,7 @@ import type {
   Course,
   CourseFormInput,
   CourseInscription,
+  FeedbackStats,
   MemberCourse,
   MemberOption,
 } from "@/modules/courses/domain/types";
@@ -339,6 +340,36 @@ export async function generateFeedbackLink(
   return parseResponse<{ token: string; url: string }>(response);
 }
 
+export async function getFeedbackStats(
+  token: string,
+  courseId: number,
+): Promise<FeedbackStats> {
+  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}/feedback-stats`, {
+    headers: authHeaders(token),
+  });
+
+  return parseResponse<FeedbackStats>(response);
+}
+
+export async function downloadFeedbackReport(
+  token: string,
+  courseId: number,
+  format: "csv" | "pdf",
+): Promise<Blob> {
+  const response = await fetch(
+    `${API_URL}/api/courses/admin/${courseId}/feedback-report?format=${format}`,
+    {
+      headers: authHeaders(token),
+    },
+  );
+
+  if (!response.ok) {
+    await parseResponse<never>(response);
+  }
+
+  return response.blob();
+}
+
 export async function sendFeedbackLinks(
   token: string,
   courseId: number,
@@ -353,14 +384,25 @@ export async function sendFeedbackLinks(
   return parseResponse<BulkActionResponse>(response);
 }
 
-export async function getFeedbackContext(
-  token: string,
-): Promise<{ course_title: string; date_course: string; participant_name: string }> {
+export interface FeedbackContext {
+  course_title: string;
+  date_course: string;
+  date_course_final: string | null;
+  hour_init: string | null;
+  hour_final: string | null;
+  location: string | null;
+  capacitator: string | null;
+  type_modality: string | null;
+  image: string | null;
+  about: string | null;
+  value: string | null;
+  participant_name: string;
+}
+
+export async function getFeedbackContext(token: string): Promise<FeedbackContext> {
   const response = await fetch(`${API_URL}/api/courses/feedback/${token}`);
 
-  return parseResponse<{ course_title: string; date_course: string; participant_name: string }>(
-    response,
-  );
+  return parseResponse<FeedbackContext>(response);
 }
 
 export async function submitFeedback(

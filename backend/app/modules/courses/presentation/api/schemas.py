@@ -162,6 +162,15 @@ class FeedbackLinkResponse(BaseModel):
 class FeedbackContextResponse(BaseModel):
     course_title: str
     date_course: str
+    date_course_final: str | None = None
+    hour_init: str | None = None
+    hour_final: str | None = None
+    location: str | None = None
+    capacitator: str | None = None
+    type_modality: str | None = None
+    image: str | None = None
+    about: str | None = None
+    value: str | None = None
     participant_name: str
 
 
@@ -171,6 +180,26 @@ class FeedbackSubmitRequest(BaseModel):
     instructor_rating: int | None = Field(default=None, ge=1, le=5)
     platform_rating: int | None = Field(default=None, ge=1, le=5)
     comments: str | None = Field(default=None, max_length=2000)
+
+
+class FeedbackAveragesResponse(BaseModel):
+    rating: float | None = None
+    content_rating: float | None = None
+    instructor_rating: float | None = None
+    platform_rating: float | None = None
+
+
+class FeedbackStatsResponse(BaseModel):
+    course_id: int
+    course_title: str
+    responses: int
+    surveys_sent: int
+    attendees: int
+    response_rate: float
+    satisfaction_rate: float
+    averages: FeedbackAveragesResponse
+    distributions: dict[str, dict[int, int]]
+    comments: list[str]
 
 
 class MessageResponse(BaseModel):

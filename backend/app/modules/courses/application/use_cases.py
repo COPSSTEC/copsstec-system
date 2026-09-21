@@ -456,3 +456,9 @@ class CourseFeedbackUseCase:
         submitted = self.repository.submit_feedback(token, data)
         if not submitted:
             raise FeedbackTokenInvalidError()
+
+    def get_stats(self, course_id: int) -> dict:
+        stats = self.repository.get_feedback_stats(course_id)
+        if stats is None:
+            raise CourseNotFoundError()
+        return stats

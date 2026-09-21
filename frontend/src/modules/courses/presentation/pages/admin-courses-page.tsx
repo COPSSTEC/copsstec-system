@@ -11,6 +11,7 @@ import {
   deleteCourse,
   downloadAttendeesReport,
   downloadCertificate,
+  downloadFeedbackReport,
   finishCourse,
   generateCertificate,
   generateFeedbackLink,
@@ -27,6 +28,7 @@ import { AdminCourseCard } from "@/modules/courses/presentation/components/admin
 import { AdminCoursePanel } from "@/modules/courses/presentation/components/admin-course-panel";
 import { CourseUiIcon } from "@/modules/courses/presentation/components/course-ui-icon";
 import { ConfirmCourseModal } from "@/modules/courses/presentation/modals/confirm-course-modal";
+import { CourseFeedbackStatsModal } from "@/modules/courses/presentation/modals/course-feedback-stats-modal";
 import { CourseFormModal } from "@/modules/courses/presentation/modals/course-form-modal";
 import { CourseInscriptionsModal } from "@/modules/courses/presentation/modals/course-inscriptions-modal";
 import {
@@ -50,6 +52,7 @@ export function AdminCoursesPage() {
   const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null);
   const [form, setForm] = useState<CourseFormInput>(EMPTY_COURSE);
   const [inscriptionsOpen, setInscriptionsOpen] = useState(false);
+  const [feedbackStatsOpen, setFeedbackStatsOpen] = useState(false);
   const [inscriptions, setInscriptions] = useState<CourseInscription[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<MemberOption[]>([]);
   const [selectedInscriptions, setSelectedInscriptions] = useState<number[]>([]);
@@ -332,6 +335,7 @@ export function AdminCoursesPage() {
           onDelete={() => selectedCourse && setConfirm({ kind: "delete", course: selectedCourse })}
           onFinish={() => selectedCourse && setConfirm({ kind: "finish", course: selectedCourse })}
           onOpenDetails={() => selectedCourse && openDetails(selectedCourse)}
+          onOpenFeedbackStats={() => selectedCourse && setFeedbackStatsOpen(true)}
           onOpenInscriptions={() => selectedCourse && void openInscriptions(selectedCourse)}
         />
       </section>
@@ -407,6 +411,26 @@ export function AdminCoursesPage() {
           rejectionTarget={rejectionTarget}
           selectedInscriptions={selectedInscriptions}
           selectedMembers={selectedMembers}
+          token={token ?? ""}
+        />
+      ) : null}
+
+      {feedbackStatsOpen && selectedCourse ? (
+        <CourseFeedbackStatsModal
+          courseId={selectedCourse.id}
+          courseTitle={selectedCourse.title}
+          onClose={() => setFeedbackStatsOpen(false)}
+          onDownload={(format) =>
+            void runAction(async () => {
+              const blob = await downloadFeedbackReport(token ?? "", selectedCourse.id, format);
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `curso-${selectedCourse.id}-satisfaccion.${format}`;
+              link.click();
+              window.URL.revokeObjectURL(url);
+            }, `Reporte ${format.toUpperCase()} descargado.`)
+          }
           token={token ?? ""}
         />
       ) : null}

@@ -86,3 +86,23 @@ export interface BulkActionResponse {
   skipped: number;
   errors: string[];
 }
+
+export interface FeedbackAverages {
+  rating: number | null;
+  content_rating: number | null;
+  instructor_rating: number | null;
+  platform_rating: number | null;
+}
+
+export interface FeedbackStats {
+  course_id: number;
+  course_title: string;
+  responses: number;
+  surveys_sent: number;
+  attendees: number;
+  response_rate: number;
+  satisfaction_rate: number;
+  averages: FeedbackAverages;
+  distributions: Record<string, Record<string, number>>;
+  comments: string[];
+}

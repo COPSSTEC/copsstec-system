@@ -7,6 +7,7 @@ import { attendanceRate } from "@/modules/courses/presentation/lib/course-admin"
 interface AdminCoursePanelProps {
   course: AdminCourse | null;
   onOpenInscriptions: () => void;
+  onOpenFeedbackStats: () => void;
   onOpenDetails: () => void;
   onFinish: () => void;
   onDelete: () => void;
@@ -15,6 +16,7 @@ interface AdminCoursePanelProps {
 export function AdminCoursePanel({
   course,
   onOpenInscriptions,
+  onOpenFeedbackStats,
   onOpenDetails,
   onFinish,
   onDelete,
@@ -62,6 +64,10 @@ export function AdminCoursePanel({
         <button className="admin-course-panel-btn is-primary" onClick={onOpenInscriptions} type="button">
           <CourseUiIcon name="users" />
           Ver inscritos
+        </button>
+        <button className="admin-course-panel-btn" onClick={onOpenFeedbackStats} type="button">
+          <CourseUiIcon name="barChart" />
+          Ver satisfacción
         </button>
         <button className="admin-course-panel-btn" onClick={onOpenDetails} type="button">
           <CourseUiIcon name="eye" />

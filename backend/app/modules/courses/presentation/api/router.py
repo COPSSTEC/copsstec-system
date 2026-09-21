@@ -24,6 +24,10 @@ from app.modules.courses.domain.entities import (
     InvalidPaymentReviewError,
     VoucherRequiredError,
 )
+from app.modules.courses.infrastructure.feedback_reports import (
+    build_feedback_report_csv,
+    build_feedback_report_pdf,
+)
 from app.modules.courses.infrastructure.files import InvalidUploadError, LocalCourseFileStorage
 from app.modules.courses.presentation.api.dependencies import (
     get_admin_course_use_cases,
@@ -46,6 +50,7 @@ from app.modules.courses.presentation.api.schemas import (
     CourseUpdateRequest,
     FeedbackContextResponse,
     FeedbackLinkResponse,
+    FeedbackStatsResponse,
     FeedbackSubmitRequest,
     GuestInscriptionResponse,
     MemberInscriptionsRequest,
@@ -57,6 +62,13 @@ from app.modules.courses.presentation.api.schemas import (
 )
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
+
+
+def _optional_text(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 @router.get("/public", response_model=list[CourseResponse])
@@ -495,6 +507,48 @@ def generate_feedback_link(
     return FeedbackLinkResponse(token=token, url=f"/cursos/feedback/{token}")
 
 
+@router.get("/admin/{course_id}/feedback-stats", response_model=FeedbackStatsResponse)
+def get_feedback_stats(
+    course_id: int,
+    use_case: Annotated[CourseFeedbackUseCase, Depends(get_feedback_use_case)],
+    _: Annotated[User, Depends(require_access("admin"))],
+) -> FeedbackStatsResponse:
+    try:
+        return FeedbackStatsResponse(**use_case.get_stats(course_id))
+    except CourseNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curso no encontrado.") from exc
+
+
+@router.get("/admin/{course_id}/feedback-report")
+def download_feedback_report(
+    course_id: int,
+    use_case: Annotated[CourseFeedbackUseCase, Depends(get_feedback_use_case)],
+    _: Annotated[User, Depends(require_access("admin"))],
+    format: str = "csv",
+) -> Response:
+    try:
+        stats = use_case.get_stats(course_id)
+    except CourseNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curso no encontrado.") from exc
+
+    if format.lower() == "pdf":
+        return Response(
+            content=build_feedback_report_pdf(stats),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="curso-{course_id}-satisfaccion.pdf"',
+            },
+        )
+
+    return Response(
+        content=build_feedback_report_csv(stats),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="curso-{course_id}-satisfaccion.csv"',
+        },
+    )
+
+
 @router.get("/feedback/{token}", response_model=FeedbackContextResponse)
 def get_feedback_context(
     token: str,
@@ -506,9 +560,18 @@ def get_feedback_context(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Link no disponible.") from exc
 
     return FeedbackContextResponse(
-        course_title=context["title"],
-        date_course=context["date_course"],
-        participant_name=context["names"],
+        course_title=str(context["title"]),
+        date_course=str(context["date_course"]),
+        date_course_final=_optional_text(context.get("date_course_final")),
+        hour_init=_optional_text(context.get("hour_init")),
+        hour_final=_optional_text(context.get("hour_final")),
+        location=_optional_text(context.get("location")),
+        capacitator=_optional_text(context.get("capacitator")),
+        type_modality=_optional_text(context.get("type_modality")),
+        image=_optional_text(context.get("image")),
+        about=_optional_text(context.get("about")),
+        value=_optional_text(context.get("value")),
+        participant_name=str(context["names"]),
     )
 
 
