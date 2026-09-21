@@ -62,6 +62,7 @@ class CourseRepository:
                     COUNT(ci.id) AS inscriptions_count,
                     COUNT(ci.id) FILTER (WHERE ci.attended_at IS NOT NULL) AS attendees_count,
                     COUNT(cp.id) FILTER (WHERE cp.state_id = :pending_state_id) AS pending_payments_count,
+                    COUNT(cp.id) FILTER (WHERE cp.state_id = :paid_state_id) AS paid_payments_count,
                     COUNT(cc.id) FILTER (WHERE cc.sent_at IS NOT NULL) AS certificates_sent_count
                 FROM courses c
                 LEFT JOIN course_lifecycle cl ON cl.course_id = c.id
@@ -73,7 +74,7 @@ class CourseRepository:
                 ORDER BY c.id DESC
                 """,
             ),
-            {"pending_state_id": PENDING_APPROVAL_STATE_ID},
+            {"pending_state_id": PENDING_APPROVAL_STATE_ID, "paid_state_id": PAID_STATE_ID},
         ).mappings().all()
 
         return [dict(row) for row in rows]
@@ -254,7 +255,10 @@ class CourseRepository:
         self.session.commit()
 
     def list_member_options(self, query: str | None = None) -> list[dict[str, Any]]:
-        params: dict[str, Any] = {"member_role": "miembro", "query": f"%{query or ''}%"}
+        term = (query or "").strip()
+        if len(term) < 3:
+            return []
+
         rows = self.session.execute(
             text(
                 """
@@ -266,16 +270,17 @@ class CourseRepository:
                 LEFT JOIN profiles p ON p.user_id = u.id
                 WHERE r.name = :member_role
                   AND (
-                    :query = '%%'
-                    OR lower(u.name) LIKE lower(:query)
+                    lower(u.name) LIKE lower(:query)
                     OR lower(u.email) LIKE lower(:query)
                     OR lower(COALESCE(p.identifier, '')) LIKE lower(:query)
+                    OR lower(COALESCE(p.names, '')) LIKE lower(:query)
+                    OR lower(COALESCE(p.lastname, '')) LIKE lower(:query)
                   )
                 ORDER BY u.name
                 LIMIT 50
                 """,
             ),
-            params,
+            {"member_role": "miembro", "query": f"%{term}%"},
         ).mappings().all()
 
         return [dict(row) for row in rows]
@@ -414,10 +419,15 @@ class CourseRepository:
                 """
                 SELECT ci.*, cp.state_id AS payment_state_id, cp.voucher_path,
                        cc.id AS certificate_id, cc.certificate_code,
-                       cc.sent_at AS certificate_sent_at
+                       cc.sent_at AS certificate_sent_at,
+                       p.lastname AS lastname,
+                       COALESCE(cft.updated_at, cft.created_at) AS feedback_sent_at,
+                       cft.used_at AS feedback_used_at
                 FROM course_inscriptions ci
                 LEFT JOIN course_payments cp ON cp.course_inscription_id = ci.id
                 LEFT JOIN course_certificates cc ON cc.course_inscription_id = ci.id
+                LEFT JOIN profiles p ON p.id = ci.profile_id
+                LEFT JOIN course_feedback_tokens cft ON cft.course_inscription_id = ci.id
                 WHERE ci.course_id = :course_id
                   AND ci.deleted_at IS NULL
                 ORDER BY ci.created_at DESC, ci.id DESC
@@ -434,10 +444,15 @@ class CourseRepository:
                 """
                 SELECT ci.*, cp.state_id AS payment_state_id, cp.voucher_path,
                        cc.id AS certificate_id, cc.certificate_code,
-                       cc.sent_at AS certificate_sent_at
+                       cc.sent_at AS certificate_sent_at,
+                       p.lastname AS lastname,
+                       COALESCE(cft.updated_at, cft.created_at) AS feedback_sent_at,
+                       cft.used_at AS feedback_used_at
                 FROM course_inscriptions ci
                 LEFT JOIN course_payments cp ON cp.course_inscription_id = ci.id
                 LEFT JOIN course_certificates cc ON cc.course_inscription_id = ci.id
+                LEFT JOIN profiles p ON p.id = ci.profile_id
+                LEFT JOIN course_feedback_tokens cft ON cft.course_inscription_id = ci.id
                 WHERE ci.id = :inscription_id
                   AND ci.deleted_at IS NULL
                 LIMIT 1
@@ -815,7 +830,15 @@ class CourseRepository:
         data.setdefault("certificate_id", None)
         data.setdefault("certificate_code", None)
         data.setdefault("certificate_sent_at", None)
-        return CourseInscription(**data)
+        data.setdefault("lastname", None)
+        data.setdefault("feedback_sent_at", None)
+        data.setdefault("feedback_used_at", None)
+        if not data.get("lastname") and data.get("names"):
+            parts = str(data["names"]).split()
+            if len(parts) > 1:
+                data["lastname"] = parts[-1]
+        allowed = set(CourseInscription.__dataclass_fields__)
+        return CourseInscription(**{key: value for key, value in data.items() if key in allowed})
 
     def _build_certificate(self, row: Any) -> CourseCertificate:
         return CourseCertificate(**dict(row))

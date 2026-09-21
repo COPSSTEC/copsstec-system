@@ -26,6 +26,7 @@ export interface AdminCourse extends Course {
   inscriptions_count: number;
   attendees_count: number;
   pending_payments_count: number;
+  paid_payments_count: number;
   certificates_sent_count: number;
 }
 
@@ -47,6 +48,7 @@ export interface CourseInscription {
   user_id: number | null;
   profile_id: number | null;
   names: string;
+  lastname: string | null;
   email: string;
   identifier: string;
   cellphone: string | null;
@@ -61,6 +63,8 @@ export interface CourseInscription {
   certificate_id: number | null;
   certificate_code: string | null;
   certificate_sent_at: string | null;
+  feedback_sent_at: string | null;
+  feedback_used_at: string | null;
 }
 
 export interface MemberOption {

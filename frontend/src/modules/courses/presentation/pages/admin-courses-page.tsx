@@ -1,15 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import Link from "next/link";
 
-import type {
-  AdminCourse,
-  CourseFormInput,
-  CourseInscription,
-  MemberOption,
-} from "@/modules/courses/domain/types";
+import type { AdminCourse, CourseFormInput, CourseInscription, MemberOption } from "@/modules/courses/domain/types";
 import {
   approvePayment,
   createCourse,
@@ -22,7 +16,6 @@ import {
   generateFeedbackLink,
   listAdminCourses,
   listCourseInscriptions,
-  listMemberOptions,
   rejectPayment,
   sendCertificates,
   sendFeedbackLinks,
@@ -30,61 +23,54 @@ import {
   updateCourse,
 } from "@/modules/courses/infrastructure/courses-api";
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { AdminCourseCard } from "@/modules/courses/presentation/components/admin-course-card";
+import { AdminCoursePanel } from "@/modules/courses/presentation/components/admin-course-panel";
+import { CourseUiIcon } from "@/modules/courses/presentation/components/course-ui-icon";
+import { ConfirmCourseModal } from "@/modules/courses/presentation/modals/confirm-course-modal";
+import { CourseFormModal } from "@/modules/courses/presentation/modals/course-form-modal";
+import { CourseInscriptionsModal } from "@/modules/courses/presentation/modals/course-inscriptions-modal";
+import {
+  EMPTY_COURSE,
+  courseToForm,
+  matchesCourseQuery,
+  normalizeCourseForm,
+} from "@/modules/courses/presentation/lib/course-admin";
 import { RoleGate } from "@/shared/components/role-gate";
+import { useToast } from "@/shared/hooks/use-toast";
 
-const EMPTY_COURSE: CourseFormInput = {
-  state_id: 4,
-  title: "",
-  value: "0",
-  location: "",
-  capacitator: "",
-  capacitator_about: "",
-  date_course: "",
-  date_course_final: "",
-  hour_init: "",
-  hour_final: "",
-  about: "",
-  image: "",
-  type_modality: "Online",
-  link: "",
-};
-
-function stateLabel(stateId: number | null): string {
-  const labels: Record<number, string> = {
-    4: "Visible",
-    5: "Oculto",
-    7: "Rechazado",
-    8: "Por aprobar",
-    9: "Inscrito",
-    11: "Asistió",
-    14: "Pagado",
-    15: "Enviado",
-  };
-
-  return stateId ? labels[stateId] ?? `Estado ${stateId}` : "Sin estado";
-}
+type ConfirmKind = "finish" | "delete";
 
 export function AdminCoursesPage() {
+  const toast = useToast();
+  const token = useMemo(() => getStoredToken(), []);
   const [courses, setCourses] = useState<AdminCourse[]>([]);
+  const [query, setQuery] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<AdminCourse | null>(null);
   const [form, setForm] = useState<CourseFormInput>(EMPTY_COURSE);
+  const [inscriptionsOpen, setInscriptionsOpen] = useState(false);
   const [inscriptions, setInscriptions] = useState<CourseInscription[]>([]);
-  const [members, setMembers] = useState<MemberOption[]>([]);
-  const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<MemberOption[]>([]);
   const [selectedInscriptions, setSelectedInscriptions] = useState<number[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [rejectionTarget, setRejectionTarget] = useState<CourseInscription | null>(null);
   const [rejectionObservation, setRejectionObservation] = useState("");
-  const token = useMemo(() => getStoredToken(), []);
+  const [confirm, setConfirm] = useState<{ kind: ConfirmKind; course: AdminCourse } | null>(null);
+
+  const selectedCourse = courses.find((course) => course.id === selectedCourseId) ?? null;
+  const visibleCourses = useMemo(
+    () => courses.filter((course) => matchesCourseQuery(course, query)),
+    [courses, query],
+  );
 
   async function loadCourses() {
     if (!token) {
-      return;
+      return [];
     }
 
-    setCourses(await listAdminCourses(token));
+    const items = await listAdminCourses(token);
+    setCourses(items);
+    return items;
   }
 
   async function loadInscriptions(courseId: number) {
@@ -102,19 +88,30 @@ export function AdminCoursesPage() {
       }
 
       try {
-        const [courseItems, memberItems] = await Promise.all([
-          listAdminCourses(token),
-          listMemberOptions(token, ""),
-        ]);
-        setCourses(courseItems);
-        setMembers(memberItems);
+        const items = await loadCourses();
+        if (items[0]) {
+          setSelectedCourseId(items[0].id);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo cargar cursos.");
+        toast.error(err instanceof Error ? err.message : "No se pudo cargar cursos.");
       }
     }
 
     void bootstrap();
   }, [token]);
+
+  async function runAction(action: () => Promise<unknown>, successMessage: string) {
+    try {
+      await action();
+      toast.success(successMessage);
+      await loadCourses();
+      if (selectedCourseId && inscriptionsOpen) {
+        await loadInscriptions(selectedCourseId);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo completar la acción.");
+    }
+  }
 
   async function handleCourseSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,117 +119,80 @@ export function AdminCoursesPage() {
       return;
     }
 
-    setError(null);
-    setMessage(null);
-
     try {
+      const payload = normalizeCourseForm(form);
       if (editingCourse) {
-        await updateCourse(token, editingCourse.id, form);
-        setMessage("Curso actualizado correctamente.");
+        await updateCourse(token, editingCourse.id, payload);
+        toast.success("Curso actualizado correctamente.");
       } else {
-        await createCourse(token, form);
-        setMessage("Curso creado correctamente.");
+        const created = await createCourse(token, payload);
+        toast.success("Curso creado correctamente.");
+        setSelectedCourseId(created.id);
       }
 
+      setFormOpen(false);
       setEditingCourse(null);
       setForm(EMPTY_COURSE);
       await loadCourses();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar el curso.");
+      toast.error(err instanceof Error ? err.message : "No se pudo guardar el curso.");
     }
   }
 
-  function startEdit(course: AdminCourse) {
+  function openCreate() {
+    setEditingCourse(null);
+    setForm(EMPTY_COURSE);
+    setFormOpen(true);
+  }
+
+  function openDetails(course: AdminCourse) {
     setEditingCourse(course);
-    setForm({
-      state_id: course.state_id,
-      title: course.title,
-      value: course.value,
-      location: course.location,
-      capacitator: course.capacitator,
-      capacitator_about: course.capacitator_about,
-      date_course: course.date_course,
-      date_course_final: course.date_course_final,
-      hour_init: course.hour_init,
-      hour_final: course.hour_final,
-      about: course.about,
-      image: course.image,
-      type_modality: course.type_modality,
-      link: course.link,
-    });
+    setForm(courseToForm(course));
+    setFormOpen(true);
   }
 
   async function selectCourse(courseId: number) {
     setSelectedCourseId(courseId);
     setSelectedInscriptions([]);
-    await loadInscriptions(courseId);
+    setSelectedMembers([]);
   }
 
-  async function runAction(action: () => Promise<unknown>, successMessage: string) {
-    setError(null);
-    setMessage(null);
-
-    try {
-      await action();
-      setMessage(successMessage);
-      await loadCourses();
-      if (selectedCourseId) {
-        await loadInscriptions(selectedCourseId);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo completar la acción.");
-    }
+  async function openInscriptions(course: AdminCourse) {
+    setSelectedCourseId(course.id);
+    setSelectedInscriptions([]);
+    setSelectedMembers([]);
+    setInscriptionsOpen(true);
+    await loadInscriptions(course.id);
   }
 
-  async function handleDownloadCertificate(certificateId: number, certificateCode: string | null) {
-    if (!token) {
+  async function handleDownloadCertificate(inscription: CourseInscription) {
+    if (!token || !inscription.certificate_id) {
       return;
     }
 
     await runAction(async () => {
-      const blob = await downloadCertificate(token, certificateId);
+      const blob = await downloadCertificate(token, inscription.certificate_id ?? 0);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${certificateCode ?? "certificado"}.pdf`;
+      link.download = `${inscription.certificate_code ?? "certificado"}.pdf`;
       link.click();
       window.URL.revokeObjectURL(url);
     }, "Certificado descargado.");
   }
 
-  async function handleDownloadReport(courseId: number) {
-    if (!token) {
-      return;
-    }
-
-    await runAction(async () => {
-      const blob = await downloadAttendeesReport(token, courseId);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `curso-${courseId}-asistentes.csv`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    }, "Informe descargado.");
-  }
-
   async function handleGenerateCertificate(inscription: CourseInscription) {
     if (!inscription.attended_at) {
-      setError("Primero marca la asistencia para poder generar el certificado.");
-      setMessage(null);
+      toast.error("Primero marca la asistencia para poder generar el certificado.");
       return;
     }
 
-    await runAction(
-      () => generateCertificate(token ?? "", inscription.id),
-      "Certificado generado correctamente.",
-    );
+    await runAction(() => generateCertificate(token ?? "", inscription.id), "Certificado generado correctamente.");
   }
 
   async function handleGenerateFeedbackLink(inscription: CourseInscription) {
     if (!inscription.attended_at) {
-      setError("Primero marca la asistencia para poder enviar la encuesta.");
-      setMessage(null);
+      toast.error("Primero marca la asistencia para poder enviar la encuesta.");
       return;
     }
 
@@ -261,21 +221,18 @@ export function AdminCoursesPage() {
       return;
     }
 
-    setError(null);
-    setMessage(null);
-
     try {
       const result = await sendCertificates(token, selectedCourseId, selectedInscriptions);
       const detail = `Procesados: ${result.processed}. Omitidos: ${result.skipped}.`;
       if (result.processed === 0) {
-        setError(`${detail} Marca asistencia antes de enviar certificados.`);
+        toast.error(`${detail} Marca asistencia antes de enviar certificados.`);
       } else {
-        setMessage(`Certificados enviados correctamente. ${detail}`);
+        toast.success(`Certificados enviados correctamente. ${detail}`);
       }
       await loadCourses();
       await loadInscriptions(selectedCourseId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron enviar los certificados.");
+      toast.error(err instanceof Error ? err.message : "No se pudieron enviar los certificados.");
     }
   }
 
@@ -284,415 +241,190 @@ export function AdminCoursesPage() {
       return;
     }
 
-    setError(null);
-    setMessage(null);
-
     try {
       const result = await sendFeedbackLinks(token, selectedCourseId, selectedInscriptions);
       const detail = `Procesados: ${result.processed}. Omitidos: ${result.skipped}.`;
       if (result.processed === 0) {
-        setError(`${detail} Solo se puede enviar encuesta a inscritos con asistencia.`);
+        toast.error(`${detail} Solo se puede enviar encuesta a inscritos con asistencia.`);
       } else {
-        setMessage(`Encuestas enviadas correctamente. ${detail}`);
+        toast.success(`Encuestas enviadas correctamente. ${detail}`);
       }
       await loadCourses();
       await loadInscriptions(selectedCourseId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron enviar las encuestas.");
+      toast.error(err instanceof Error ? err.message : "No se pudieron enviar las encuestas.");
     }
+  }
+
+  async function handleConfirm() {
+    if (!confirm || !token) {
+      return;
+    }
+
+    const course = confirm.course;
+    setConfirm(null);
+
+    if (confirm.kind === "finish") {
+      await runAction(() => finishCourse(token, course.id), "Curso finalizado.");
+      return;
+    }
+
+    await runAction(async () => {
+      await deleteCourse(token, course.id);
+      if (selectedCourseId === course.id) {
+        setSelectedCourseId(null);
+        setInscriptionsOpen(false);
+      }
+    }, "Curso eliminado.");
   }
 
   return (
     <RoleGate requiredAccess="admin">
-      <section className="page-heading page-heading-actions">
+      <section className="page-heading page-heading-actions admin-courses-heading">
         <div>
           <h1>Cursos</h1>
           <p>Gestión administrativa de cursos, inscritos, pagos, asistencia y certificados.</p>
         </div>
-        <div className="hero-actions">
+        <div className="admin-courses-heading-actions">
+          <label className="admin-courses-search">
+            <CourseUiIcon name="search" />
+            <input
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar curso"
+              type="search"
+              value={query}
+            />
+          </label>
           <Link className="secondary-button button-link" href="/cursos">
             Ver catálogo público
           </Link>
-          <Link className="secondary-button button-link" href="/mi-espacio/cursos">
-            Mis cursos
-          </Link>
+          <button className="primary-button" onClick={openCreate} type="button">
+            <CourseUiIcon name="plus" />
+            Nuevo curso
+          </button>
         </div>
       </section>
 
-      {message ? <ActionAlert tone="success" title="Acción completada" message={message} /> : null}
-      {error ? <ActionAlert tone="error" title="Revisa la acción" message={error} /> : null}
-
-      <section className="admin-course-layout">
-        <form className="card form-stack" onSubmit={handleCourseSubmit}>
-          <h2>{editingCourse ? "Editar curso" : "Nuevo curso"}</h2>
-          <CourseInput label="Título" name="title" onChange={setForm} value={form.title} />
-          <div className="grid">
-            <CourseInput label="Valor" name="value" onChange={setForm} value={form.value} />
-            <CourseInput label="Estado" name="state_id" onChange={setForm} type="number" value={String(form.state_id)} />
-          </div>
-          <CourseInput label="Lugar" name="location" onChange={setForm} value={form.location} />
-          <CourseInput label="Imagen URL/ruta" name="image" onChange={setForm} value={form.image} />
-          <div className="grid">
-            <CourseInput label="Fecha inicio" name="date_course" onChange={setForm} value={form.date_course} />
-            <CourseInput label="Fecha fin" name="date_course_final" onChange={setForm} value={form.date_course_final} />
-          </div>
-          <div className="grid">
-            <CourseInput label="Hora inicio" name="hour_init" onChange={setForm} value={form.hour_init} />
-            <CourseInput label="Hora fin" name="hour_final" onChange={setForm} value={form.hour_final} />
-          </div>
-          <CourseInput label="Modalidad" name="type_modality" onChange={setForm} value={form.type_modality ?? ""} />
-          <CourseInput label="Link" name="link" onChange={setForm} value={form.link ?? ""} />
-          <CourseInput label="Capacitador" name="capacitator" onChange={setForm} value={form.capacitator} />
-          <CourseTextarea label="Sobre el capacitador" name="capacitator_about" onChange={setForm} value={form.capacitator_about} />
-          <CourseTextarea label="Descripción" name="about" onChange={setForm} value={form.about} />
-          <div className="hero-actions">
-            <button className="primary-button" type="submit">
-              {editingCourse ? "Guardar cambios" : "Crear curso"}
-            </button>
-            {editingCourse ? (
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  setEditingCourse(null);
-                  setForm(EMPTY_COURSE);
-                }}
-                type="button"
-              >
-                Cancelar
-              </button>
-            ) : null}
-          </div>
-        </form>
-
-        <section className="card">
-          <h2>Listado</h2>
-          <div className="table-scroll">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Curso</th>
-                  <th>Estado</th>
-                  <th>Inscritos</th>
-                  <th>Pagos</th>
-                  <th>Asistentes</th>
-                  <th>Certificados</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {courses.map((course) => (
-                  <tr key={course.id}>
-                    <td>{course.title}</td>
-                    <td>{course.finished_at ? "Finalizado" : stateLabel(course.state_id)}</td>
-                    <td>{course.inscriptions_count}</td>
-                    <td>{course.pending_payments_count}</td>
-                    <td>{course.attendees_count}</td>
-                    <td>{course.certificates_sent_count}</td>
-                    <td>
-                      <div className="table-actions">
-                        <button className="secondary-button" onClick={() => startEdit(course)} type="button">
-                          Editar
-                        </button>
-                        <button className="secondary-button" onClick={() => void selectCourse(course.id)} type="button">
-                          Inscritos
-                        </button>
-                        <button className="secondary-button" onClick={() => void handleDownloadReport(course.id)} type="button">
-                          Informe
-                        </button>
-                        <button
-                          className="secondary-button"
-                          onClick={() => void runAction(() => finishCourse(token ?? "", course.id), "Curso finalizado.")}
-                          type="button"
-                        >
-                          Finalizar
-                        </button>
-                        <button
-                          className="secondary-button danger-button"
-                          onClick={() => void runAction(() => deleteCourse(token ?? "", course.id), "Curso eliminado.")}
-                          type="button"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </section>
-
-      {selectedCourseId ? (
-        <section className="card course-admin-panel">
-          <h2>Inscripciones del curso #{selectedCourseId}</h2>
-          <div className="member-picker">
-            <strong>Registrar miembros sin costo</strong>
-            <div className="member-list">
-              {members.map((member) => (
-                <label key={member.id}>
-                  <input
-                    checked={selectedMembers.includes(member.id)}
-                    onChange={(event) => {
-                      setSelectedMembers((current) =>
-                        event.target.checked
-                          ? [...current, member.id]
-                          : current.filter((id) => id !== member.id),
-                      );
-                    }}
-                    type="checkbox"
-                  />
-                  {member.name} ({member.email})
-                </label>
+      <section className="admin-courses-workspace">
+        <div className="admin-courses-grid-wrap">
+          <header className="admin-courses-grid-head">
+            <h2>Todos los cursos</h2>
+            <span className="muted">{visibleCourses.length} cursos</span>
+          </header>
+          {visibleCourses.length === 0 ? (
+            <p className="muted">No hay cursos que coincidan con la búsqueda.</p>
+          ) : (
+            <div className="admin-courses-grid">
+              {visibleCourses.map((course) => (
+                <AdminCourseCard
+                  course={course}
+                  key={course.id}
+                  onSelect={(courseId) => void selectCourse(courseId)}
+                  selected={course.id === selectedCourseId}
+                />
               ))}
             </div>
-            <button
-              className="primary-button"
-              disabled={selectedMembers.length === 0}
-              onClick={() =>
-                void runAction(
-                  () => createMemberInscriptions(token ?? "", selectedCourseId, selectedMembers),
-                  "Miembros registrados.",
-                )
-              }
-              type="button"
-            >
-              Registrar seleccionados
-            </button>
-          </div>
+          )}
+        </div>
 
-          <div className="table-scroll">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th></th>
-                  <th>Participante</th>
-                  <th>Tipo</th>
-                  <th>Estado</th>
-                  <th>Pago</th>
-                  <th>Asistencia</th>
-                  <th>Certificado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {inscriptions.map((inscription) => (
-                  <tr key={inscription.id}>
-                    <td>
-                      <input
-                        checked={selectedInscriptions.includes(inscription.id)}
-                        onChange={(event) => {
-                          setSelectedInscriptions((current) =>
-                            event.target.checked
-                              ? [...current, inscription.id]
-                              : current.filter((id) => id !== inscription.id),
-                          );
-                        }}
-                        type="checkbox"
-                      />
-                    </td>
-                    <td>
-                      <strong>{inscription.names}</strong>
-                      <span className="muted table-subtitle">{inscription.email}</span>
-                    </td>
-                    <td>{inscription.participant_type === "member" ? "Miembro" : "Invitado"}</td>
-                    <td>{stateLabel(inscription.state_id)}</td>
-                    <td>{stateLabel(inscription.payment_state_id)}</td>
-                    <td>{inscription.attended_at ? "Sí" : "No"}</td>
-                    <td>
-                      {inscription.certificate_id ? (
-                        <button
-                          className="secondary-button"
-                          onClick={() =>
-                            void handleDownloadCertificate(
-                              inscription.certificate_id ?? 0,
-                              inscription.certificate_code,
-                            )
-                          }
-                          type="button"
-                        >
-                          {inscription.certificate_code}
-                        </button>
-                      ) : (
-                        "Pendiente"
-                      )}
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        {inscription.payment_state_id === 8 ? (
-                          <>
-                            <button
-                              className="secondary-button"
-                              onClick={() =>
-                                void runAction(
-                                  () => approvePayment(token ?? "", inscription.id),
-                                  "Pago aprobado correctamente.",
-                                )
-                              }
-                              type="button"
-                            >
-                              Aprobar
-                            </button>
-                            <button
-                              className="secondary-button"
-                              onClick={() => setRejectionTarget(inscription)}
-                              type="button"
-                            >
-                              Rechazar
-                            </button>
-                          </>
-                        ) : null}
-                        <button
-                          className="secondary-button"
-                          onClick={() =>
-                            void runAction(
-                              () => updateAttendance(token ?? "", inscription.id, !inscription.attended_at),
-                              "Asistencia actualizada.",
-                            )
-                          }
-                          type="button"
-                        >
-                          {inscription.attended_at ? "Quitar asistencia" : "Asistió"}
-                        </button>
-                        <button
-                          className="secondary-button"
-                          onClick={() => void handleGenerateCertificate(inscription)}
-                          type="button"
-                        >
-                          Generar certificado
-                        </button>
-                        <button
-                          className="secondary-button"
-                          onClick={() => void handleGenerateFeedbackLink(inscription)}
-                          type="button"
-                        >
-                          Encuesta
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <AdminCoursePanel
+          course={selectedCourse}
+          onDelete={() => selectedCourse && setConfirm({ kind: "delete", course: selectedCourse })}
+          onFinish={() => selectedCourse && setConfirm({ kind: "finish", course: selectedCourse })}
+          onOpenDetails={() => selectedCourse && openDetails(selectedCourse)}
+          onOpenInscriptions={() => selectedCourse && void openInscriptions(selectedCourse)}
+        />
+      </section>
 
-          <button
-            className="primary-button"
-            disabled={selectedInscriptions.length === 0}
-            onClick={() => void handleSendCertificates()}
-            type="button"
-          >
-            Enviar certificados seleccionados
-          </button>
-          <button
-            className="secondary-button"
-            disabled={selectedInscriptions.length === 0}
-            onClick={() => void handleSendFeedbackLinks()}
-            type="button"
-          >
-            Enviar encuestas seleccionadas
-          </button>
-        </section>
+      {formOpen ? (
+        <CourseFormModal
+          editing={Boolean(editingCourse)}
+          form={form}
+          onChange={setForm}
+          onClose={() => {
+            setFormOpen(false);
+            setEditingCourse(null);
+            setForm(EMPTY_COURSE);
+          }}
+          onSubmit={handleCourseSubmit}
+        />
       ) : null}
 
-      {rejectionTarget ? (
-        <div className="modal-backdrop" role="presentation">
-          <form className="confirm-dialog" onSubmit={handleRejectPaymentSubmit}>
-            <h2>Rechazar pago</h2>
-            <p className="muted">
-              Ingresa la observación que recibirá {rejectionTarget.names}.
-            </p>
-            <div className="field">
-              <label htmlFor="rejection-observation">Observación</label>
-              <textarea
-                id="rejection-observation"
-                onChange={(event) => setRejectionObservation(event.target.value)}
-                required
-                rows={4}
-                value={rejectionObservation}
-              />
-            </div>
-            <div className="hero-actions">
-              <button className="primary-button" type="submit">
-                Confirmar rechazo
-              </button>
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  setRejectionTarget(null);
-                  setRejectionObservation("");
-                }}
-                type="button"
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
+      {inscriptionsOpen && selectedCourse ? (
+        <CourseInscriptionsModal
+          course={selectedCourse}
+          inscriptions={inscriptions}
+          onApprovePayment={(inscription) =>
+            void runAction(() => approvePayment(token ?? "", inscription.id), "Pago aprobado correctamente.")
+          }
+          onCancelRejection={() => {
+            setRejectionTarget(null);
+            setRejectionObservation("");
+          }}
+          onClose={() => setInscriptionsOpen(false)}
+          onDownloadCertificate={(inscription) => void handleDownloadCertificate(inscription)}
+          onOpenDetails={() => {
+            setInscriptionsOpen(false);
+            openDetails(selectedCourse);
+          }}
+          onFeedback={(inscription) => void handleGenerateFeedbackLink(inscription)}
+          onGenerateCertificate={(inscription) => void handleGenerateCertificate(inscription)}
+          onRegisterMembers={() =>
+            void runAction(async () => {
+              await createMemberInscriptions(
+                token ?? "",
+                selectedCourse.id,
+                selectedMembers.map((member) => member.id),
+              );
+              setSelectedMembers([]);
+            }, "Miembros registrados.")
+          }
+          onRejectPayment={setRejectionTarget}
+          onRejectSubmit={handleRejectPaymentSubmit}
+          onRejectionObservationChange={setRejectionObservation}
+          onSelectedInscriptionsChange={setSelectedInscriptions}
+          onSelectedMembersChange={setSelectedMembers}
+          onDownloadReport={() =>
+            void runAction(async () => {
+              const blob = await downloadAttendeesReport(token ?? "", selectedCourse.id);
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `curso-${selectedCourse.id}-asistentes.csv`;
+              link.click();
+              window.URL.revokeObjectURL(url);
+            }, "Informe descargado.")
+          }
+          onSendCertificates={() => void handleSendCertificates()}
+          onSendFeedback={() => void handleSendFeedbackLinks()}
+          onToggleAttendance={(inscription) =>
+            void runAction(
+              () => updateAttendance(token ?? "", inscription.id, !inscription.attended_at),
+              "Asistencia actualizada.",
+            )
+          }
+          rejectionObservation={rejectionObservation}
+          rejectionTarget={rejectionTarget}
+          selectedInscriptions={selectedInscriptions}
+          selectedMembers={selectedMembers}
+          token={token ?? ""}
+        />
+      ) : null}
+
+      {confirm ? (
+        <ConfirmCourseModal
+          confirmLabel={confirm.kind === "delete" ? "Eliminar" : "Finalizar"}
+          danger={confirm.kind === "delete"}
+          description={
+            confirm.kind === "delete"
+              ? `Se eliminará “${confirm.course.title}” del listado administrativo.`
+              : `“${confirm.course.title}” quedará marcado como finalizado.`
+          }
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => void handleConfirm()}
+          title={confirm.kind === "delete" ? "Eliminar curso" : "Finalizar curso"}
+        />
       ) : null}
     </RoleGate>
-  );
-}
-
-interface ActionAlertProps {
-  tone: "success" | "error";
-  title: string;
-  message: string;
-}
-
-function ActionAlert({ tone, title, message }: ActionAlertProps) {
-  return (
-    <div className={`action-alert action-alert-${tone}`} role="status">
-      <strong>{title}</strong>
-      <span>{message}</span>
-    </div>
-  );
-}
-
-interface CourseFieldProps {
-  label: string;
-  name: keyof CourseFormInput;
-  onChange: Dispatch<SetStateAction<CourseFormInput>>;
-  type?: string;
-  value: string;
-}
-
-function CourseInput({ label, name, onChange, type = "text", value }: CourseFieldProps) {
-  return (
-    <div className="field">
-      <label htmlFor={name}>{label}</label>
-      <input
-        id={name}
-        onChange={(event) =>
-          onChange((current) => ({
-            ...current,
-            [name]: name === "state_id" ? Number(event.target.value) : event.target.value,
-          }))
-        }
-        required={name !== "link" && name !== "type_modality"}
-        type={type}
-        value={value}
-      />
-    </div>
-  );
-}
-
-function CourseTextarea({ label, name, onChange, value }: CourseFieldProps) {
-  return (
-    <div className="field">
-      <label htmlFor={name}>{label}</label>
-      <textarea
-        id={name}
-        onChange={(event) =>
-          onChange((current) => ({
-            ...current,
-            [name]: event.target.value,
-          }))
-        }
-        required
-        rows={4}
-        value={value}
-      />
-    </div>
   );
 }

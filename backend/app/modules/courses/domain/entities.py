@@ -64,6 +64,9 @@ class CourseInscription:
     certificate_id: int | None = None
     certificate_code: str | None = None
     certificate_sent_at: datetime | None = None
+    lastname: str | None = None
+    feedback_sent_at: datetime | None = None
+    feedback_used_at: datetime | None = None
 
 
 @dataclass(frozen=True)

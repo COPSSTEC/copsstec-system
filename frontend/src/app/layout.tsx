@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { BRAND_MEDIA } from "@/config/brand-media";
 import { SITE } from "@/config/site";
 import { AnalyticsNoscript, AnalyticsScripts } from "@/shared/components/analytics";
+import { AppProviders } from "@/shared/components/app-providers";
 import { JsonLd } from "@/shared/components/json-ld";
 import "./globals.css";
 
@@ -68,7 +69,7 @@ export default function RootLayout({
       <body>
         <AnalyticsNoscript />
         <JsonLd />
-        {children}
+        <AppProviders>{children}</AppProviders>
         <AnalyticsScripts />
       </body>
     </html>

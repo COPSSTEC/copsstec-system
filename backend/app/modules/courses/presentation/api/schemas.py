@@ -48,6 +48,7 @@ class AdminCourseResponse(CourseResponse):
     inscriptions_count: int = 0
     attendees_count: int = 0
     pending_payments_count: int = 0
+    paid_payments_count: int = 0
     certificates_sent_count: int = 0
 
 
@@ -113,6 +114,9 @@ class CourseInscriptionResponse(BaseModel):
     certificate_id: int | None
     certificate_code: str | None
     certificate_sent_at: datetime | None
+    lastname: str | None = None
+    feedback_sent_at: datetime | None = None
+    feedback_used_at: datetime | None = None
 
     @classmethod
     def from_domain(
