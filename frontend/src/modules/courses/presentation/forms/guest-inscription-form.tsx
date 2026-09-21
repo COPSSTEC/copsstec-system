@@ -4,117 +4,111 @@ import { FormEvent, useState } from "react";
 
 import type { Course } from "@/modules/courses/domain/types";
 import { createGuestInscription } from "@/modules/courses/infrastructure/courses-api";
+import { CourseUiIcon } from "@/modules/courses/presentation/components/course-ui-icon";
+import { formatCoursePrice, isPaidCourse } from "@/modules/courses/presentation/lib/public-courses";
+import { useToast } from "@/shared/hooks/use-toast";
 
 interface GuestInscriptionFormProps {
   course: Course;
 }
 
-function requiresPayment(course: Course): boolean {
-  const amount = Number(course.value.replace(",", "."));
-
-  return Number.isFinite(amount) && amount > 0;
-}
-
 export function GuestInscriptionForm({ course }: GuestInscriptionFormProps) {
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const needsVoucher = requiresPayment(course);
+  const needsVoucher = isPaidCourse(course);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
-    setError(null);
-    setSuccess(null);
     setIsSubmitting(true);
 
     try {
       const formData = new FormData(formElement);
       const response = await createGuestInscription(course.id, formData);
-      setError(null);
-      setSuccess(response.message);
+      toast.success(response.message, "Inscripción enviada");
       formElement.reset();
     } catch (err) {
-      setSuccess(null);
-      setError(err instanceof Error ? err.message : "No se pudo registrar la inscripción.");
+      toast.error(err instanceof Error ? err.message : "No se pudo registrar la inscripción.", "No se pudo registrar");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <form className="card form-stack" onSubmit={handleSubmit}>
-      <h2>Inscripción de invitado</h2>
-      <p className="muted">
-        {needsVoucher
-          ? "Este curso requiere voucher de pago para revisión administrativa."
-          : "Este curso es gratuito para invitados."}
-      </p>
+    <form className="card form-stack guest-inscription-card" onSubmit={handleSubmit}>
+      <header className="guest-inscription-head">
+        <span className="course-modal-icon">
+          <CourseUiIcon name="userPlus" />
+        </span>
+        <div>
+          <h2>Inscripción de invitado</h2>
+          <p className="muted">
+            {needsVoucher
+              ? "Este curso requiere voucher de pago para revisión administrativa."
+              : "Este curso es gratuito para invitados."}
+          </p>
+        </div>
+        <strong className={`status-badge ${needsVoucher ? "status-badge-info" : "status-badge-success"}`}>
+          {formatCoursePrice(course.value)}
+        </strong>
+      </header>
 
-      <div className="field">
-        <label htmlFor="names">Nombres completos</label>
-        <input id="names" name="names" required />
-      </div>
-
-      <div className="field">
-        <label htmlFor="email">Correo electrónico</label>
-        <input id="email" name="email" required type="email" />
-      </div>
-
-      <div className="field">
-        <label htmlFor="identifier">Cédula/RUC/Pasaporte</label>
-        <input id="identifier" name="identifier" required />
-      </div>
-
-      <div className="field">
-        <label htmlFor="cellphone">Celular</label>
-        <input id="cellphone" name="cellphone" />
-      </div>
-
-      <div className="grid">
+      <section className="guest-inscription-section">
+        <h3>Datos personales</h3>
         <div className="field">
-          <label htmlFor="country">País</label>
-          <input id="country" name="country" />
+          <label htmlFor="names">Nombres completos</label>
+          <input id="names" name="names" placeholder="Nombre y apellidos" required />
+        </div>
+        <div className="grid">
+          <div className="field">
+            <label htmlFor="email">Correo electrónico</label>
+            <input id="email" name="email" placeholder="nombre@ejemplo.com" required type="email" />
+          </div>
+          <div className="field">
+            <label htmlFor="identifier">Cédula / RUC / Pasaporte</label>
+            <input id="identifier" name="identifier" placeholder="Documento de identidad" required />
+          </div>
         </div>
         <div className="field">
-          <label htmlFor="province">Provincia</label>
-          <input id="province" name="province" />
+          <label htmlFor="cellphone">Celular</label>
+          <input id="cellphone" name="cellphone" placeholder="0999999999" />
+        </div>
+      </section>
+
+      <section className="guest-inscription-section">
+        <h3>Ubicación y organización</h3>
+        <div className="grid">
+          <div className="field">
+            <label htmlFor="country">País</label>
+            <input id="country" name="country" placeholder="Ecuador" />
+          </div>
+          <div className="field">
+            <label htmlFor="province">Provincia</label>
+            <input id="province" name="province" />
+          </div>
+          <div className="field">
+            <label htmlFor="city">Ciudad</label>
+            <input id="city" name="city" />
+          </div>
         </div>
         <div className="field">
-          <label htmlFor="city">Ciudad</label>
-          <input id="city" name="city" />
+          <label htmlFor="organization">Empresa o institución</label>
+          <input id="organization" name="organization" placeholder="Opcional" />
         </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="organization">Empresa o institución</label>
-        <input id="organization" name="organization" />
-      </div>
+      </section>
 
       {needsVoucher ? (
-        <>
+        <section className="guest-inscription-section">
+          <h3>Comprobante de pago</h3>
           <div className="field">
             <label htmlFor="payment_reference">Referencia de pago</label>
-            <input id="payment_reference" name="payment_reference" />
+            <input id="payment_reference" name="payment_reference" placeholder="Número de transferencia" />
           </div>
           <div className="field">
             <label htmlFor="voucher">Voucher de pago</label>
             <input accept="image/png,image/jpeg,image/webp" id="voucher" name="voucher" required type="file" />
           </div>
-        </>
-      ) : null}
-
-      {error ? (
-        <div className="action-alert action-alert-error" role="status">
-          <strong>No se pudo registrar</strong>
-          <span>{error}</span>
-        </div>
-      ) : null}
-      {success ? (
-        <div className="action-alert action-alert-success" role="status">
-          <strong>Inscripción enviada</strong>
-          <span>{success}</span>
-        </div>
+        </section>
       ) : null}
 
       <button className="primary-button" disabled={isSubmitting} type="submit">

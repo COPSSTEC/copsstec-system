@@ -5,7 +5,15 @@ import Link from "next/link";
 
 import type { Course } from "@/modules/courses/domain/types";
 import { getPublicCourse } from "@/modules/courses/infrastructure/courses-api";
+import { CourseCover } from "@/modules/courses/presentation/components/course-cover";
+import { CourseUiIcon } from "@/modules/courses/presentation/components/course-ui-icon";
 import { GuestInscriptionForm } from "@/modules/courses/presentation/forms/guest-inscription-form";
+import {
+  courseScheduleLabel,
+  courseScheduleState,
+  formatCourseDates,
+  formatCoursePrice,
+} from "@/modules/courses/presentation/lib/public-courses";
 import { PublicFooter } from "@/shared/components/public-footer";
 import { PublicSiteHeader } from "@/shared/components/public-site-header";
 
@@ -32,6 +40,8 @@ export function PublicCourseDetailPage({ courseId }: PublicCourseDetailPageProps
     void loadCourse();
   }, [courseId]);
 
+  const schedule = course ? courseScheduleState(course) : null;
+
   return (
     <main className="public-page">
       <PublicSiteHeader current="cursos" />
@@ -41,38 +51,43 @@ export function PublicCourseDetailPage({ courseId }: PublicCourseDetailPageProps
 
       {course ? (
         <div className="course-detail-layout">
-          <section className="card">
-            <div className="course-hero-image" style={{ backgroundImage: `url(${course.image})` }} />
-            <p className="eyebrow">{course.type_modality ?? "Curso"}</p>
+          <section className="card public-course-detail">
+            <CourseCover className="course-hero-cover" image={course.image} title={course.title} />
+            <div className="course-meta">
+              <span>{course.type_modality ?? "Curso"}</span>
+              <strong>{formatCoursePrice(course.value)}</strong>
+            </div>
+            {schedule ? (
+              <span className={`course-schedule-badge is-${schedule}`}>{courseScheduleLabel(schedule)}</span>
+            ) : null}
             <h1>{course.title}</h1>
             <p>{course.about}</p>
-            <div className="profile-list">
-              <div className="profile-item">
-                <span>Fecha</span>
-                <strong>
-                  {course.date_course} - {course.date_course_final}
-                </strong>
-              </div>
-              <div className="profile-item">
-                <span>Horario</span>
-                <strong>
+            <ul className="course-form-preview-meta">
+              <li>
+                <CourseUiIcon name="calendar" />
+                <span>{formatCourseDates(course)}</span>
+              </li>
+              <li>
+                <CourseUiIcon name="clock" />
+                <span>
                   {course.hour_init} a {course.hour_final}
-                </strong>
-              </div>
-              <div className="profile-item">
-                <span>Ubicación</span>
-                <strong>{course.location}</strong>
-              </div>
-              <div className="profile-item">
-                <span>Valor</span>
-                <strong>{Number(course.value.replace(",", ".")) > 0 ? `$${course.value}` : "Gratis"}</strong>
-              </div>
-            </div>
-            <h2>Capacitador</h2>
-            <p>
-              <strong>{course.capacitator}</strong>
-            </p>
-            <p className="muted">{course.capacitator_about}</p>
+                </span>
+              </li>
+              <li>
+                <CourseUiIcon name="pin" />
+                <span>{course.location}</span>
+              </li>
+              <li>
+                <CourseUiIcon name="user" />
+                <span>{course.capacitator}</span>
+              </li>
+            </ul>
+            {course.capacitator_about ? (
+              <>
+                <h2>Capacitador</h2>
+                <p className="muted">{course.capacitator_about}</p>
+              </>
+            ) : null}
             <div className="hero-actions">
               <Link className="secondary-button button-link" href="/cursos">
                 Volver a cursos
