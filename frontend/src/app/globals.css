@@ -7966,16 +7966,39 @@ textarea {
   top: 0.7rem;
 }
 
+.course-ui-icon {
+  display: block;
+  flex: 0 0 16px;
+  height: 16px;
+  overflow: visible;
+  width: 16px;
+}
+
 .course-form-preview-modality,
 .course-form-preview-meta {
   color: var(--muted);
-  display: flex;
-  flex-wrap: wrap;
   font-size: 0.82rem;
-  gap: 0.45rem 0.75rem;
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.course-form-preview-meta {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.course-form-preview-modality,
+.course-form-preview-meta li {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.5rem;
+  line-height: 1.35;
+}
+
+.course-form-preview-modality svg,
+.course-form-preview-meta svg {
+  margin-top: 0.1rem;
 }
 
 .course-form-preview-card h3,

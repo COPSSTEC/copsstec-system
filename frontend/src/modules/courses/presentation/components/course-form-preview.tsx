@@ -43,26 +43,32 @@ export function CourseFormPreview({ form }: CourseFormPreviewProps) {
 
         <p className="course-form-preview-modality">
           <CourseUiIcon name="monitor" />
-          {form.type_modality?.trim() || "Online"}
+          <span>{form.type_modality?.trim() || "Online"}</span>
         </p>
         <h3>{form.title.trim() || "Título del curso"}</h3>
 
         <ul className="course-form-preview-meta">
           <li>
             <CourseUiIcon name="user" />
-            {form.capacitator.trim() || "Capacitador (opcional)"}
+            <span>{form.capacitator.trim() || "Capacitador (opcional)"}</span>
           </li>
           <li>
             <CourseUiIcon name="dollar" />
-            {formatCoursePrice(form.value || "0")}
+            <span>{formatCoursePrice(form.value || "0")}</span>
+          </li>
+          <li>
             <CourseUiIcon name="calendar" />
-            Inicio: {form.date_course.trim() || "dd/mm/aaaa"}
+            <span>Inicio: {form.date_course.trim() || "dd/mm/aaaa"}</span>
+          </li>
+          <li>
             <CourseUiIcon name="clock" />
-            {form.hour_init.trim() || "08:00"}–{form.hour_final.trim() || "17:00"}
+            <span>
+              {form.hour_init.trim() || "08:00"}–{form.hour_final.trim() || "17:00"}
+            </span>
           </li>
           <li>
             <CourseUiIcon name="pin" />
-            {form.location.trim() || "Virtual / Presencial"}
+            <span>{form.location.trim() || "Virtual / Presencial"}</span>
           </li>
         </ul>
 

@@ -475,26 +475,30 @@ export function CourseInscriptionsModal({
             <ul className="course-form-preview-meta">
               <li>
                 <CourseUiIcon name="user" />
-                {course.capacitator || "Capacitador por confirmar"}
+                <span>{course.capacitator || "Capacitador por confirmar"}</span>
               </li>
               <li>
                 <CourseUiIcon name="monitor" />
-                {course.type_modality || "Modalidad por confirmar"}
+                <span>{course.type_modality || "Modalidad por confirmar"}</span>
               </li>
               <li>
                 <CourseUiIcon name="calendar" />
-                {course.date_course}
-                {course.date_course_final && course.date_course_final !== course.date_course
-                  ? ` – ${course.date_course_final}`
-                  : ""}
+                <span>
+                  {course.date_course}
+                  {course.date_course_final && course.date_course_final !== course.date_course
+                    ? ` – ${course.date_course_final}`
+                    : ""}
+                </span>
               </li>
               <li>
                 <CourseUiIcon name="clock" />
-                {course.hour_init} – {course.hour_final}
+                <span>
+                  {course.hour_init} – {course.hour_final}
+                </span>
               </li>
               <li>
                 <CourseUiIcon name="pin" />
-                {course.location}
+                <span>{course.location}</span>
               </li>
             </ul>
             <p className="muted">{course.about}</p>
