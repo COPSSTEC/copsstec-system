@@ -8679,7 +8679,7 @@ textarea {
   pointer-events: none;
   position: fixed;
   width: min(380px, calc(100vw - 2.3rem));
-  z-index: 200;
+  z-index: 400;
 }
 
 .toast {

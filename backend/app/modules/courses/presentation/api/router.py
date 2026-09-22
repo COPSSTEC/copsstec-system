@@ -187,7 +187,10 @@ def enroll_member_self(
             use_case.enroll_self(course_id, user.id),
         )
     except CourseUnavailableError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Curso no disponible.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc) or "Curso no disponible.",
+        ) from exc
     except DuplicateInscriptionError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

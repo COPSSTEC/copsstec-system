@@ -31,7 +31,27 @@ export function canDownloadCertificate(course: MemberCourse): boolean {
 }
 
 export function isCourseActive(course: Course): boolean {
-  return courseScheduleState(course) !== "finished";
+  if (course.finished_at || courseScheduleState(course) === "finished") {
+    return false;
+  }
+
+  const endDay = parseCourseDate(course.date_course_final) ?? parseCourseDate(course.date_course);
+  if (!endDay) {
+    return true;
+  }
+
+  const minutes = timeToMinutes(course.hour_final);
+  if (minutes === null) {
+    return true;
+  }
+
+  const end = new Date(endDay);
+  end.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+  return end.getTime() >= Date.now();
+}
+
+export function canEnrollInCourse(course: MemberCourse): boolean {
+  return !isMemberEnrolled(course) && isCourseActive(course);
 }
 
 export function courseCategoryId(course: Course): (typeof COURSE_CATEGORIES)[number]["id"] {

@@ -17,6 +17,7 @@ import { CourseUiIcon } from "@/modules/courses/presentation/components/course-u
 import {
   MEMBER_COURSE_PREVIEW,
   canDownloadCertificate,
+  canEnrollInCourse,
   matchesMemberCourseFilters,
   visibleCategories,
   type MemberCourseFilter,
@@ -192,12 +193,21 @@ export function MemberCoursesPage() {
 
   async function enrollFromMemberView(course: MemberCourse) {
     if (!token || course.inscription_id !== null) {
+      if (course.inscription_id !== null) {
+        toast.info("Ya estás inscrito en este curso.", "Inscripción");
+      }
+      return;
+    }
+
+    if (!canEnrollInCourse(course)) {
+      toast.error("Este curso ya finalizó o su horario ya pasó.", "No se puede inscribir");
       return;
     }
 
     setIsBusy(true);
     try {
       await enrollCurrentMember(token, course.id);
+      toast.success("Inscripción confirmada sin costo.", "Ya estás inscrito");
       const { mine, available } = await loadCourses();
       const updated = resolveCourse(course.id, mine, available, {
         ...course,
@@ -206,9 +216,8 @@ export function MemberCoursesPage() {
       });
       setDetailCourse(updated);
       setPanelOpen(true);
-      toast.success("Inscripción confirmada sin costo.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "No se pudo completar la inscripción.");
+      toast.error(err instanceof Error ? err.message : "No se pudo completar la inscripción.", "No se pudo inscribir");
     } finally {
       setIsBusy(false);
     }

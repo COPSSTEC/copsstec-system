@@ -8,6 +8,7 @@ import { CourseCover } from "@/modules/courses/presentation/components/course-co
 import { CourseUiIcon } from "@/modules/courses/presentation/components/course-ui-icon";
 import {
   canDownloadCertificate,
+  canEnrollInCourse,
   courseCategoryLabel,
   courseDurationLabel,
   formatMemberDateRange,
@@ -58,6 +59,7 @@ export function MemberCoursePanel({
   const enrolled = isMemberEnrolled(course);
   const active = isCourseActive(course);
   const certificateReady = canDownloadCertificate(course);
+  const canEnroll = canEnrollInCourse(course);
 
   return (
     <aside className="member-course-panel" onClick={(event) => event.stopPropagation()}>
@@ -88,8 +90,8 @@ export function MemberCoursePanel({
           <CourseUiIcon name="checkCircle" />
           {active ? "Activo" : "Finalizado"}
         </span>
-        <span className={`member-course-chip is-status ${enrolled ? "is-enrolled" : "is-available"}`}>
-          {enrolled ? "Inscrito" : "Disponible"}
+        <span className={`member-course-chip is-status ${enrolled ? "is-enrolled" : active ? "is-available" : "is-finished"}`}>
+          {enrolled ? "Inscrito" : active ? "Disponible" : "Finalizado"}
         </span>
       </div>
 
@@ -118,6 +120,16 @@ export function MemberCoursePanel({
           <div>
             <strong>Asistencia pendiente</strong>
             <p>El certificado estará disponible cuando administración marque tu asistencia.</p>
+          </div>
+        </div>
+      ) : null}
+
+      {!enrolled && !canEnroll ? (
+        <div className="member-course-note is-pending">
+          <CourseUiIcon name="clock" />
+          <div>
+            <strong>Inscripción cerrada</strong>
+            <p>Este curso ya finalizó o su horario ya pasó, por eso no admite nuevas inscripciones.</p>
           </div>
         </div>
       ) : null}
@@ -168,7 +180,7 @@ export function MemberCoursePanel({
             Descargar certificado
           </button>
         ) : null}
-        {!enrolled ? (
+        {canEnroll ? (
           <button className="primary-button" disabled={isBusy} onClick={onEnroll} type="button">
             Inscribirme
           </button>

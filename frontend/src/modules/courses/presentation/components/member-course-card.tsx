@@ -2,6 +2,7 @@ import type { MemberCourse } from "@/modules/courses/domain/types";
 import { CourseCover } from "@/modules/courses/presentation/components/course-cover";
 import { CourseUiIcon } from "@/modules/courses/presentation/components/course-ui-icon";
 import {
+  canEnrollInCourse,
   courseCategoryLabel,
   formatMemberDateRange,
   formatMemberTimeRange,
@@ -19,6 +20,7 @@ interface MemberCourseCardProps {
 export function MemberCourseCard({ course, isSelected, onSelect, onEnroll }: MemberCourseCardProps) {
   const enrolled = isMemberEnrolled(course);
   const active = isCourseActive(course);
+  const canEnroll = Boolean(onEnroll) && canEnrollInCourse(course);
 
   return (
     <article
@@ -37,8 +39,8 @@ export function MemberCourseCard({ course, isSelected, onSelect, onEnroll }: Mem
             course.type_modality || "Online"
           )}
         </span>
-        <span className={`member-course-chip is-status ${enrolled ? "is-enrolled" : "is-available"}`}>
-          {enrolled ? "Inscrito" : "Disponible"}
+        <span className={`member-course-chip is-status ${enrolled ? "is-enrolled" : active ? "is-available" : "is-finished"}`}>
+          {enrolled ? "Inscrito" : active ? "Disponible" : "Finalizado"}
         </span>
       </div>
 
@@ -67,21 +69,21 @@ export function MemberCourseCard({ course, isSelected, onSelect, onEnroll }: Mem
           </li>
         </ul>
 
-        {enrolled || !onEnroll ? (
-          <button className="member-course-outline-btn" onClick={onSelect} type="button">
-            Ver detalle
-            <CourseUiIcon name="arrow" />
-          </button>
-        ) : (
+        {canEnroll ? (
           <button
             className="primary-button"
             onClick={(event) => {
               event.stopPropagation();
-              onEnroll();
+              onEnroll?.();
             }}
             type="button"
           >
             Inscribirme
+          </button>
+        ) : (
+          <button className="member-course-outline-btn" onClick={onSelect} type="button">
+            Ver detalle
+            <CourseUiIcon name="arrow" />
           </button>
         )}
       </div>

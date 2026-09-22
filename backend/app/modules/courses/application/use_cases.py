@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+import re
 
 from app.core.config import get_settings
 from app.modules.courses.domain.entities import (
@@ -20,6 +22,48 @@ from app.modules.courses.infrastructure.certificates import SimplePdfCertificate
 from app.modules.courses.infrastructure.files import LocalCourseFileStorage
 from app.modules.courses.infrastructure.notifications import EmailMessage, LogEmailNotifier
 from app.modules.courses.infrastructure.repository import CourseRepository
+
+
+def _parse_course_day(value: str | None) -> datetime | None:
+    if not value:
+        return None
+
+    text = value.strip()
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        try:
+            return datetime.strptime(text[:10], fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
+def _parse_course_clock(value: str | None) -> tuple[int, int] | None:
+    if not value:
+        return None
+
+    match = re.match(r"^(\d{1,2}):(\d{2})", value.strip())
+    if match is None:
+        return None
+
+    return int(match.group(1)), int(match.group(2))
+
+
+def course_is_closed_for_enrollment(course: Course) -> bool:
+    if course.finished_at is not None:
+        return True
+
+    end_day = _parse_course_day(course.date_course_final) or _parse_course_day(course.date_course)
+    if end_day is None:
+        return False
+
+    clock = _parse_course_clock(course.hour_final)
+    if clock is None:
+        end_at = end_day.replace(hour=23, minute=59, second=59)
+    else:
+        end_at = end_day.replace(hour=clock[0], minute=clock[1], second=0)
+
+    return datetime.now() > end_at
 
 
 def course_requires_payment(course: Course) -> bool:
@@ -235,6 +279,8 @@ class MemberCoursesUseCase:
         course = self.repository.get_course(course_id)
         if course is None or course.state_id != VISIBLE_STATE_ID:
             raise CourseUnavailableError()
+        if course_is_closed_for_enrollment(course):
+            raise CourseUnavailableError("Este curso ya finalizó o su horario ya pasó.")
 
         try:
             inscription = self.repository.create_member_inscription(course_id, user_id)
