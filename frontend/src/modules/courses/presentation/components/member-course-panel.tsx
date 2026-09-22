@@ -45,7 +45,7 @@ export function MemberCoursePanel({
 
   if (!course) {
     return (
-      <aside className="member-course-panel">
+      <aside className="member-course-panel" onClick={(event) => event.stopPropagation()}>
         <div className="member-course-panel-empty">
           <CourseUiIcon name="book" />
           <h3>Selecciona un curso</h3>
@@ -60,7 +60,8 @@ export function MemberCoursePanel({
   const certificateReady = canDownloadCertificate(course);
 
   return (
-    <aside className="member-course-panel">
+    <aside className="member-course-panel" onClick={(event) => event.stopPropagation()}>
+      <i aria-hidden="true" className="member-course-sheet-handle" />
       <header className="member-course-panel-head">
         <h2>Detalles del curso</h2>
         <button aria-label="Cerrar detalle" className="member-course-icon-btn" onClick={onClose} type="button">

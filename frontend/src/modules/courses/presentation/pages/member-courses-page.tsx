@@ -24,6 +24,12 @@ import {
 import { RoleGate } from "@/shared/components/role-gate";
 import { useToast } from "@/shared/hooks/use-toast";
 
+const COMPACT_COURSES_QUERY = "(max-width: 1100px)";
+
+function isCompactCoursesLayout() {
+  return window.matchMedia(COMPACT_COURSES_QUERY).matches;
+}
+
 export function MemberCoursesPage() {
   const toast = useToast();
   const token = useMemo(() => getStoredToken(), []);
@@ -32,7 +38,8 @@ export function MemberCoursesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [detailCourse, setDetailCourse] = useState<MemberCourse | null>(null);
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [compactLayout, setCompactLayout] = useState(false);
   const [filter, setFilter] = useState<MemberCourseFilter>("all");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
@@ -97,6 +104,14 @@ export function MemberCoursesPage() {
   }, []);
 
   useEffect(() => {
+    const media = window.matchMedia(COMPACT_COURSES_QUERY);
+    const sync = () => setCompactLayout(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
     if (didAutoSelect.current || isLoading) {
       return;
     }
@@ -104,14 +119,39 @@ export function MemberCoursesPage() {
     const first = myCourses[0] ?? availableCourses[0] ?? null;
     if (first) {
       setDetailCourse(first);
-      setPanelOpen(true);
+      setPanelOpen(!isCompactCoursesLayout());
       didAutoSelect.current = true;
     }
   }, [availableCourses, isLoading, myCourses]);
 
+  useEffect(() => {
+    if (!panelOpen || !compactLayout) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPanelOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [compactLayout, panelOpen]);
+
   function selectCourse(course: MemberCourse) {
     setDetailCourse(course);
     setPanelOpen(true);
+  }
+
+  function closePanel() {
+    setPanelOpen(false);
   }
 
   function resolveCourse(
@@ -310,27 +350,36 @@ export function MemberCoursesPage() {
         </div>
 
         {panelOpen ? (
-          <MemberCoursePanel
-            key={detailCourse?.id ?? "empty"}
-            course={detailCourse}
-            isBusy={isBusy}
-            onClose={() => setPanelOpen(false)}
-            onDownloadCertificate={() => {
-              if (detailCourse) {
-                void downloadCertificate(detailCourse);
+          <div
+            className={`member-course-sheet ${compactLayout ? "is-overlay" : ""}`}
+            onClick={(event) => {
+              if (compactLayout && event.target === event.currentTarget) {
+                closePanel();
               }
             }}
-            onEnroll={() => {
-              if (detailCourse) {
-                void enrollFromMemberView(detailCourse);
-              }
-            }}
-            onShare={() => {
-              if (detailCourse) {
-                void shareCourse(detailCourse);
-              }
-            }}
-          />
+          >
+            <MemberCoursePanel
+              key={detailCourse?.id ?? "empty"}
+              course={detailCourse}
+              isBusy={isBusy}
+              onClose={closePanel}
+              onDownloadCertificate={() => {
+                if (detailCourse) {
+                  void downloadCertificate(detailCourse);
+                }
+              }}
+              onEnroll={() => {
+                if (detailCourse) {
+                  void enrollFromMemberView(detailCourse);
+                }
+              }}
+              onShare={() => {
+                if (detailCourse) {
+                  void shareCourse(detailCourse);
+                }
+              }}
+            />
+          </div>
         ) : null}
       </div>
     </RoleGate>

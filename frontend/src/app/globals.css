@@ -11752,13 +11752,60 @@ textarea {
   gap: 0.4rem;
 }
 
+.member-course-sheet {
+  display: contents;
+}
+
+.member-course-sheet-handle {
+  display: none;
+}
+
 @media (max-width: 1100px) {
   .member-courses-workspace {
     grid-template-columns: 1fr;
   }
 
-  .member-course-panel {
-    position: static;
+  .member-course-sheet.is-overlay {
+    align-items: flex-end;
+    background: rgba(15, 23, 42, 0.46);
+    display: flex;
+    inset: 0;
+    overflow: hidden;
+    padding: 0.7rem 0 0;
+    position: fixed;
+    z-index: 70;
+  }
+
+  .member-course-sheet.is-overlay .member-course-panel {
+    animation: member-course-sheet-in 220ms ease-out;
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -18px 50px rgba(15, 23, 42, 0.18);
+    max-height: min(88vh, 860px);
+    position: relative;
+    top: auto;
+    width: 100%;
+  }
+
+  .member-course-sheet-handle {
+    background: #d7deea;
+    border-radius: 99px;
+    display: block;
+    height: 5px;
+    justify-self: center;
+    margin: 0.1rem 0 0.15rem;
+    width: 46px;
+  }
+}
+
+@keyframes member-course-sheet-in {
+  from {
+    opacity: 0.72;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
