@@ -92,7 +92,7 @@ def can_member_see_lists(election: Election, today: date) -> bool:
         return False
     if election.publish_until and today > election.publish_until:
         return False
-    return election.status in {"publicada", "en_votacion"}
+    return election.status in {"en_preparacion", "publicada", "en_votacion"}
 
 
 def candidate_for_position(lista: ElectionList, position_id: int) -> ElectionCandidate | None:
@@ -110,6 +110,7 @@ def validate_candidate_fields(
     profession: str,
     short_profile: str,
     photo_url: str | None,
+    skip_photo: bool = False,
 ) -> None:
     if position.full_name_required and not full_name.strip():
         raise ElectionValidationError(f"El cargo {position.name} exige nombre completo.")
@@ -118,7 +119,7 @@ def validate_candidate_fields(
     if position.short_profile_required and not short_profile.strip():
         raise ElectionValidationError(f"El cargo {position.name} exige un perfil breve.")
     needs_photo = election.photo_required or position.photo_required
-    if needs_photo and not photo_url:
+    if not skip_photo and needs_photo and not photo_url:
         raise ElectionValidationError(f"El cargo {position.name} exige fotografía.")
 
 

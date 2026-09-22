@@ -295,6 +295,8 @@ export const CALENDAR_EVENT_COLORS: Record<string, string> = {
   fin_gestion: "#dc2626",
 };
 
+export const MEMBER_CALENDAR_KEYS = ["votacion", "escrutinio", "inicio_gestion", "fin_gestion"] as const;
+
 export interface WorkPlanItem {
   title: string;
   body: string;
@@ -383,6 +385,53 @@ function parseIsoDate(value: string): Date | null {
     return null;
   }
   return new Date(year, month - 1, day);
+}
+
+export function memberCalendarEvents(election: Election) {
+  return MEMBER_CALENDAR_KEYS.map((eventKey) => {
+    const event = election.calendar.find((item) => item.event_key === eventKey);
+    const dates = event
+      ? calendarEventDate(event)
+      : eventKey === "votacion"
+        ? { start: election.voting_starts_on, end: election.voting_ends_on, single: false }
+        : eventKey === "inicio_gestion"
+          ? { start: election.term_starts_on, end: null, single: true }
+          : eventKey === "fin_gestion"
+            ? { start: election.term_ends_on, end: null, single: true }
+            : { start: null, end: null, single: true };
+    return {
+      eventKey,
+      title:
+        event?.title ||
+        (eventKey === "votacion"
+          ? "Periodo de votación"
+          : eventKey === "escrutinio"
+            ? "Escrutinio y publicación de resultados"
+            : eventKey === "inicio_gestion"
+              ? "Inicio del periodo de gestión"
+              : "Fin del periodo de gestión"),
+      label: formatCronogramaDate(dates.start, dates.end, dates.single),
+      color: CALENDAR_EVENT_COLORS[eventKey],
+    };
+  });
+}
+
+export function isVotingPending(election: Election): boolean {
+  if (election.status === "en_votacion") {
+    return false;
+  }
+  const voting = election.calendar.find((item) => item.event_key === "votacion");
+  const start = voting ? calendarEventDate(voting).start : election.voting_starts_on;
+  if (!start) {
+    return true;
+  }
+  const date = parseIsoDate(start);
+  if (!date) {
+    return true;
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date > today || election.status !== "en_votacion";
 }
 
 export function formatLongSpanishDate(value: string | null | undefined): string {

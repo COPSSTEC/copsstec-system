@@ -337,6 +337,7 @@ class ManageListsUseCase:
                 profession=profession,
                 short_profile=short_profile,
                 photo_url=photo_url,
+                skip_photo=True,
             )
         elif position.full_name_required and not full_name:
             raise ElectionValidationError("El nombre completo es obligatorio.")

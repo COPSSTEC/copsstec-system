@@ -682,6 +682,8 @@ export function AdminListEditorPage() {
                   onChange={(event) => setDraftCandidate({ ...draftCandidate, photo: event.target.files?.[0] ?? null })}
                   type="file"
                 />
+                {draftCandidate.photo ? <small>Archivo listo: {draftCandidate.photo.name}</small> : null}
+                {editingCandidate?.photo_url && !draftCandidate.photo ? <small>Este candidato ya tiene fotografía cargada.</small> : null}
               </label>
               <div className="votaciones-inline-form">
                 <button

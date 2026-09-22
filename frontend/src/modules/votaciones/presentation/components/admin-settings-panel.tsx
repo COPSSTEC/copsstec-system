@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   ELECTION_STATUS_LABELS,
   calendarEventDate,
-  formatCronogramaDate,
   formatDate,
   formatLongSpanishDate,
   mediaUrl,
@@ -16,6 +15,7 @@ import {
   type MessageTemplate,
 } from "@/modules/votaciones/domain/types";
 import { useAdminElection } from "@/modules/votaciones/presentation/hooks/use-admin-election";
+import { MemberElectionShowcase } from "@/modules/votaciones/presentation/components/member-election-showcase";
 import { TextEditor } from "@/shared/components/text-editor";
 
 const CONFIG_PANELS: Array<{ id: ConfigPanel; label: string }> = [
@@ -535,7 +535,6 @@ function DesignTab({
   const bannerRef = useRef<HTMLInputElement>(null);
   const voting = draft.calendar.find((item) => item.event_key === "votacion");
   const votingStart = voting ? calendarEventDate(voting).start : draft.voting_starts_on;
-  const votingEnd = voting?.ends_on || draft.voting_ends_on;
   const visibleLists = lists.filter((item) => item.status === "activa").slice(0, 3);
 
   return (
@@ -713,117 +712,12 @@ function DesignTab({
               </button>
             </div>
           </header>
-          <div className={`votaciones-cfg-portal is-${device}`}>
-            <div className="votaciones-cfg-portal-nav">
-              <div className="votaciones-cfg-portal-brand">
-                {draft.logo_url ? <img alt="" src={mediaUrl(draft.logo_url)} /> : <strong>C</strong>}
-                <div>
-                  <strong>COPSSTEC</strong>
-                  <small>Colegio de Profesionales de Seguridad y Salud en el Trabajo</small>
-                </div>
-              </div>
-              <nav>
-                <span>Portal de miembros</span>
-                <span>Elecciones</span>
-                <span>Noticias</span>
-                <span>
-                  Mi cuenta <b>▾</b>
-                </span>
-              </nav>
-            </div>
-            <div
-              className="votaciones-cfg-portal-hero"
-              style={{
-                backgroundColor: draft.primary_color || "#0D47A1",
-                backgroundImage: draft.banner_url ? `url(${mediaUrl(draft.banner_url)})` : undefined,
-              }}
-            >
-              <div className="votaciones-cfg-portal-hero-copy">
-                <div className="votaciones-cfg-portal-hero-brand">
-                  {draft.logo_url ? <img alt="" src={mediaUrl(draft.logo_url)} /> : null}
-                  <div>
-                    <strong>COPSSTEC</strong>
-                    <small>Colegio de Profesionales de Seguridad y Salud en el Trabajo</small>
-                  </div>
-                </div>
-                <h3>{draft.title || "Título de la elección"}</h3>
-                {draft.subtitle ? <p>{draft.subtitle}</p> : null}
-                {draft.tagline ? <blockquote>“{draft.tagline}”</blockquote> : null}
-              </div>
-              <aside className="votaciones-cfg-portal-hero-words" aria-hidden="true">
-                <span>PROFESIONALES</span>
-                <span>SEGURIDAD</span>
-                <span>SALUD</span>
-                <span>BIENESTAR</span>
-              </aside>
-            </div>
-            <div className="votaciones-cfg-portal-kpis">
-              <article>
-                <i>{calendarIcon()}</i>
-                <div>
-                  <strong>Votación</strong>
-                  <span>{formatCronogramaDate(votingStart, votingEnd)}</span>
-                </div>
-              </article>
-              <article>
-                <i>{usersIcon()}</i>
-                <div>
-                  <strong>Candidatos</strong>
-                  <span>
-                    {lists.length} {lists.length === 1 ? "lista inscrita" : "listas inscritas"}
-                  </span>
-                </div>
-              </article>
-              <article>
-                <i>{fileIcon()}</i>
-                <div>
-                  <strong>Tu voto cuenta</strong>
-                  <span>Por un mejor futuro profesional</span>
-                </div>
-              </article>
-            </div>
-            <div className="votaciones-cfg-portal-lists">
-              <header>
-                <h4>Listas participantes</h4>
-                {draft.show_work_plan ? (
-                  <span>
-                    {checkIcon()} Ver plan de trabajo
-                  </span>
-                ) : null}
-              </header>
-              <div>
-                {(visibleLists.length > 0 ? visibleLists : lists.slice(0, 3)).map((lista, index) => (
-                  <article key={lista.id}>
-                    <div className="votaciones-cfg-portal-list-head">
-                      <i style={{ background: lista.color || draft.primary_color }} />
-                      <div>
-                        <small>LISTA {lista.sort_order || index + 1}</small>
-                        <strong>{lista.name}</strong>
-                      </div>
-                    </div>
-                    {draft.show_all_photos ? (
-                      <div className="votaciones-cfg-faces">
-                        {previewFaces(lista).map((candidate, faceIndex) =>
-                          candidate?.photo_url ? (
-                            <img alt="" key={candidate.id} src={mediaUrl(candidate.photo_url)} />
-                          ) : (
-                            <span key={candidate?.id || `face-${lista.id}-${faceIndex}`}>
-                              {candidate?.full_name.slice(0, 1) || ""}
-                            </span>
-                          ),
-                        )}
-                      </div>
-                    ) : null}
-                    <p>{lista.slogan || "Participa por un mejor colegio."}</p>
-                    <em>
-                      Ver detalles <b>›</b>
-                    </em>
-                  </article>
-                ))}
-                {lists.length === 0 ? <p className="muted">Aún no hay listas para previsualizar.</p> : null}
-              </div>
-            </div>
-          </div>
+          <MemberElectionShowcase
+            device={device}
+            election={draft}
+            lists={visibleLists.length > 0 ? visibleLists : lists.slice(0, 3)}
+            variant="preview"
+          />
           <footer>
             <button className="votaciones-cfg-ghost" type="button">
               {eyeIcon()} Vista previa
@@ -1540,16 +1434,6 @@ function usersIcon() {
       <path d="M15.2 19a4.8 4.8 0 015.8-4.4" />
     </svg>
   );
-}
-
-function previewFaces(lista: ElectionList) {
-  const faces: Array<ElectionList["candidates"][number] | null> = lista.candidates
-    .filter((candidate) => candidate.photo_url)
-    .slice(0, 4);
-  while (faces.length < 4) {
-    faces.push(null);
-  }
-  return faces;
 }
 
 function tabIcon(id: ConfigPanel) {
