@@ -6,13 +6,17 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db_session
 from app.modules.membership.application.use_cases import (
     ApproveMembershipUseCase,
+    DownloadAuthorizationPdfUseCase,
+    DownloadOnboardingDocumentUseCase,
     GetApprovalPreviewUseCase,
     GetMembershipInvoiceUseCase,
     GetMembershipStatusUseCase,
     GetPaymentInfoUseCase,
     RegisterMembershipUseCase,
+    UploadOnboardingDocumentsUseCase,
     UploadPaymentVoucherUseCase,
 )
+from app.modules.membership.infrastructure.authorization_pdf import AuthorizationDebitPdfGenerator
 from app.modules.membership.infrastructure.email import SmtpOrLogEmailSender
 from app.modules.membership.infrastructure.files import LocalMembershipFileStorage
 from app.modules.membership.infrastructure.invoices import MembershipInvoicePdfGenerator
@@ -63,10 +67,29 @@ def get_invoice_use_case(
     return GetMembershipInvoiceUseCase(repository)
 
 
+def get_authorization_pdf_use_case(
+    repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
+) -> DownloadAuthorizationPdfUseCase:
+    return DownloadAuthorizationPdfUseCase(repository, AuthorizationDebitPdfGenerator())
+
+
+def get_upload_onboarding_documents_use_case(
+    repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
+    storage: Annotated[LocalMembershipFileStorage, Depends(get_membership_storage)],
+) -> UploadOnboardingDocumentsUseCase:
+    return UploadOnboardingDocumentsUseCase(repository, storage)
+
+
 def get_approval_preview_use_case(
     repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
 ) -> GetApprovalPreviewUseCase:
     return GetApprovalPreviewUseCase(repository)
+
+
+def get_download_onboarding_document_use_case(
+    repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
+) -> DownloadOnboardingDocumentUseCase:
+    return DownloadOnboardingDocumentUseCase(repository)
 
 
 def get_approve_membership_use_case(

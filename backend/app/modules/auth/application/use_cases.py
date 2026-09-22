@@ -65,9 +65,6 @@ class LoginUseCase:
             raise InvalidCredentialsError()
 
         access_level = resolve_access_level(user.roles)
-        if access_level == "member" and user.state_id == 2:
-            raise AffiliationPendingError()
-
         if access_level == "member" and user.state_id == 1:
             if not is_corporate_email(user.email, get_settings().corporate_email_domain):
                 raise MemberCorporateEmailRequiredError()

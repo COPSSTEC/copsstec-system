@@ -2,11 +2,13 @@ from secrets import token_urlsafe
 from dataclasses import replace
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password
 from app.modules.auth.application.rbac import resolve_access_policy
 from app.modules.membership.application.ports import (
+    AuthorizationPdfGenerator,
     EmailPort,
     InvoiceGenerator,
     MailboxPort,
@@ -18,6 +20,7 @@ from app.modules.membership.domain.corporate_email import is_corporate_email, su
 from app.modules.membership.domain.entities import (
     BLOOD_TYPES,
     ENABLED_STATE_ID,
+    GATE_DOCUMENTS,
     GATE_NONE,
     GATE_PAYMENT,
     GATE_PENDING_APPROVAL,
@@ -31,6 +34,8 @@ from app.modules.membership.domain.entities import (
     MembershipRegistrationData,
     MembershipStatus,
     RegisteredMember,
+    membership_gate_from_payment,
+    onboarding_documents_complete,
 )
 from app.modules.membership.domain.exceptions import (
     MailboxError,
@@ -179,17 +184,23 @@ class GetMembershipStatusUseCase:
             )
 
         overdue = days_overdue(status.coverage_until, today)
-        if policy.access_level != "member":
+        if policy.access_level != "member" and status.state_id != PENDING_ENABLE_STATE_ID:
             return replace(
                 status,
                 gate=GATE_NONE,
                 must_complete_payment=False,
                 must_wait_approval=False,
+                must_upload_documents=False,
                 must_pay_subscription=False,
                 days_overdue=overdue,
             )
 
-        gate = status.gate
+        gate = membership_gate_from_payment(
+            status.state_id,
+            status.payment_status,
+            status.has_invoice,
+            status.has_signed_authorization and status.has_identity_document,
+        )
         if gate == GATE_NONE:
             gate = apply_subscription_gate(
                 GATE_NONE,
@@ -202,6 +213,7 @@ class GetMembershipStatusUseCase:
             gate=gate,
             must_complete_payment=gate == GATE_PAYMENT,
             must_wait_approval=gate == GATE_PENDING_APPROVAL,
+            must_upload_documents=gate == GATE_DOCUMENTS,
             must_pay_subscription=gate == GATE_SUBSCRIPTION_DUE,
             days_overdue=overdue,
         )
@@ -300,6 +312,8 @@ class GetApprovalPreviewUseCase:
             "suggested_corporate_email": suggested,
             "payment_status": payment.status,
             "voucher_url": payment.voucher_path,
+            "signed_authorization_url": payment.signed_authorization_path,
+            "identity_document_url": payment.identity_document_path,
             "amount": str(payment.amount),
         }
 
@@ -336,6 +350,8 @@ class ApproveMembershipUseCase:
         payment = self.repository.get_payment(user_id)
         if payment is None:
             raise MembershipNotFoundError()
+        if not onboarding_documents_complete(payment.signed_authorization_path, payment.identity_document_path):
+            raise MembershipValidationError("Faltan la autorización firmada y/o la copia de cédula.")
 
         from datetime import UTC, datetime
 
@@ -384,3 +400,111 @@ class ApproveMembershipUseCase:
             {"nombres": full_name, "email": corporate, "password": password},
         )
         return member
+
+
+class DownloadAuthorizationPdfUseCase:
+    def __init__(
+        self,
+        repository: MembershipRepository,
+        pdf_generator: AuthorizationPdfGenerator,
+    ) -> None:
+        self.repository = repository
+        self.pdf_generator = pdf_generator
+
+    def execute(self, user_id: int, today: date | None = None) -> bytes:
+        payment = self.repository.get_payment(user_id)
+        if payment is None:
+            raise MembershipNotFoundError()
+        if payment.status != PAYMENT_REVIEW:
+            raise MembershipForbiddenError("La autorización solo está disponible después de subir el comprobante.")
+
+        status = self.repository.get_status(user_id)
+        if status is None:
+            raise MembershipNotFoundError()
+
+        return self.pdf_generator.generate(
+            names=status.names,
+            lastname=status.lastname,
+            identifier=status.identifier,
+            city=status.city,
+            issued_on=today or date.today(),
+        )
+
+
+class UploadOnboardingDocumentsUseCase:
+    def __init__(self, repository: MembershipRepository, storage: MembershipFileStorage) -> None:
+        self.repository = repository
+        self.storage = storage
+
+    def execute(
+        self,
+        user_id: int,
+        signed_authorization: tuple[str, bytes, str] | None,
+        identity_document: tuple[str, bytes, str] | None,
+    ) -> tuple[MembershipPayment, MembershipStatus]:
+        payment = self.repository.get_payment(user_id)
+        if payment is None:
+            raise MembershipNotFoundError()
+        if payment.status == PAYMENT_APPROVED:
+            raise MembershipForbiddenError("Tu afiliación ya fue aprobada.")
+        if payment.status != PAYMENT_REVIEW:
+            raise MembershipForbiddenError("Debes subir el comprobante de pago antes de enviar los documentos.")
+
+        auth_upload = signed_authorization if signed_authorization and signed_authorization[1] else None
+        identity_upload = identity_document if identity_document and identity_document[1] else None
+        if auth_upload is None and identity_upload is None:
+            raise MembershipValidationError("Debe adjuntar al menos un archivo PDF.")
+
+        has_signed = bool((payment.signed_authorization_path or "").strip())
+        has_identity = bool((payment.identity_document_path or "").strip())
+        if not has_signed and auth_upload is None:
+            raise MembershipValidationError("La autorización firmada es obligatoria.")
+        if not has_identity and identity_upload is None:
+            raise MembershipValidationError("La copia de cédula es obligatoria.")
+
+        signed_path = None
+        identity_path = None
+        if auth_upload is not None:
+            filename, content, content_type = auth_upload
+            signed_path = self.storage.save_pdf(user_id, "authorization", filename, content, content_type)
+        if identity_upload is not None:
+            filename, content, content_type = identity_upload
+            identity_path = self.storage.save_pdf(user_id, "identity", filename, content, content_type)
+
+        updated = self.repository.save_onboarding_documents(user_id, signed_path, identity_path)
+        status = self.repository.get_status(user_id)
+        if status is None:
+            raise MembershipNotFoundError()
+        return updated, status
+
+
+class DownloadOnboardingDocumentUseCase:
+    def __init__(self, repository: MembershipRepository) -> None:
+        self.repository = repository
+
+    def execute(self, user_id: int, kind: str) -> tuple[str, Path]:
+        if kind not in {"authorization", "identity", "voucher"}:
+            raise MembershipValidationError("Documento no válido.")
+        payment = self.repository.get_payment(user_id)
+        if payment is None:
+            raise MembershipNotFoundError()
+        stored = {
+            "authorization": payment.signed_authorization_path,
+            "identity": payment.identity_document_path,
+            "voucher": payment.voucher_path,
+        }[kind]
+        if not (stored or "").strip():
+            raise MembershipNotFoundError()
+
+        relative = stored.replace("/media/membership/", "").lstrip("/")
+        file_path = Path("storage/membership") / relative
+        if not file_path.exists():
+            raise MembershipNotFoundError()
+
+        suffix = file_path.suffix or ".pdf"
+        filenames = {
+            "authorization": f"autorizacion-firmada{suffix}",
+            "identity": f"cedula{suffix}",
+            "voucher": f"comprobante{suffix}",
+        }
+        return filenames[kind], file_path

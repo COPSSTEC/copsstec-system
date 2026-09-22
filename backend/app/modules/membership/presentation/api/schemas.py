@@ -28,6 +28,9 @@ class MembershipStatusResponse(BaseModel):
     credit_balance: str = "0.00"
     days_overdue: int = 0
     open_payment_status: str | None = None
+    must_upload_documents: bool = False
+    has_signed_authorization: bool = False
+    has_identity_document: bool = False
 
     @classmethod
     def from_domain(cls, status: MembershipStatus) -> "MembershipStatusResponse":
@@ -49,6 +52,9 @@ class MembershipStatusResponse(BaseModel):
             credit_balance=f"{status.credit_balance.quantize(Decimal('0.01')):.2f}",
             days_overdue=status.days_overdue,
             open_payment_status=status.open_payment_status,
+            must_upload_documents=status.must_upload_documents,
+            has_signed_authorization=status.has_signed_authorization,
+            has_identity_document=status.has_identity_document,
         )
 
 
@@ -83,14 +89,21 @@ class PaymentResponse(BaseModel):
     status: str
     voucher_path: str | None
     message: str
+    gate: str | None = None
 
     @classmethod
-    def from_domain(cls, payment: MembershipPayment, message: str) -> "PaymentResponse":
+    def from_domain(
+        cls,
+        payment: MembershipPayment,
+        message: str,
+        gate: str | None = None,
+    ) -> "PaymentResponse":
         return cls(
             id=payment.id,
             status=payment.status,
             voucher_path=payment.voucher_path,
             message=message,
+            gate=gate,
         )
 
 
@@ -135,7 +148,17 @@ class ApprovalPreviewResponse(BaseModel):
     suggested_corporate_email: str
     payment_status: str
     voucher_url: str | None
+    signed_authorization_url: str | None = None
+    identity_document_url: str | None = None
     amount: str
+
+
+class OnboardingDocumentsResponse(BaseModel):
+    status: str
+    has_signed_authorization: bool
+    has_identity_document: bool
+    gate: str
+    message: str
 
 
 class ApproveMemberRequest(BaseModel):

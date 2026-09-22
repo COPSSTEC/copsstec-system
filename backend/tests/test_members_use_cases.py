@@ -2,7 +2,6 @@ from dataclasses import replace
 
 from app.core.security import hash_password, verify_password
 from app.modules.auth.application.use_cases import (
-    AffiliationPendingError,
     ChangePasswordUseCase,
     InvalidCredentialsError,
     LoginUseCase,
@@ -272,7 +271,7 @@ def test_login_admin_allows_non_copsstec_email() -> None:
     assert result.user.email == "admin@gmail.com"
 
 
-def test_login_pending_member_rejects_until_approval() -> None:
+def test_login_pending_member_can_resume_onboarding() -> None:
     user = User(
         id=103,
         name="Aspirante",
@@ -285,11 +284,9 @@ def test_login_pending_member_rejects_until_approval() -> None:
         profile=None,
     )
 
-    try:
-        LoginUseCase(FakeAuthRepository(user)).execute("persona@gmail.com", "secret123")
-        raise AssertionError("Expected affiliation pending")
-    except AffiliationPendingError:
-        pass
+    result = LoginUseCase(FakeAuthRepository(user)).execute("persona@gmail.com", "secret123")
+    assert result.user.email == "persona@gmail.com"
+    assert result.user.state_id == 2
 
 
 def test_change_password_clears_temporary_flag() -> None:

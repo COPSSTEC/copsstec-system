@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.modules.membership.domain.entities import (
     ENABLED_STATE_ID,
+    GATE_DOCUMENTS,
+    GATE_PAYMENT,
+    GATE_PENDING_APPROVAL,
     MEMBER_ROLE_NAME,
     PAYMENT_APPROVED,
     PAYMENT_PENDING,
@@ -14,6 +17,7 @@ from app.modules.membership.domain.entities import (
     PENDING_ENABLE_STATE_ID,
     USER_MODEL_TYPE,
     membership_gate_from_payment,
+    onboarding_documents_complete,
     MembershipInvoice,
     MembershipPayment,
     MembershipRegistrationData,
@@ -235,7 +239,10 @@ class SqlAlchemyMembershipRepository:
                     COALESCE(p.names, '') AS names,
                     COALESCE(p.lastname, '') AS lastname,
                     COALESCE(p.identifier, '') AS identifier,
+                    COALESCE(p.city, '') AS city,
                     mp.status AS payment_status,
+                    mp.signed_authorization_path,
+                    mp.identity_document_path,
                     EXISTS(
                         SELECT 1 FROM membership_invoices mi WHERE mi.user_id = u.id
                     ) AS has_invoice,
@@ -265,7 +272,12 @@ class SqlAlchemyMembershipRepository:
         payment_status = row["payment_status"]
         state_id = int(row["state_id"])
         has_invoice = bool(row["has_invoice"])
-        gate = membership_gate_from_payment(state_id, payment_status, has_invoice)
+        signed_path = row["signed_authorization_path"]
+        identity_path = row["identity_document_path"]
+        has_signed = bool((signed_path or "").strip())
+        has_identity = bool((identity_path or "").strip())
+        documents_ok = onboarding_documents_complete(signed_path, identity_path)
+        gate = membership_gate_from_payment(state_id, payment_status, has_invoice, documents_ok)
         return MembershipStatus(
             user_id=int(row["user_id"]),
             state_id=state_id,
@@ -273,8 +285,8 @@ class SqlAlchemyMembershipRepository:
             login_email=row["login_email"],
             payment_status=payment_status,
             gate=gate,
-            must_complete_payment=gate == "payment",
-            must_wait_approval=gate == "pending_approval",
+            must_complete_payment=gate == GATE_PAYMENT,
+            must_wait_approval=gate == GATE_PENDING_APPROVAL,
             has_invoice=has_invoice,
             names=row["names"],
             lastname=row["lastname"],
@@ -284,6 +296,10 @@ class SqlAlchemyMembershipRepository:
             credit_balance=Decimal(str(row["credit_balance"] or 0)),
             days_overdue=0,
             open_payment_status=row["open_payment_status"],
+            must_upload_documents=gate == GATE_DOCUMENTS,
+            has_signed_authorization=has_signed,
+            has_identity_document=has_identity,
+            city=row["city"] or "",
         )
 
     def get_payment(self, user_id: int) -> MembershipPayment | None:
@@ -292,7 +308,8 @@ class SqlAlchemyMembershipRepository:
                 """
                 SELECT id, user_id, profile_id, amount, currency, bank_name, account_type,
                        account_number, account_holder, account_ruc, reference, voucher_path,
-                       status, reviewed_by, reviewed_at
+                       status, reviewed_by, reviewed_at, signed_authorization_path,
+                       identity_document_path, documents_uploaded_at
                 FROM membership_payments
                 WHERE user_id = :user_id
                 LIMIT 1
@@ -319,6 +336,46 @@ class SqlAlchemyMembershipRepository:
             {
                 "voucher_path": voucher_path,
                 "status": PAYMENT_REVIEW,
+                "now": now,
+                "user_id": user_id,
+            },
+        ).rowcount
+        if not updated:
+            raise MembershipNotFoundError()
+        self.session.commit()
+        payment = self.get_payment(user_id)
+        if payment is None:
+            raise MembershipNotFoundError()
+        return payment
+
+    def save_onboarding_documents(
+        self,
+        user_id: int,
+        signed_authorization_path: str | None,
+        identity_document_path: str | None,
+    ) -> MembershipPayment:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        updated = self.session.execute(
+            text(
+                """
+                UPDATE membership_payments
+                SET signed_authorization_path = COALESCE(:signed_authorization_path, signed_authorization_path),
+                    identity_document_path = COALESCE(:identity_document_path, identity_document_path),
+                    documents_uploaded_at = CASE
+                        WHEN COALESCE(:signed_authorization_path, signed_authorization_path) IS NOT NULL
+                         AND COALESCE(:signed_authorization_path, signed_authorization_path) <> ''
+                         AND COALESCE(:identity_document_path, identity_document_path) IS NOT NULL
+                         AND COALESCE(:identity_document_path, identity_document_path) <> ''
+                        THEN :now
+                        ELSE documents_uploaded_at
+                    END,
+                    updated_at = :now
+                WHERE user_id = :user_id
+                """,
+            ),
+            {
+                "signed_authorization_path": signed_authorization_path,
+                "identity_document_path": identity_document_path,
                 "now": now,
                 "user_id": user_id,
             },
@@ -482,4 +539,7 @@ class SqlAlchemyMembershipRepository:
             status=row["status"],
             reviewed_by=int(row["reviewed_by"]) if row["reviewed_by"] is not None else None,
             reviewed_at=row["reviewed_at"],
+            signed_authorization_path=row["signed_authorization_path"],
+            identity_document_path=row["identity_document_path"],
+            documents_uploaded_at=row["documents_uploaded_at"],
         )

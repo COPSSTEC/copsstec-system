@@ -90,7 +90,10 @@ export async function getPaymentInfo(token: string): Promise<PaymentInfo> {
   return parseResponse<PaymentInfo>(response);
 }
 
-export async function uploadPaymentVoucher(token: string, file: File): Promise<{ status: string; message: string }> {
+export async function uploadPaymentVoucher(
+  token: string,
+  file: File,
+): Promise<{ status: string; message: string; gate?: string }> {
   const body = new FormData();
   body.append("voucher", file);
   const response = await fetch(`${API_URL}/api/membership/payment-voucher`, {
@@ -118,6 +121,48 @@ export async function downloadMembershipInvoice(token: string): Promise<void> {
   window.URL.revokeObjectURL(url);
 }
 
+export async function downloadAuthorizationPdf(token: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/membership/authorization-pdf`, {
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    await parseResponse<void>(response);
+    return;
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "autorizacion-debito-copsstec.pdf";
+  link.click();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function uploadOnboardingDocuments(
+  token: string,
+  files: { signedAuthorization?: File; identityDocument?: File },
+): Promise<{
+  status: string;
+  has_signed_authorization: boolean;
+  has_identity_document: boolean;
+  gate: string;
+  message: string;
+}> {
+  const body = new FormData();
+  if (files.signedAuthorization) {
+    body.append("signed_authorization", files.signedAuthorization);
+  }
+  if (files.identityDocument) {
+    body.append("identity_document", files.identityDocument);
+  }
+  const response = await fetch(`${API_URL}/api/membership/onboarding-documents`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body,
+  });
+  return parseResponse(response);
+}
+
 export async function getApprovalPreview(token: string, memberId: number): Promise<ApprovalPreview> {
   const response = await fetch(`${API_URL}/api/members/${memberId}/approval-preview`, {
     headers: authHeaders(token),
@@ -137,6 +182,32 @@ export async function approveMember(
     body: JSON.stringify({ email_corp: emailCorp }),
   });
   return parseResponse(response);
+}
+
+export async function downloadOnboardingDocument(
+  token: string,
+  memberId: number,
+  kind: "authorization" | "identity" | "voucher",
+): Promise<void> {
+  const filenames = {
+    authorization: "autorizacion-firmada.pdf",
+    identity: "cedula.pdf",
+    voucher: "comprobante",
+  };
+  const response = await fetch(`${API_URL}/api/members/${memberId}/onboarding-documents/${kind}`, {
+    headers: authHeaders(token),
+  });
+  if (!response.ok) {
+    await parseResponse<void>(response);
+    return;
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filenames[kind];
+  link.click();
+  window.URL.revokeObjectURL(url);
 }
 
 export function mediaUrl(path: string | null): string | null {

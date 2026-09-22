@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { clearStoredToken, getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
-import { membershipRedirect } from "@/modules/membership/domain/types";
+import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
@@ -25,8 +25,8 @@ export function MembershipPendingApprovalPage() {
     async function load() {
       try {
         const status = await getMembershipStatus(sessionToken);
-        if (status.gate !== "pending_approval") {
-          router.replace(membershipRedirect(status.gate));
+        if (membershipPathForStatus(status) !== "/afiliacion/en-revision") {
+          router.replace(membershipPathForStatus(status));
           return;
         }
         setReady(true);
@@ -58,15 +58,17 @@ export function MembershipPendingApprovalPage() {
         </button>
       </div>
       <section className="affiliation-card pending-card">
-        <p className="eyebrow">Pago en revisión</p>
-        <h1>Tu pago todavía no ha sido aprobado</h1>
+        <p className="eyebrow">Solicitud en revisión</p>
+        <h1>Tus documentos ya fueron recibidos</h1>
         <p>
-          Recibimos tu comprobante, pero el administrador aún no confirma el pago. No puedes ingresar
-          al dashboard ni al resto del sistema hasta que se apruebe tu afiliación.
+          Recibimos tu comprobante de pago, la autorización firmada y la copia de tu cédula. El
+          administrador revisará tu solicitud. No puedes ingresar al dashboard hasta que se apruebe
+          tu afiliación.
         </p>
         <p className="muted">
-          Te avisaremos por correo cuando tu cuenta corporativa esté lista. Mientras tanto, cada vez
-          que inicies sesión volverás a esta pantalla.
+          Cuando te aprueben, te llegará por correo electrónico tu usuario corporativo, la
+          contraseña y el resto de la información de acceso. Cada vez que inicies sesión volverás a
+          esta pantalla hasta que eso ocurra.
         </p>
       </section>
       <PublicFooter />

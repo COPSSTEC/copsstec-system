@@ -7,7 +7,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { passwordChangeRedirect } from "@/modules/auth/domain/types";
 import { login } from "@/modules/auth/infrastructure/auth-api";
 import { storeToken } from "@/modules/auth/infrastructure/auth-storage";
-import { membershipRedirect } from "@/modules/membership/domain/types";
+import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 
 const REMEMBER_EMAIL_KEY = "copsstec.remember_email";
@@ -49,9 +49,9 @@ export function LoginForm() {
         router.replace(passwordChangeRedirect());
         return;
       }
-      if (response.user.access_level === "member") {
+      if (response.user.access_level === "member" || response.user.state_id === 2) {
         const status = await getMembershipStatus(response.access_token);
-        router.replace(membershipRedirect(status.gate));
+        router.replace(membershipPathForStatus(status));
       } else {
         router.replace("/dashboard");
       }

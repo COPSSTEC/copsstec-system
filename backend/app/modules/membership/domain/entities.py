@@ -14,6 +14,7 @@ PAYMENT_REVIEW = "pending_review"
 PAYMENT_APPROVED = "approved"
 
 GATE_PAYMENT = "payment"
+GATE_DOCUMENTS = "documents"
 GATE_PENDING_APPROVAL = "pending_approval"
 GATE_SUBSCRIPTION_DUE = "subscription_due"
 GATE_NONE = "none"
@@ -32,12 +33,28 @@ BLOOD_TYPES = (
 GENDERS = ("Masculino", "Femenino")
 
 
-def membership_gate_from_payment(state_id: int, payment_status: str | None, has_invoice: bool) -> str:
+def onboarding_documents_complete(
+    signed_authorization_path: str | None,
+    identity_document_path: str | None,
+) -> bool:
+    return bool((signed_authorization_path or "").strip() and (identity_document_path or "").strip())
+
+
+def membership_gate_from_payment(
+    state_id: int,
+    payment_status: str | None,
+    has_invoice: bool,
+    documents_complete: bool = False,
+) -> str:
+    if state_id == PENDING_ENABLE_STATE_ID:
+        if payment_status == PAYMENT_REVIEW:
+            return GATE_PENDING_APPROVAL if documents_complete else GATE_DOCUMENTS
+        return GATE_PAYMENT
     if state_id == ENABLED_STATE_ID and payment_status == PAYMENT_APPROVED:
         return GATE_NONE
     if payment_status == PAYMENT_REVIEW:
-        return GATE_PENDING_APPROVAL
-    if payment_status == PAYMENT_PENDING or state_id == PENDING_ENABLE_STATE_ID:
+        return GATE_PENDING_APPROVAL if documents_complete else GATE_DOCUMENTS
+    if payment_status == PAYMENT_PENDING:
         return GATE_PAYMENT
     _ = has_invoice
     return GATE_NONE
@@ -83,6 +100,9 @@ class MembershipPayment:
     status: str
     reviewed_by: int | None
     reviewed_at: datetime | None
+    signed_authorization_path: str | None = None
+    identity_document_path: str | None = None
+    documents_uploaded_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -115,6 +135,10 @@ class MembershipStatus:
     credit_balance: Decimal = Decimal("0.00")
     days_overdue: int = 0
     open_payment_status: str | None = None
+    must_upload_documents: bool = False
+    has_signed_authorization: bool = False
+    has_identity_document: bool = False
+    city: str = ""
 
 
 @dataclass(frozen=True)

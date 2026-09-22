@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 
 from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import require_access
@@ -44,6 +44,7 @@ from app.modules.members.presentation.api.schemas import (
 )
 from app.modules.membership.application.use_cases import (
     ApproveMembershipUseCase,
+    DownloadOnboardingDocumentUseCase,
     GetApprovalPreviewUseCase,
 )
 from app.modules.membership.domain.exceptions import (
@@ -55,6 +56,7 @@ from app.modules.membership.domain.exceptions import (
 from app.modules.membership.presentation.api.dependencies import (
     get_approval_preview_use_case,
     get_approve_membership_use_case,
+    get_download_onboarding_document_use_case,
 )
 from app.modules.membership.presentation.api.schemas import (
     ApprovalPreviewResponse,
@@ -290,11 +292,23 @@ def download_member_file(
     )
 
 
-    return Response(
-        content=content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+@router.get("/{member_id}/onboarding-documents/{document_kind}")
+def download_onboarding_document(
+    member_id: int,
+    document_kind: str,
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[
+        DownloadOnboardingDocumentUseCase,
+        Depends(get_download_onboarding_document_use_case),
+    ],
+) -> FileResponse:
+    try:
+        filename, file_path = use_case.execute(member_id, document_kind)
+    except (AffiliationNotFoundError, AffiliationValidationError) as exc:
+        raise _http_error(exc) from exc
+
+    media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
+    return FileResponse(path=str(file_path), media_type=media_type, filename=filename)
 
 
 @router.get("/{member_id}/approval-preview", response_model=ApprovalPreviewResponse)

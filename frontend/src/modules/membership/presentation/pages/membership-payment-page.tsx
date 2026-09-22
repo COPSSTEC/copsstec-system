@@ -5,12 +5,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { clearStoredToken, getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
-import { membershipRedirect } from "@/modules/membership/domain/types";
+import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import {
   getMembershipStatus,
   getPaymentInfo,
   uploadPaymentVoucher,
 } from "@/modules/membership/infrastructure/membership-api";
+import { AffiliationAmountBanner } from "@/modules/membership/presentation/components/affiliation-amount-banner";
 import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
 import type { PaymentInfo } from "@/modules/membership/domain/types";
@@ -33,8 +34,9 @@ export function MembershipPaymentPage() {
     async function load() {
       try {
         const status = await getMembershipStatus(sessionToken);
-        if (status.gate !== "payment") {
-          router.replace(membershipRedirect(status.gate));
+        const nextPath = membershipPathForStatus(status);
+        if (nextPath !== "/afiliacion/pago") {
+          router.replace(nextPath);
           return;
         }
         setInfo(await getPaymentInfo(sessionToken));
@@ -61,7 +63,7 @@ export function MembershipPaymentPage() {
     setError(null);
     try {
       await uploadPaymentVoucher(token, file);
-      router.replace("/afiliacion/en-revision");
+      router.replace("/afiliacion/documentos");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo subir el comprobante.");
     } finally {
@@ -92,9 +94,10 @@ export function MembershipPaymentPage() {
       <section className="affiliation-card">
         <h1>Pago de afiliación</h1>
         <p className="muted">
-          Escanea el QR o transfiere a la cuenta. Luego sube el comprobante. El administrador aprobará
-          tu solicitud cuando confirme el pago.
+          Escanea el QR o transfiere a la cuenta. Luego sube el comprobante. El siguiente paso será
+          firmar la autorización de débito y adjuntar tu cédula.
         </p>
+        {info ? <AffiliationAmountBanner amount={info.amount} currency={info.currency} /> : null}
         {info ? (
           <div className="payment-grid">
             <div className="payment-qr">

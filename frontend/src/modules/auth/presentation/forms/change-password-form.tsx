@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { changePassword } from "@/modules/auth/infrastructure/auth-api";
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
-import { membershipRedirect } from "@/modules/membership/domain/types";
+import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 
 export function ChangePasswordForm() {
@@ -33,9 +33,9 @@ export function ChangePasswordForm() {
         password,
         password_confirmation: confirmation,
       });
-      if (user.access_level === "member") {
+      if (user.access_level === "member" || user.state_id === 2) {
         const status = await getMembershipStatus(token);
-        router.replace(membershipRedirect(status.gate));
+        router.replace(membershipPathForStatus(status));
       } else {
         router.replace("/dashboard");
       }

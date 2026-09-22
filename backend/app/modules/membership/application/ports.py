@@ -45,6 +45,14 @@ class MembershipRepository(Protocol):
     def save_voucher(self, user_id: int, voucher_path: str) -> MembershipPayment:
         ...
 
+    def save_onboarding_documents(
+        self,
+        user_id: int,
+        signed_authorization_path: str | None,
+        identity_document_path: str | None,
+    ) -> MembershipPayment:
+        ...
+
     def get_invoice(self, user_id: int) -> MembershipInvoice | None:
         ...
 
@@ -87,6 +95,19 @@ class InvoiceGenerator(Protocol):
         ...
 
 
+class AuthorizationPdfGenerator(Protocol):
+    def generate(
+        self,
+        *,
+        names: str,
+        lastname: str,
+        identifier: str,
+        city: str,
+        issued_on: date,
+    ) -> bytes:
+        ...
+
+
 class MembershipFileStorage(Protocol):
     def save_photo(self, user_id: int, filename: str, content: bytes, content_type: str) -> str:
         ...
@@ -95,4 +116,7 @@ class MembershipFileStorage(Protocol):
         ...
 
     def save_invoice_pdf(self, user_id: int, number: str, content: bytes) -> str:
+        ...
+
+    def save_pdf(self, user_id: int, folder: str, filename: str, content: bytes, content_type: str) -> str:
         ...

@@ -2,15 +2,17 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import get_current_user
 from app.modules.membership.application.use_cases import (
+    DownloadAuthorizationPdfUseCase,
     GetMembershipInvoiceUseCase,
     GetMembershipStatusUseCase,
     GetPaymentInfoUseCase,
     RegisterMembershipUseCase,
+    UploadOnboardingDocumentsUseCase,
     UploadPaymentVoucherUseCase,
 )
 from app.modules.membership.domain.entities import MembershipRegistrationData
@@ -22,14 +24,17 @@ from app.modules.membership.domain.exceptions import (
 )
 from app.modules.membership.infrastructure.files import InvalidMembershipFileError
 from app.modules.membership.presentation.api.dependencies import (
+    get_authorization_pdf_use_case,
     get_invoice_use_case,
     get_membership_status_use_case,
     get_payment_info_use_case,
     get_register_membership_use_case,
+    get_upload_onboarding_documents_use_case,
     get_upload_voucher_use_case,
 )
 from app.modules.membership.presentation.api.schemas import (
     MembershipStatusResponse,
+    OnboardingDocumentsResponse,
     PaymentInfoResponse,
     PaymentResponse,
     RegisterMembershipResponse,
@@ -162,7 +167,8 @@ async def upload_payment_voucher(
 
     return PaymentResponse.from_domain(
         payment,
-        "Comprobante recibido. El administrador confirmará el pago antes de habilitar tu acceso.",
+        "Comprobante recibido. Continúa con la autorización de débito y la cédula.",
+        gate="documents",
     )
 
 
@@ -186,3 +192,59 @@ def download_invoice(
         media_type="application/pdf",
         filename=f"{number}.pdf",
     )
+
+
+@router.get("/authorization-pdf")
+def download_authorization_pdf(
+    user: Annotated[User, Depends(get_current_user)],
+    use_case: Annotated[DownloadAuthorizationPdfUseCase, Depends(get_authorization_pdf_use_case)],
+) -> Response:
+    try:
+        pdf_bytes = use_case.execute(user.id)
+    except (MembershipNotFoundError, MembershipForbiddenError) as exc:
+        raise _http_error(exc) from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="autorizacion-debito-copsstec.pdf"'},
+    )
+
+
+@router.post("/onboarding-documents", response_model=OnboardingDocumentsResponse)
+async def upload_onboarding_documents(
+    user: Annotated[User, Depends(get_current_user)],
+    use_case: Annotated[UploadOnboardingDocumentsUseCase, Depends(get_upload_onboarding_documents_use_case)],
+    signed_authorization: UploadFile | None = File(None),
+    identity_document: UploadFile | None = File(None),
+) -> OnboardingDocumentsResponse:
+    try:
+        _, status = use_case.execute(
+            user_id=user.id,
+            signed_authorization=await _optional_upload(signed_authorization),
+            identity_document=await _optional_upload(identity_document),
+        )
+    except (
+        MembershipNotFoundError,
+        MembershipForbiddenError,
+        MembershipValidationError,
+        InvalidMembershipFileError,
+    ) as exc:
+        raise _http_error(exc) from exc
+
+    return OnboardingDocumentsResponse(
+        status=status.payment_status or "",
+        has_signed_authorization=status.has_signed_authorization,
+        has_identity_document=status.has_identity_document,
+        gate=status.gate,
+        message="Documentos recibidos. El administrador revisará tu solicitud.",
+    )
+
+
+async def _optional_upload(upload: UploadFile | None) -> tuple[str, bytes, str] | None:
+    if upload is None:
+        return None
+    content = await upload.read()
+    if not content:
+        return None
+    return (upload.filename or "documento.pdf", content, upload.content_type or "")

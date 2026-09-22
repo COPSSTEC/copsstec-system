@@ -1,6 +1,7 @@
 from app.modules.membership.domain.corporate_email import suggest_corporate_email
 from app.modules.membership.domain.entities import (
     ENABLED_STATE_ID,
+    GATE_DOCUMENTS,
     GATE_NONE,
     GATE_PAYMENT,
     GATE_PENDING_APPROVAL,
@@ -18,5 +19,8 @@ def test_suggest_corporate_email_strips_accents() -> None:
 
 def test_membership_gate_payment_and_review() -> None:
     assert membership_gate_from_payment(PENDING_ENABLE_STATE_ID, PAYMENT_PENDING, False) == GATE_PAYMENT
-    assert membership_gate_from_payment(PENDING_ENABLE_STATE_ID, PAYMENT_REVIEW, False) == GATE_PENDING_APPROVAL
+    assert membership_gate_from_payment(PENDING_ENABLE_STATE_ID, PAYMENT_REVIEW, False) == GATE_DOCUMENTS
+    assert membership_gate_from_payment(PENDING_ENABLE_STATE_ID, PAYMENT_REVIEW, False, True) == GATE_PENDING_APPROVAL
     assert membership_gate_from_payment(ENABLED_STATE_ID, PAYMENT_APPROVED, True) == GATE_NONE
+    assert membership_gate_from_payment(PENDING_ENABLE_STATE_ID, None, False) == GATE_PAYMENT
+    assert membership_gate_from_payment(PENDING_ENABLE_STATE_ID, PAYMENT_APPROVED, True) == GATE_PAYMENT

@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import type { ApprovalPreview } from "@/modules/membership/domain/types";
-import { approveMember, getApprovalPreview, mediaUrl } from "@/modules/membership/infrastructure/membership-api";
+import {
+  approveMember,
+  downloadOnboardingDocument,
+  getApprovalPreview,
+} from "@/modules/membership/infrastructure/membership-api";
 
 interface ApproveMemberModalProps {
   memberId: number;
@@ -66,7 +70,22 @@ export function ApproveMemberModal({
     }
   }
 
-  const voucher = mediaUrl(preview?.voucher_url ?? null);
+  const hasVoucher = Boolean(preview?.voucher_url);
+  const hasSignedAuthorization = Boolean(preview?.signed_authorization_url);
+  const hasIdentityDocument = Boolean(preview?.identity_document_url);
+  const missingDocuments = Boolean(preview) && (!hasVoucher || !hasSignedAuthorization || !hasIdentityDocument);
+
+  async function handleDownload(kind: "authorization" | "identity" | "voucher") {
+    if (!token) {
+      return;
+    }
+    setError(null);
+    try {
+      await downloadOnboardingDocument(token, memberId, kind);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo descargar el documento.");
+    }
+  }
 
   return (
     <div className="modal-backdrop">
@@ -92,10 +111,33 @@ export function ApproveMemberModal({
                 value={emailCorp}
               />
             </label>
-            {voucher ? (
-              <a href={voucher} rel="noreferrer" target="_blank">
-                Ver comprobante de pago
-              </a>
+            <div className="approve-documents">
+              {hasVoucher ? (
+                <button className="secondary-button" onClick={() => void handleDownload("voucher")} type="button">
+                  Descargar comprobante
+                </button>
+              ) : (
+                <p className="muted">No hay comprobante de pago.</p>
+              )}
+              {hasSignedAuthorization ? (
+                <button className="secondary-button" onClick={() => void handleDownload("authorization")} type="button">
+                  Descargar autorización firmada
+                </button>
+              ) : (
+                <p className="muted">No hay autorización firmada.</p>
+              )}
+              {hasIdentityDocument ? (
+                <button className="secondary-button" onClick={() => void handleDownload("identity")} type="button">
+                  Descargar cédula
+                </button>
+              ) : (
+                <p className="muted">No hay copia de cédula.</p>
+              )}
+            </div>
+            {missingDocuments ? (
+              <p className="form-error">
+                Faltan documentos. No se puede aprobar sin comprobante, autorización firmada y cédula.
+              </p>
             ) : null}
           </div>
         ) : null}
@@ -106,7 +148,7 @@ export function ApproveMemberModal({
           </button>
           <button
             className="primary-button"
-            disabled={isSubmitting || !preview}
+            disabled={isSubmitting || !preview || missingDocuments}
             onClick={() => void handleApprove()}
             type="button"
           >

@@ -30,6 +30,27 @@ class LocalMembershipFileStorage:
         target.write_bytes(content)
         return f"/media/membership/{user_id}/invoices/{target.name}"
 
+    def save_pdf(self, user_id: int, folder: str, filename: str, content: bytes, content_type: str) -> str:
+        if folder not in {"authorization", "identity"}:
+            raise InvalidMembershipFileError("El documento no corresponde a un tipo permitido.")
+        normalized_type = (content_type or "").split(";")[0].strip().lower()
+        if normalized_type not in {"application/pdf", "application/octet-stream", ""}:
+            raise InvalidMembershipFileError("El archivo debe ser PDF.")
+        if not content.startswith(b"%PDF"):
+            raise InvalidMembershipFileError("El archivo debe ser PDF.")
+        if len(content) > MAX_FILE_BYTES:
+            raise InvalidMembershipFileError("El archivo no puede superar 8 MB.")
+
+        suffix = Path(filename or "").suffix.lower()
+        if suffix != ".pdf":
+            suffix = ".pdf"
+
+        target_dir = self.base_path / str(user_id) / folder
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / f"{uuid4().hex}{suffix}"
+        target.write_bytes(content)
+        return f"/media/membership/{user_id}/{folder}/{target.name}"
+
     def _save_image(
         self,
         user_id: int,

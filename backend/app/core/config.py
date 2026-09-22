@@ -37,7 +37,7 @@ class Settings:
     )
     app_env: str = getenv("APP_ENV", "local")
     frontend_origin: str = getenv("FRONTEND_ORIGIN", "http://localhost:3000")
-    membership_fee: str = getenv("MEMBERSHIP_FEE", "50.00")
+    membership_fee: str = getenv("MEMBERSHIP_FEE", "10.00")
     membership_bank_name: str = getenv("MEMBERSHIP_BANK_NAME", "Banco Pichincha")
     membership_account_type: str = getenv("MEMBERSHIP_ACCOUNT_TYPE", "Cuenta de ahorros")
     membership_account_number: str = getenv("MEMBERSHIP_ACCOUNT_NUMBER", "XXXXXXXXXX")
