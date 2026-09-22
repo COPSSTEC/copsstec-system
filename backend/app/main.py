@@ -9,7 +9,9 @@ from app.modules.auth.presentation.api.router import router as auth_router
 from app.modules.blogs.presentation.api.router import router as blogs_router
 from app.modules.courses.presentation.api.router import router as courses_router
 from app.modules.dashboard.presentation.api.router import router as dashboard_router
+from app.modules.documents.presentation.api.router import router as documents_router
 from app.modules.members.presentation.api.router import router as members_router
+from app.modules.notices.presentation.api.router import router as notices_router
 from app.modules.membership.presentation.api.router import router as membership_router
 from app.modules.partners.presentation.api.router import router as partners_router
 from app.modules.payments.presentation.api.router import router as payments_router
@@ -34,11 +36,29 @@ app.include_router(auth_router)
 app.include_router(blogs_router)
 app.include_router(courses_router)
 app.include_router(dashboard_router)
+app.include_router(documents_router)
 app.include_router(members_router)
+app.include_router(notices_router)
 app.include_router(membership_router)
 app.include_router(partners_router)
 app.include_router(payments_router)
 app.include_router(votaciones_router)
+
+notice_media_dir = Path("storage/notices")
+notice_media_dir.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/notices",
+    StaticFiles(directory=str(notice_media_dir)),
+    name="notice-media",
+)
+
+member_documents_dir = Path("storage/member-documents")
+member_documents_dir.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/media/member-documents",
+    StaticFiles(directory=str(member_documents_dir)),
+    name="member-documents-media",
+)
 
 member_media_dir = Path("storage/members")
 member_media_dir.mkdir(parents=True, exist_ok=True)

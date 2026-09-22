@@ -34,6 +34,8 @@ NAVIGATION_BY_ACCESS: dict[str, list[dict]] = {
         {"label": "Pagos", "href": "/admin/pagos"},
         {"label": "Cursos", "href": "/admin/cursos"},
         {"label": "Blogs", "href": "/admin/blogs"},
+        {"label": "Avisos", "href": "/admin/avisos"},
+        {"label": "Documentos", "href": "/admin/documentos"},
         {
             "label": "Votaciones",
             "href": "/admin/votaciones",
