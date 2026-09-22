@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/modules/auth/infrastructure/auth-api";
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { ProfileSummary } from "@/modules/dashboard/presentation/components/profile-summary";
 import { StatCard } from "@/modules/dashboard/presentation/components/stat-card";
+import { AdminDashboardPage } from "@/modules/dashboard/presentation/pages/admin-dashboard-page";
 
 export function DashboardPage() {
   const router = useRouter();
@@ -36,6 +37,10 @@ export function DashboardPage() {
 
   if (user === null) {
     return <p className="muted">Cargando dashboard...</p>;
+  }
+
+  if (user.access_level === "admin") {
+    return <AdminDashboardPage />;
   }
 
   return (

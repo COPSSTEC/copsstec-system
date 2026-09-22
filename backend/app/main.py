@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.modules.auth.presentation.api.router import router as auth_router
 from app.modules.blogs.presentation.api.router import router as blogs_router
 from app.modules.courses.presentation.api.router import router as courses_router
+from app.modules.dashboard.presentation.api.router import router as dashboard_router
 from app.modules.members.presentation.api.router import router as members_router
 from app.modules.membership.presentation.api.router import router as membership_router
 from app.modules.partners.presentation.api.router import router as partners_router
@@ -32,6 +33,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(blogs_router)
 app.include_router(courses_router)
+app.include_router(dashboard_router)
 app.include_router(members_router)
 app.include_router(membership_router)
 app.include_router(partners_router)
