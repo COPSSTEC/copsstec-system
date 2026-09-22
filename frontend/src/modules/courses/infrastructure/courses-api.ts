@@ -80,6 +80,7 @@ export async function listAdminCourses(token: string): Promise<AdminCourse[]> {
 
 export async function listMyCourses(token: string): Promise<MemberCourse[]> {
   const response = await fetch(`${API_URL}/api/courses/member/my-courses`, {
+    cache: "no-store",
     headers: authHeaders(token),
   });
 
@@ -88,6 +89,7 @@ export async function listMyCourses(token: string): Promise<MemberCourse[]> {
 
 export async function listMemberAvailableCourses(token: string): Promise<MemberCourse[]> {
   const response = await fetch(`${API_URL}/api/courses/member/available`, {
+    cache: "no-store",
     headers: authHeaders(token),
   });
 

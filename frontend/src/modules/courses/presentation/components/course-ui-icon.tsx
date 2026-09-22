@@ -30,7 +30,13 @@ type CourseIconName =
   | "facePoor"
   | "faceOk"
   | "faceGood"
-  | "faceGreat";
+  | "faceGreat"
+  | "tag"
+  | "share"
+  | "graduation"
+  | "globe"
+  | "checkCircle"
+  | "award";
 
 const PATHS: Record<CourseIconName, string[]> = {
   users: [
@@ -111,6 +117,18 @@ const PATHS: Record<CourseIconName, string[]> = {
     "M8 10h.01",
     "M16 10h.01",
     "M8 14c1.3 2 2.8 3 4 3s2.7-1 4-3",
+  ],
+  tag: [
+    "M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z",
+    "M7 7h.01",
+  ],
+  share: ["M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8", "M16 6l-4-4-4 4", "M12 2v13"],
+  graduation: ["M22 10l-10-5-10 5 10 5 10-5z", "M6 12v5c3 3 9 3 12 0v-5"],
+  globe: ["M12 21a9 9 0 100-18 9 9 0 000 18z", "M3 12h18", "M12 3c3.5 3.2 3.5 14.8 0 18", "M12 3c-3.5 3.2-3.5 14.8 0 18"],
+  checkCircle: ["M21 12a9 9 0 11-18 0 9 9 0 0118 0z", "M9 12l2 2 4-4"],
+  award: [
+    "M12 15a6.5 6.5 0 100-13 6.5 6.5 0 000 13z",
+    "M8.21 13.89L7 23l5-3 5 3-1.21-9.12",
   ],
 };
 

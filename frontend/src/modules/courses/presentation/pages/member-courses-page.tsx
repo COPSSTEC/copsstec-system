@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
 import type { MemberCourse } from "@/modules/courses/domain/types";
@@ -11,30 +11,61 @@ import {
   listMyCourses,
 } from "@/modules/courses/infrastructure/courses-api";
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { MemberCourseCard } from "@/modules/courses/presentation/components/member-course-card";
+import { MemberCoursePanel } from "@/modules/courses/presentation/components/member-course-panel";
+import { CourseUiIcon } from "@/modules/courses/presentation/components/course-ui-icon";
+import {
+  MEMBER_COURSE_PREVIEW,
+  canDownloadCertificate,
+  matchesMemberCourseFilters,
+  visibleCategories,
+  type MemberCourseFilter,
+} from "@/modules/courses/presentation/lib/member-courses";
 import { RoleGate } from "@/shared/components/role-gate";
-
-function stateLabel(stateId: number | null): string {
-  const labels: Record<number, string> = {
-    4: "Visible",
-    7: "Rechazado",
-    8: "Por aprobar",
-    9: "Inscrito",
-    11: "Asistió",
-    14: "Pagado",
-    15: "Enviado",
-  };
-
-  return stateId ? labels[stateId] ?? `Estado ${stateId}` : "No inscrito";
-}
+import { useToast } from "@/shared/hooks/use-toast";
 
 export function MemberCoursesPage() {
+  const toast = useToast();
   const token = useMemo(() => getStoredToken(), []);
   const [myCourses, setMyCourses] = useState<MemberCourse[]>([]);
   const [availableCourses, setAvailableCourses] = useState<MemberCourse[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBusy, setIsBusy] = useState(false);
   const [detailCourse, setDetailCourse] = useState<MemberCourse | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [filter, setFilter] = useState<MemberCourseFilter>("all");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [expanded, setExpanded] = useState<{ enrolled: boolean; available: boolean }>({
+    enrolled: false,
+    available: false,
+  });
+  const didAutoSelect = useRef(false);
+
+  const filters = { query, category };
+
+  const filteredMine = useMemo(
+    () => myCourses.filter((course) => matchesMemberCourseFilters(course, filters)),
+    [myCourses, query, category],
+  );
+  const enrolledIds = useMemo(() => new Set(myCourses.map((course) => course.id)), [myCourses]);
+  const filteredAvailable = useMemo(
+    () =>
+      availableCourses.filter(
+        (course) => !enrolledIds.has(course.id) && matchesMemberCourseFilters(course, filters),
+      ),
+    [availableCourses, enrolledIds, query, category],
+  );
+  const categories = useMemo(
+    () => visibleCategories([...myCourses, ...availableCourses]),
+    [myCourses, availableCourses],
+  );
+
+  const showEnrolled = filter !== "available";
+  const showAvailable = filter !== "enrolled";
+  const visibleMine = expanded.enrolled || filter === "enrolled" ? filteredMine : filteredMine.slice(0, MEMBER_COURSE_PREVIEW);
+  const visibleAvailable =
+    expanded.available || filter === "available" ? filteredAvailable : filteredAvailable.slice(0, MEMBER_COURSE_PREVIEW);
 
   async function loadCourses(): Promise<{ mine: MemberCourse[]; available: MemberCourse[] }> {
     if (!token) {
@@ -56,7 +87,7 @@ export function MemberCoursesPage() {
       try {
         await loadCourses();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudieron cargar tus cursos.");
+        toast.error(err instanceof Error ? err.message : "No se pudieron cargar tus cursos.");
       } finally {
         setIsLoading(false);
       }
@@ -65,17 +96,31 @@ export function MemberCoursesPage() {
     void bootstrap();
   }, []);
 
-  async function runAction(action: () => Promise<unknown>, successMessage: string) {
-    setError(null);
-    setMessage(null);
-
-    try {
-      await action();
-      setMessage(successMessage);
-      await loadCourses();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo completar la acción.");
+  useEffect(() => {
+    if (didAutoSelect.current || isLoading) {
+      return;
     }
+
+    const first = myCourses[0] ?? availableCourses[0] ?? null;
+    if (first) {
+      setDetailCourse(first);
+      setPanelOpen(true);
+      didAutoSelect.current = true;
+    }
+  }, [availableCourses, isLoading, myCourses]);
+
+  function selectCourse(course: MemberCourse) {
+    setDetailCourse(course);
+    setPanelOpen(true);
+  }
+
+  function resolveCourse(
+    courseId: number,
+    mine: MemberCourse[],
+    available: MemberCourse[],
+    fallback: MemberCourse,
+  ): MemberCourse {
+    return mine.find((item) => item.id === courseId) ?? available.find((item) => item.id === courseId) ?? fallback;
   }
 
   async function downloadCertificate(course: MemberCourse) {
@@ -83,274 +128,268 @@ export function MemberCoursesPage() {
       return;
     }
 
-    if (!course.attended_at) {
-      setError("El certificado estará disponible cuando administración marque tu asistencia.");
-      setMessage(null);
+    if (!canDownloadCertificate(course)) {
+      toast.error("El certificado estará disponible cuando administración marque tu asistencia.");
       return;
     }
 
-    await runAction(async () => {
-      const blob = await downloadMyCertificate(token, course.inscription_id ?? 0);
+    setIsBusy(true);
+    try {
+      const blob = await downloadMyCertificate(token, course.inscription_id);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = `${course.certificate_code ?? `curso-${course.id}-certificado`}.pdf`;
       link.click();
       window.URL.revokeObjectURL(url);
-    }, "Certificado descargado correctamente.");
+      toast.success("Certificado descargado correctamente.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo descargar el certificado.");
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   async function enrollFromMemberView(course: MemberCourse) {
-    if (!token) {
+    if (!token || course.inscription_id !== null) {
       return;
     }
 
-    setError(null);
-    setMessage(null);
-
+    setIsBusy(true);
     try {
       await enrollCurrentMember(token, course.id);
       const { mine, available } = await loadCourses();
-      const updated =
-        mine.find((item) => item.id === course.id) ??
-        available.find((item) => item.id === course.id) ??
-        { ...course, inscription_id: course.inscription_id ?? 0, inscription_state_id: 9 };
+      const updated = resolveCourse(course.id, mine, available, {
+        ...course,
+        inscription_id: course.inscription_id ?? 0,
+        inscription_state_id: 9,
+      });
       setDetailCourse(updated);
-      setMessage("Inscripción confirmada sin costo.");
+      setPanelOpen(true);
+      toast.success("Inscripción confirmada sin costo.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo completar la inscripción.");
+      toast.error(err instanceof Error ? err.message : "No se pudo completar la inscripción.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function shareCourse(course: MemberCourse) {
+    const url = `${window.location.origin}/cursos/${course.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: course.title, url });
+        return;
+      }
+
+      await navigator.clipboard.writeText(url);
+      toast.success("Enlace del curso copiado.");
+    } catch {
+      toast.info(url, "Enlace del curso");
     }
   }
 
   return (
     <RoleGate requiredAccess="member">
-      <section className="page-heading page-heading-actions">
+      <section className="page-heading page-heading-actions member-courses-heading">
         <div>
           <h1>Mis cursos</h1>
-          <p>Consulta tus cursos inscritos, inscríbete a nuevos cursos y descarga certificados.</p>
+          <p>Consulta tus cursos inscritos, explora nuevas capacitaciones y descarga tus certificados.</p>
         </div>
-        <div className="hero-actions">
-          <Link className="secondary-button button-link" href="/cursos">
+        <div className="member-courses-heading-actions">
+          <Link className="member-course-ghost-btn" href="/cursos">
+            <CourseUiIcon name="book" />
             Ver catálogo público
           </Link>
-          <Link className="secondary-button button-link" href="/dashboard">
+          <Link className="member-course-ghost-btn" href="/dashboard">
+            <CourseUiIcon name="plus" />
             Volver al dashboard
           </Link>
         </div>
       </section>
 
-      {message ? <ActionAlert tone="success" title="Acción completada" message={message} /> : null}
-      {error ? <ActionAlert tone="error" title="Revisa la acción" message={error} /> : null}
+      <div className="member-courses-toolbar">
+        <div className="member-courses-tabs" role="tablist">
+          <FilterTab
+            active={filter === "enrolled"}
+            count={filteredMine.length}
+            label="Inscritos"
+            onClick={() => setFilter("enrolled")}
+          />
+          <FilterTab
+            active={filter === "available"}
+            count={filteredAvailable.length}
+            label="Disponibles"
+            onClick={() => setFilter("available")}
+          />
+          <FilterTab
+            active={filter === "all"}
+            count={filteredMine.length + filteredAvailable.length}
+            label="Todos"
+            onClick={() => setFilter("all")}
+          />
+        </div>
+        <div className="member-courses-tools">
+          <label className="member-courses-search">
+            <CourseUiIcon name="search" />
+            <input
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar cursos..."
+              type="search"
+              value={query}
+            />
+          </label>
+          <select
+            aria-label="Filtrar por categoría"
+            className="member-courses-select"
+            onChange={(event) => setCategory(event.target.value)}
+            value={category}
+          >
+            <option value="">Todas las categorías</option>
+            {categories.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {isLoading ? <p className="muted">Cargando cursos...</p> : null}
 
-      <section className="card course-admin-panel">
-        <h2>Cursos en los que estoy inscrito</h2>
-        {myCourses.length === 0 && !isLoading ? (
-          <p className="muted">Aún no tienes cursos inscritos.</p>
+      <div className={`member-courses-workspace ${panelOpen ? "" : "is-collapsed"}`}>
+        <div className="member-courses-main">
+          {showEnrolled ? (
+            <CourseSection
+              count={filteredMine.length}
+              emptyText="Aún no tienes cursos inscritos."
+              icon="graduation"
+              isLoading={isLoading}
+              onSeeAll={() => {
+                setExpanded((current) => ({ ...current, enrolled: true }));
+                setFilter("enrolled");
+              }}
+              showSeeAll={filter === "all" && filteredMine.length > 0}
+              title="Cursos en los que estoy inscrito"
+            >
+              {visibleMine.map((course) => (
+                <MemberCourseCard
+                  course={course}
+                  isSelected={panelOpen && detailCourse?.id === course.id}
+                  key={`${course.id}-${course.inscription_id}`}
+                  onSelect={() => selectCourse(course)}
+                />
+              ))}
+            </CourseSection>
+          ) : null}
+
+          {showAvailable ? (
+            <CourseSection
+              count={filteredAvailable.length}
+              emptyText="No hay cursos disponibles para inscripción."
+              icon="book"
+              isLoading={isLoading}
+              onSeeAll={() => {
+                setExpanded((current) => ({ ...current, available: true }));
+                setFilter("available");
+              }}
+              showSeeAll={filter === "all" && filteredAvailable.length > 0}
+              title="Cursos disponibles para inscripción"
+            >
+              {visibleAvailable.map((course) => (
+                <MemberCourseCard
+                  course={course}
+                  isSelected={panelOpen && detailCourse?.id === course.id}
+                  key={course.id}
+                  onEnroll={() => void enrollFromMemberView(course)}
+                  onSelect={() => selectCourse(course)}
+                />
+              ))}
+            </CourseSection>
+          ) : null}
+        </div>
+
+        {panelOpen ? (
+          <MemberCoursePanel
+            key={detailCourse?.id ?? "empty"}
+            course={detailCourse}
+            isBusy={isBusy}
+            onClose={() => setPanelOpen(false)}
+            onDownloadCertificate={() => {
+              if (detailCourse) {
+                void downloadCertificate(detailCourse);
+              }
+            }}
+            onEnroll={() => {
+              if (detailCourse) {
+                void enrollFromMemberView(detailCourse);
+              }
+            }}
+            onShare={() => {
+              if (detailCourse) {
+                void shareCourse(detailCourse);
+              }
+            }}
+          />
         ) : null}
-        <div className="courses-grid">
-          {myCourses.map((course) => (
-            <article className="course-card" key={`${course.id}-${course.inscription_id}`}>
-              <div className="course-card-body">
-                <div className="course-meta">
-                  <span>{course.finished_at ? "Finalizado" : "Activo"}</span>
-                  <strong>{stateLabel(course.inscription_state_id)}</strong>
-                </div>
-                <h3>{course.title}</h3>
-                <p className="muted">
-                  {course.date_course} - {course.date_course_final} · {course.hour_init} a{" "}
-                  {course.hour_final}
-                </p>
-                <p>Asistencia: {course.attended_at ? "Sí" : "Pendiente"}</p>
-                <div className="hero-actions">
-                  <button
-                    className="secondary-button"
-                    onClick={() => setDetailCourse(course)}
-                    type="button"
-                  >
-                    Ver detalle
-                  </button>
-                  <button
-                    className="primary-button"
-                    disabled={!course.attended_at}
-                    onClick={() => void downloadCertificate(course)}
-                    type="button"
-                  >
-                    Descargar certificado
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="card course-admin-panel">
-        <h2>Cursos disponibles para inscripción</h2>
-        <div className="courses-grid">
-          {availableCourses.map((course) => (
-            <article className="course-card" key={course.id}>
-              <div className="course-card-body">
-                <div className="course-meta">
-                  <span>{course.type_modality ?? "Curso"}</span>
-                  <strong>{course.inscription_id ? "Ya inscrito" : "Disponible"}</strong>
-                </div>
-                <h3>{course.title}</h3>
-                <p className="muted">
-                  {course.date_course} - {course.date_course_final} · {course.location}
-                </p>
-                <div className="hero-actions">
-                  <button
-                    className="secondary-button"
-                    onClick={() => setDetailCourse(course)}
-                    type="button"
-                  >
-                    Ver detalle
-                  </button>
-                  <button
-                    className="primary-button"
-                    disabled={course.inscription_id !== null}
-                    onClick={() =>
-                      void enrollFromMemberView(course)
-                    }
-                    type="button"
-                  >
-                    {course.inscription_id ? "Inscrito" : "Inscribirme"}
-                  </button>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {detailCourse ? (
-        <CourseDetailModal
-          course={detailCourse}
-          onClose={() => setDetailCourse(null)}
-          onDownloadCertificate={() => void downloadCertificate(detailCourse)}
-          onEnroll={() => void enrollFromMemberView(detailCourse)}
-        />
-      ) : null}
+      </div>
     </RoleGate>
   );
 }
 
-interface CourseDetailModalProps {
-  course: MemberCourse;
-  onClose: () => void;
-  onDownloadCertificate: () => void;
-  onEnroll: () => void;
-}
-
-function CourseDetailModal({
-  course,
-  onClose,
-  onDownloadCertificate,
-  onEnroll,
-}: CourseDetailModalProps) {
-  const isEnrolled = course.inscription_id !== null;
-
+function FilterTab({
+  active,
+  count,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  count: number;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <div
-      className="modal-backdrop"
-      onClick={onClose}
-      role="presentation"
-    >
-      <section
-        aria-modal="true"
-        className="confirm-dialog course-detail-modal"
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-      >
-        {course.image ? (
-          <div className="course-hero-image" style={{ backgroundImage: `url(${course.image})` }} />
-        ) : null}
-
-        <div className="page-heading page-heading-actions">
-          <div>
-            <p className="eyebrow">{course.type_modality ?? "Curso"}</p>
-            <h2>{course.title}</h2>
-          </div>
-          <button className="secondary-button" onClick={onClose} type="button">
-            Cerrar
-          </button>
-        </div>
-
-        <p>{course.about}</p>
-        <div className="profile-list">
-          <div className="profile-item">
-            <span>Fecha</span>
-            <strong>
-              {course.date_course} - {course.date_course_final}
-            </strong>
-          </div>
-          <div className="profile-item">
-            <span>Horario</span>
-            <strong>
-              {course.hour_init} a {course.hour_final}
-            </strong>
-          </div>
-          <div className="profile-item">
-            <span>Ubicación</span>
-            <strong>{course.location}</strong>
-          </div>
-          <div className="profile-item">
-            <span>Valor para miembros</span>
-            <strong>Sin costo</strong>
-          </div>
-          <div className="profile-item">
-            <span>Estado</span>
-            <strong>{isEnrolled ? stateLabel(course.inscription_state_id) : "Disponible"}</strong>
-          </div>
-          <div className="profile-item">
-            <span>Curso</span>
-            <strong>{course.finished_at ? "Finalizado" : "Activo"}</strong>
-          </div>
-        </div>
-
-        <h3>Capacitador</h3>
-        <p>
-          <strong>{course.capacitator}</strong>
-        </p>
-        <p className="muted">{course.capacitator_about}</p>
-
-        <div className="hero-actions">
-          <button
-            className="primary-button"
-            disabled={isEnrolled}
-            onClick={onEnroll}
-            type="button"
-          >
-            {isEnrolled ? "Ya inscrito" : "Inscribirme"}
-          </button>
-          {isEnrolled ? (
-            <button
-              className="secondary-button"
-              disabled={!course.attended_at}
-              onClick={onDownloadCertificate}
-              type="button"
-            >
-              Descargar certificado
-            </button>
-          ) : null}
-        </div>
-      </section>
-    </div>
+    <button className={`member-courses-tab ${active ? "is-active" : ""}`} onClick={onClick} type="button">
+      {label} ({count})
+    </button>
   );
 }
 
-interface ActionAlertProps {
-  tone: "success" | "error";
+function CourseSection({
+  children,
+  count,
+  emptyText,
+  icon,
+  isLoading,
+  onSeeAll,
+  showSeeAll,
+  title,
+}: {
+  children: ReactNode;
+  count: number;
+  emptyText: string;
+  icon: "graduation" | "book";
+  isLoading: boolean;
+  onSeeAll: () => void;
+  showSeeAll: boolean;
   title: string;
-  message: string;
-}
-
-function ActionAlert({ tone, title, message }: ActionAlertProps) {
+}) {
   return (
-    <div className={`action-alert action-alert-${tone}`} role="status">
-      <strong>{title}</strong>
-      <span>{message}</span>
-    </div>
+    <section className="member-courses-section">
+      <header className="member-courses-section-head">
+        <h2>
+          <CourseUiIcon name={icon} />
+          {title} ({count})
+        </h2>
+        {showSeeAll ? (
+          <button className="member-courses-see-all" onClick={onSeeAll} type="button">
+            Ver todos
+            <CourseUiIcon name="arrow" />
+          </button>
+        ) : null}
+      </header>
+      {count === 0 && !isLoading ? <p className="muted">{emptyText}</p> : null}
+      <div className="member-courses-grid">{children}</div>
+    </section>
   );
 }
