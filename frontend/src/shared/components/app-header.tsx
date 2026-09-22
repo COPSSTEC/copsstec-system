@@ -181,6 +181,22 @@ export function AppHeader({ user, onMenuToggle, variant = "default" }: AppHeader
                   <p className="muted">{user?.email ?? ""}</p>
                 </div>
               </div>
+              {variant === "bulletin" ? (
+                <>
+                  <Link href="/mi-espacio/cursos" onClick={() => setIsUserMenuOpen(false)}>
+                    Mis cursos
+                  </Link>
+                  <Link href="/mi-espacio/pagos" onClick={() => setIsUserMenuOpen(false)}>
+                    Mis pagos
+                  </Link>
+                  <Link href="/mi-espacio" onClick={() => setIsUserMenuOpen(false)}>
+                    Mi espacio
+                  </Link>
+                  <Link href="/mi-espacio/votaciones" onClick={() => setIsUserMenuOpen(false)}>
+                    Votaciones
+                  </Link>
+                </>
+              ) : null}
               <Link href="/profile" onClick={() => setIsUserMenuOpen(false)}>
                 Ver mi perfil
               </Link>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import type { User } from "@/modules/auth";
@@ -9,6 +9,7 @@ import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { ProfileSummary } from "@/modules/dashboard/presentation/components/profile-summary";
 import { StatCard } from "@/modules/dashboard/presentation/components/stat-card";
 import { AdminDashboardPage } from "@/modules/dashboard/presentation/pages/admin-dashboard-page";
+import { MemberNewspaperPage } from "@/modules/dashboard/presentation/pages/member-newspaper-page";
 
 export function DashboardPage() {
   const router = useRouter();
@@ -41,6 +42,14 @@ export function DashboardPage() {
 
   if (user.access_level === "admin") {
     return <AdminDashboardPage />;
+  }
+
+  if (user.access_level === "member") {
+    return (
+      <Suspense fallback={<p className="muted">Cargando el boletín...</p>}>
+        <MemberNewspaperPage user={user} />
+      </Suspense>
+    );
   }
 
   return (

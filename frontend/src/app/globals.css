@@ -210,16 +210,31 @@ textarea {
 
 .app-shell-bulletin {
   background: #ffffff;
+  grid-template-columns: 1fr;
 }
 
 .app-shell-bulletin .app-shell-main {
   background: #ffffff;
 }
 
+.app-shell-bulletin .app-sidebar {
+  display: none;
+}
+
+.app-shell-bulletin .app-topbar {
+  border-bottom: 1px solid #eef2f7;
+  padding: 0.85rem 2rem;
+}
+
+.app-shell-bulletin .app-topbar-date,
+.app-shell-bulletin .app-topbar-menu {
+  display: none;
+}
+
 .app-shell-bulletin .main {
   margin: 0 auto;
   max-width: 1380px;
-  padding: 1.2rem 1.5rem 2.2rem;
+  padding: 1.45rem 2rem 2.6rem;
   width: 100%;
 }
 
@@ -1742,6 +1757,14 @@ textarea {
 }
 
 @media (max-width: 900px) {
+  .app-shell-bulletin .app-sidebar {
+    display: flex;
+  }
+
+  .app-shell-bulletin .app-topbar-menu {
+    display: grid;
+  }
+
   .app-shell {
     grid-template-columns: 1fr;
   }

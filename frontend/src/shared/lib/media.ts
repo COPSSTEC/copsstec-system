@@ -9,7 +9,8 @@ export function resolveMediaSrc(path: string | null | undefined): string | null 
     path.startsWith("data:") ||
     path.startsWith("/media/brand/") ||
     path.startsWith("/media/login/") ||
-    path.startsWith("/media/landing/")
+    path.startsWith("/media/landing/") ||
+    path.startsWith("/media/bulletin/")
   ) {
     return path;
   }

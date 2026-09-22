@@ -11,11 +11,14 @@ export const BLOOD_TYPES = [
 
 export const GENDERS = ["Masculino", "Femenino"] as const;
 
-export type MembershipGate = "payment" | "pending_approval" | "subscription_due" | "none";
+export type MembershipGate = "documents" | "payment" | "pending_approval" | "subscription_due" | "none";
 
 export interface MembershipStatus {
   must_complete_payment: boolean;
+  must_upload_documents: boolean;
   must_wait_approval: boolean;
+  has_signed_authorization: boolean;
+  has_identity_document: boolean;
   gate: MembershipGate;
   payment_status: string | null;
   state_id: number;
@@ -53,6 +56,8 @@ export interface ApprovalPreview {
   suggested_corporate_email: string;
   payment_status: string;
   voucher_url: string | null;
+  signed_authorization_url: string | null;
+  identity_document_url: string | null;
   amount: string;
 }
 
@@ -123,6 +128,9 @@ export function membershipRedirect(gate: MembershipGate): string {
   if (gate === "payment") {
     return "/afiliacion/pago";
   }
+  if (gate === "documents") {
+    return "/afiliacion/documentos";
+  }
   if (gate === "pending_approval") {
     return "/afiliacion/en-revision";
   }
@@ -130,4 +138,22 @@ export function membershipRedirect(gate: MembershipGate): string {
     return "/suscripcion/pendiente";
   }
   return "/dashboard";
+}
+
+export function membershipPathForStatus(status: MembershipStatus): string {
+  if (status.state_id === 2) {
+    const documentsReady = Boolean(status.has_signed_authorization && status.has_identity_document);
+    if (status.gate === "pending_approval" || (status.payment_status === "pending_review" && documentsReady)) {
+      return "/afiliacion/en-revision";
+    }
+    if (
+      status.gate === "documents" ||
+      status.must_upload_documents ||
+      status.payment_status === "pending_review"
+    ) {
+      return "/afiliacion/documentos";
+    }
+    return "/afiliacion/pago";
+  }
+  return membershipRedirect(status.gate);
 }
