@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import type { AccessLevel, NavigationItem } from "@/modules/auth/domain/types";
 import { navIconForHref, SOCIAL_LINKS } from "@/config/social-links";
+import { BRAND_MEDIA } from "@/config/brand-media";
 import { AppLogo } from "@/shared/components/app-logo";
 import { SidebarIcon } from "@/shared/components/sidebar-icon";
 
@@ -144,7 +145,7 @@ export function AppSidebar({ navigation, accessLevel, isOpen, onClose }: AppSide
             ))}
           </nav>
 
-          <p className="app-sidebar-socials-label">Socials</p>
+          <p className="app-sidebar-socials-label">Comunidad</p>
           <nav aria-label="Redes sociales" className="app-sidebar-nav app-sidebar-socials">
             {SOCIAL_LINKS.map((item) => (
               <a href={item.href} key={item.href} rel="noreferrer" target="_blank">
@@ -154,6 +155,14 @@ export function AppSidebar({ navigation, accessLevel, isOpen, onClose }: AppSide
             ))}
           </nav>
         </div>
+
+        <article className="app-sidebar-promo">
+          <img alt="" src={BRAND_MEDIA.sidebarPromo} />
+          <div>
+            <strong>Juntos por un Ecuador seguro</strong>
+            <span>Prevención hoy, mejores mañanas</span>
+          </div>
+        </article>
       </aside>
     </>
   );

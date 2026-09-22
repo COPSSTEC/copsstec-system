@@ -40,11 +40,19 @@ export type NavIconName =
   | "user"
   | "newspaper"
   | "vote"
+  | "creditCard"
+  | "folder"
+  | "megaphone"
+  | "academic"
   | SocialIconName;
 
 export function navIconForHref(href: string): NavIconName {
+  if (href === "/dashboard") {
+    return "home";
+  }
+
   if (href.startsWith("/admin/pagos") || href.startsWith("/mi-espacio/pagos")) {
-    return "bolt";
+    return "creditCard";
   }
 
   if (href.startsWith("/admin/miembros")) {
@@ -52,11 +60,19 @@ export function navIconForHref(href: string): NavIconName {
   }
 
   if (href.includes("/cursos") || href.startsWith("/admin/cursos")) {
-    return "certificate";
+    return "academic";
+  }
+
+  if (href.startsWith("/admin/avisos")) {
+    return "megaphone";
   }
 
   if (href.includes("/blogs") || href.startsWith("/admin/blogs")) {
     return "newspaper";
+  }
+
+  if (href.startsWith("/admin/documentos")) {
+    return "folder";
   }
 
   if (href === "/mi-espacio") {

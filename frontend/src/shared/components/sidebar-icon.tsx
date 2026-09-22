@@ -11,13 +11,13 @@ function SvgIcon({ children, className }: { children: React.ReactNode; className
       aria-hidden="true"
       className={className}
       fill="none"
-      height="16"
+      height="18"
       stroke="currentColor"
       strokeLinecap="round"
       strokeLinejoin="round"
-      strokeWidth="1.75"
+      strokeWidth="1.7"
       viewBox="0 0 24 24"
-      width="16"
+      width="18"
     >
       {children}
     </svg>
@@ -74,6 +74,24 @@ const PATHS: Record<NavIconName, string[]> = {
   facebook: ["M7 10v4h3v7h4v-7h3l1-4h-4v-2a1 1 0 011-1h3v-4h-3a5 5 0 00-5 5v2H7"],
   linkedin: ["M8 11v5", "M8 8v.01", "M12 16v-5", "M16 16v-3a2 2 0 10-4 0", "M3 7a4 4 0 014-4h10a4 4 0 014 4v10a4 4 0 01-4 4H7a4 4 0 01-4-4z"],
   youtube: ["M2 8a4 4 0 014-4h12a4 4 0 014 4v8a4 4 0 01-4 4H6a4 4 0 01-4-4V8z", "M10 9l5 3-5 3z"],
+  creditCard: [
+    "M3 8a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z",
+    "M3 10h18",
+    "M7 15h.01",
+    "M11 15h2",
+  ],
+  folder: [
+    "M5 4h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z",
+  ],
+  megaphone: [
+    "M18 8a3 3 0 010 6",
+    "M10 8v11a1 1 0 01-1 1H8a1 1 0 01-1-1v-5",
+    "M4 8l14-4v10L4 10V8z",
+  ],
+  academic: [
+    "M22 10l-10-5L2 10l10 5 10-5z",
+    "M6 12v5c3 2 9 2 12 0v-5",
+  ],
 };
 
 export function SidebarIcon({ name, className }: SidebarIconProps) {
