@@ -93,6 +93,47 @@ MEMBER_SELECT = """
       AND p.deleted_at IS NULL
 """
 
+PROFILE_SELECT = """
+    SELECT
+        u.id AS user_id,
+        p.id AS profile_id,
+        u.name,
+        u.email AS login_email,
+        u.state_id,
+        u.last_conexion,
+        u.created_at,
+        COALESCE(p.names, '') AS names,
+        COALESCE(p.lastname, '') AS lastname,
+        COALESCE(p.identifier, '') AS identifier,
+        COALESCE(p.email, u.email) AS email,
+        COALESCE(p.birtday, '') AS birtday,
+        COALESCE(p.blood_type, '') AS blood_type,
+        COALESCE(p.mobile_phone, '') AS mobile_phone,
+        COALESCE(p.fixed_phone, '') AS fixed_phone,
+        COALESCE(p.title_academic, '') AS title_academic,
+        COALESCE(p.level_academic, '') AS level_academic,
+        COALESCE(p.cod_senescyt, '') AS cod_senescyt,
+        COALESCE(p.date_register, '') AS date_register,
+        COALESCE(p.linkdink, '') AS linkdink,
+        COALESCE(p.want_notifications, false) AS want_notifications,
+        COALESCE(p.is_work, false) AS is_work,
+        COALESCE(p.foto_id, '') AS foto_id,
+        p.province,
+        p.city,
+        p.street_principal,
+        p.street_secondary,
+        p.type_profile,
+        p.date_exit,
+        p.fourth_title,
+        p.type_commision,
+        p.codigo_senescyt_cuarto,
+        p.cod,
+        p.gender
+    FROM profiles p
+    INNER JOIN users u ON u.id = p.user_id
+    WHERE p.deleted_at IS NULL
+"""
+
 
 class SqlAlchemyMemberRepository:
     def __init__(self, session: Session) -> None:
@@ -158,6 +199,20 @@ class SqlAlchemyMemberRepository:
             return None
 
         return self._to_member(row)
+
+    def get_profile_by_user_id(self, user_id: int) -> Member | None:
+        row = self.session.execute(
+            text(f"{PROFILE_SELECT} AND u.id = :user_id"),
+            {"user_id": user_id},
+        ).mappings().first()
+        return self._to_member(row) if row is not None else None
+
+    def get_profile_by_id(self, profile_id: int) -> Member | None:
+        row = self.session.execute(
+            text(f"{PROFILE_SELECT} AND p.id = :profile_id"),
+            {"profile_id": profile_id},
+        ).mappings().first()
+        return self._to_member(row) if row is not None else None
 
     def create_member(self, data: MemberWriteData, password_hash: str) -> Member:
         now = datetime.now(UTC).replace(tzinfo=None)
@@ -323,7 +378,7 @@ class SqlAlchemyMemberRepository:
             )
 
         self.session.commit()
-        member = self.get_member(user_id)
+        member = self.get_member(user_id) or self.get_profile_by_user_id(user_id)
         if member is None:
             raise MemberNotFoundError()
         return member
@@ -437,7 +492,7 @@ class SqlAlchemyMemberRepository:
             raise MemberNotFoundError()
 
         self.session.commit()
-        member = self.get_member(user_id)
+        member = self.get_member(user_id) or self.get_profile_by_user_id(user_id)
         if member is None:
             raise MemberNotFoundError()
         return member

@@ -2,7 +2,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.modules.members.domain.entities import Member, MemberColumn, MemberListResult, MemberWriteData
+from app.modules.members.domain.entities import (
+    ENABLED_STATE_ID,
+    Member,
+    MemberColumn,
+    MemberListResult,
+    MemberWriteData,
+    ProfileSelfUpdate,
+)
 
 
 class MemberColumnResponse(BaseModel):
@@ -164,3 +171,88 @@ class CredentialsResponse(BaseModel):
 class MessageResponse(BaseModel):
     message: str
     member: MemberResponse
+
+
+class ProfileSelfUpdateRequest(BaseModel):
+    names: str | None = None
+    lastname: str | None = None
+    identifier: str | None = None
+    email: EmailStr | None = None
+    birtday: str | None = None
+    blood_type: str | None = None
+    mobile_phone: str | None = None
+    fixed_phone: str | None = None
+    title_academic: str | None = None
+    level_academic: str | None = None
+    cod_senescyt: str | None = None
+    linkdink: str | None = None
+    want_notifications: bool | None = None
+    is_work: bool | None = None
+    province: str | None = None
+    city: str | None = None
+    street_principal: str | None = None
+    street_secondary: str | None = None
+    fourth_title: str | None = None
+    codigo_senescyt_cuarto: str | None = None
+    gender: str | None = None
+
+    def to_patch(self) -> ProfileSelfUpdate:
+        return ProfileSelfUpdate(
+            names=self.names,
+            lastname=self.lastname,
+            identifier=self.identifier,
+            email=str(self.email) if self.email is not None else None,
+            birtday=self.birtday,
+            blood_type=self.blood_type,
+            mobile_phone=self.mobile_phone,
+            fixed_phone=self.fixed_phone,
+            title_academic=self.title_academic,
+            level_academic=self.level_academic,
+            cod_senescyt=self.cod_senescyt,
+            linkdink=self.linkdink,
+            want_notifications=self.want_notifications,
+            is_work=self.is_work,
+            province=self.province,
+            city=self.city,
+            street_principal=self.street_principal,
+            street_secondary=self.street_secondary,
+            fourth_title=self.fourth_title,
+            codigo_senescyt_cuarto=self.codigo_senescyt_cuarto,
+            gender=self.gender,
+        )
+
+
+class PublicMemberResponse(BaseModel):
+    profile_id: int
+    names: str
+    lastname: str
+    identifier: str
+    title: str
+    mobile_phone: str
+    email: str
+    province: str | None
+    state_label: str
+    is_active: bool
+    foto_id: str
+    member_code: str
+
+    @classmethod
+    def from_domain(cls, member: Member) -> "PublicMemberResponse":
+        from app.modules.members.infrastructure.pdfs import member_code
+
+        title = (member.fourth_title or member.title_academic or "").strip()
+        profile_id = member.profile_id or member.user_id
+        return cls(
+            profile_id=profile_id,
+            names=member.names,
+            lastname=member.lastname,
+            identifier=member.identifier,
+            title=title,
+            mobile_phone=member.mobile_phone,
+            email=member.email,
+            province=member.province,
+            state_label="Miembro activo" if member.state_id == ENABLED_STATE_ID else "Miembro inactivo",
+            is_active=member.state_id == ENABLED_STATE_ID,
+            foto_id=member.foto_id,
+            member_code=member_code(member),
+        )

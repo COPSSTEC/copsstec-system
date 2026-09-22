@@ -39,6 +39,15 @@ class FakeMemberRepository:
     def get_member(self, user_id: int) -> Member | None:
         return self.members.get(user_id)
 
+    def get_profile_by_user_id(self, user_id: int) -> Member | None:
+        return self.members.get(user_id)
+
+    def get_profile_by_id(self, profile_id: int) -> Member | None:
+        for member in self.members.values():
+            if member.profile_id == profile_id:
+                return member
+        return None
+
     def create_member(self, data: MemberWriteData, password_hash: str) -> Member:
         user_id = self.next_id
         self.next_id += 1

@@ -281,7 +281,25 @@ def download_member_file(
     use_case: Annotated[DownloadMemberPdfUseCase, Depends(get_download_pdf_use_case)],
 ) -> Response:
     try:
-        filename, content = use_case.execute(member_id, "download")
+        filename, content = use_case.execute(member_id, "carnet")
+    except MemberNotFoundError as exc:
+        raise _http_error(exc) from exc
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{member_id}/certificate")
+def download_member_certificate(
+    member_id: int,
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[DownloadMemberPdfUseCase, Depends(get_download_pdf_use_case)],
+) -> Response:
+    try:
+        filename, content = use_case.execute(member_id, "certificate")
     except MemberNotFoundError as exc:
         raise _http_error(exc) from exc
 

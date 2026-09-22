@@ -166,3 +166,28 @@ class MemberWriteData:
     codigo_senescyt_cuarto: str | None = None
     gender: str | None = None
     state_id: int = ENABLED_STATE_ID
+
+
+@dataclass(frozen=True)
+class ProfileSelfUpdate:
+    names: str | None = None
+    lastname: str | None = None
+    identifier: str | None = None
+    email: str | None = None
+    birtday: str | None = None
+    blood_type: str | None = None
+    mobile_phone: str | None = None
+    fixed_phone: str | None = None
+    title_academic: str | None = None
+    level_academic: str | None = None
+    cod_senescyt: str | None = None
+    linkdink: str | None = None
+    want_notifications: bool | None = None
+    is_work: bool | None = None
+    province: str | None = None
+    city: str | None = None
+    street_principal: str | None = None
+    street_secondary: str | None = None
+    fourth_title: str | None = None
+    codigo_senescyt_cuarto: str | None = None
+    gender: str | None = None

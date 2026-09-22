@@ -38,14 +38,23 @@ class MemberRepository(Protocol):
     ) -> str | None:
         ...
 
+    def get_profile_by_user_id(self, user_id: int) -> Member | None:
+        ...
+
+    def get_profile_by_id(self, profile_id: int) -> Member | None:
+        ...
+
 
 class MemberNotifier(Protocol):
     def notify_credentials(self, email: str, password: str, full_name: str) -> None:
         ...
 
 
-class BlankPdfGenerator(Protocol):
-    def generate(self, title: str) -> bytes:
+class MemberDocumentGenerator(Protocol):
+    def generate_certificate(self, member: Member, verify_url: str) -> bytes:
+        ...
+
+    def generate_carnet(self, member: Member, verify_url: str) -> bytes:
         ...
 
 

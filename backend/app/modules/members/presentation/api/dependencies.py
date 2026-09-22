@@ -9,14 +9,16 @@ from app.modules.members.application.use_cases import (
     DeleteMemberUseCase,
     DownloadMemberPdfUseCase,
     GetMemberUseCase,
+    GetPublicMemberUseCase,
     ListMembersUseCase,
     ResendMemberCredentialsUseCase,
     SetMemberStateUseCase,
     UpdateMemberPhotoUseCase,
     UpdateMemberUseCase,
+    UpdateMyProfileUseCase,
 )
 from app.modules.members.infrastructure.notifications import LogMemberNotifier
-from app.modules.members.infrastructure.pdfs import BlankMemberPdfGenerator
+from app.modules.members.infrastructure.pdfs import MemberDocumentGenerator
 from app.modules.members.infrastructure.photos import LocalMemberPhotoStorage
 from app.modules.members.infrastructure.repository import SqlAlchemyMemberRepository
 from app.modules.membership.infrastructure.email import SmtpOrLogEmailSender
@@ -33,8 +35,8 @@ def get_member_notifier() -> LogMemberNotifier:
     return LogMemberNotifier()
 
 
-def get_blank_pdf_generator() -> BlankMemberPdfGenerator:
-    return BlankMemberPdfGenerator()
+def get_member_document_generator() -> MemberDocumentGenerator:
+    return MemberDocumentGenerator()
 
 
 def get_list_members_use_case(
@@ -97,6 +99,18 @@ def get_update_member_photo_use_case(
 
 def get_download_pdf_use_case(
     repository: Annotated[SqlAlchemyMemberRepository, Depends(get_member_repository)],
-    pdf_generator: Annotated[BlankMemberPdfGenerator, Depends(get_blank_pdf_generator)],
+    pdf_generator: Annotated[MemberDocumentGenerator, Depends(get_member_document_generator)],
 ) -> DownloadMemberPdfUseCase:
     return DownloadMemberPdfUseCase(repository, pdf_generator)
+
+
+def get_update_my_profile_use_case(
+    repository: Annotated[SqlAlchemyMemberRepository, Depends(get_member_repository)],
+) -> UpdateMyProfileUseCase:
+    return UpdateMyProfileUseCase(repository)
+
+
+def get_get_public_member_use_case(
+    repository: Annotated[SqlAlchemyMemberRepository, Depends(get_member_repository)],
+) -> GetPublicMemberUseCase:
+    return GetPublicMemberUseCase(repository)

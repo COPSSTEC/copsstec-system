@@ -10,6 +10,10 @@ from app.modules.blogs.presentation.api.router import router as blogs_router
 from app.modules.courses.presentation.api.router import router as courses_router
 from app.modules.dashboard.presentation.api.router import router as dashboard_router
 from app.modules.documents.presentation.api.router import router as documents_router
+from app.modules.members.presentation.api.profile_router import (
+    profile_router,
+    public_members_router,
+)
 from app.modules.members.presentation.api.router import router as members_router
 from app.modules.notices.presentation.api.router import router as notices_router
 from app.modules.membership.presentation.api.router import router as membership_router
@@ -38,6 +42,8 @@ app.include_router(courses_router)
 app.include_router(dashboard_router)
 app.include_router(documents_router)
 app.include_router(members_router)
+app.include_router(profile_router)
+app.include_router(public_members_router)
 app.include_router(notices_router)
 app.include_router(membership_router)
 app.include_router(partners_router)
