@@ -11,6 +11,7 @@ import { UserAvatar } from "@/shared/components/user-avatar";
 interface AppHeaderProps {
   user: User | null;
   onMenuToggle: () => void;
+  onNavigate?: (href: string) => void;
   variant?: "default" | "bulletin";
 }
 
@@ -38,7 +39,7 @@ function formatHeaderDate(value: Date) {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-export function AppHeader({ user, onMenuToggle, variant = "default" }: AppHeaderProps) {
+export function AppHeader({ user, onMenuToggle, onNavigate, variant = "default" }: AppHeaderProps) {
   const router = useRouter();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -97,7 +98,9 @@ export function AppHeader({ user, onMenuToggle, variant = "default" }: AppHeader
           event.preventDefault();
           const query = search.trim();
           const target = user?.access_level === "admin" ? "/admin/miembros" : "/dashboard";
-          router.push(query ? `${target}?q=${encodeURIComponent(query)}` : target);
+          const href = query ? `${target}?q=${encodeURIComponent(query)}` : target;
+          onNavigate?.(href);
+          router.push(href);
         }}
       >
         <svg fill="none" height="18" viewBox="0 0 24 24" width="18">
@@ -181,22 +184,6 @@ export function AppHeader({ user, onMenuToggle, variant = "default" }: AppHeader
                   <p className="muted">{user?.email ?? ""}</p>
                 </div>
               </div>
-              {variant === "bulletin" ? (
-                <>
-                  <Link href="/mi-espacio/cursos" onClick={() => setIsUserMenuOpen(false)}>
-                    Mis cursos
-                  </Link>
-                  <Link href="/mi-espacio/pagos" onClick={() => setIsUserMenuOpen(false)}>
-                    Mis pagos
-                  </Link>
-                  <Link href="/mi-espacio" onClick={() => setIsUserMenuOpen(false)}>
-                    Mi espacio
-                  </Link>
-                  <Link href="/mi-espacio/votaciones" onClick={() => setIsUserMenuOpen(false)}>
-                    Votaciones
-                  </Link>
-                </>
-              ) : null}
               <Link href="/profile" onClick={() => setIsUserMenuOpen(false)}>
                 Ver mi perfil
               </Link>

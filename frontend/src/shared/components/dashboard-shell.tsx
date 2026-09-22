@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { AccessPolicy, User } from "@/modules/auth/domain/types";
@@ -11,9 +11,19 @@ import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 import { AppHeader } from "@/shared/components/app-header";
 import { AppSidebar } from "@/shared/components/app-sidebar";
+import { RouteLoader } from "@/shared/components/route-loader";
 
 interface DashboardShellProps {
   children: ReactNode;
+}
+
+function isInternalHref(href: string) {
+  return href.startsWith("/") && !href.startsWith("//");
+}
+
+function sameLocation(href: string, pathname: string) {
+  const [path] = href.split("?");
+  return path === pathname;
 }
 
 export function DashboardShell({ children }: DashboardShellProps) {
@@ -23,6 +33,8 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const [accessPolicy, setAccessPolicy] = useState<AccessPolicy | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRouting, setIsRouting] = useState(false);
+  const hideTimer = useRef(0);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -67,29 +79,82 @@ export function DashboardShell({ children }: DashboardShellProps) {
     void loadSession();
   }, [router]);
 
-  if (isLoading) {
-    return <main className="main">Cargando sesión...</main>;
+  function startRouting(href?: string) {
+    if (href && sameLocation(href, pathname)) {
+      return;
+    }
+
+    window.clearTimeout(hideTimer.current);
+    setIsRouting(true);
   }
 
-  const isBulletin = user?.access_level === "member" && pathname === "/dashboard";
+  useEffect(() => {
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setIsRouting(false), 320);
+    return () => window.clearTimeout(hideTimer.current);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isRouting) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setIsRouting(false), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [isRouting]);
+
+  function handleShellClick(event: MouseEvent<HTMLDivElement>) {
+    const link = (event.target as HTMLElement).closest("a[href]");
+    if (!(link instanceof HTMLAnchorElement)) {
+      return;
+    }
+
+    if (link.target === "_blank" || link.hasAttribute("download") || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+
+    const href = link.getAttribute("href");
+    if (!href || !isInternalHref(href) || href.startsWith("#")) {
+      return;
+    }
+
+    startRouting(href);
+  }
+
+  if (isLoading) {
+    return (
+      <main className="main app-session-loading">
+        <RouteLoader label="Cargando sesión" />
+      </main>
+    );
+  }
 
   return (
     <div
-      className={`app-shell ${isBulletin ? "app-shell-bulletin" : ""} ${isSidebarOpen ? "is-sidebar-open" : ""}`}
+      className={`app-shell ${isSidebarOpen ? "is-sidebar-open" : ""} ${isRouting ? "is-routing" : ""}`}
+      onClickCapture={handleShellClick}
     >
+      <div className={`app-route-bar ${isRouting ? "is-active" : ""}`} />
       <AppSidebar
         accessLevel={user?.access_level ?? "restricted"}
         isOpen={isSidebarOpen}
         navigation={accessPolicy?.navigation ?? []}
         onClose={() => setIsSidebarOpen(false)}
+        onNavigate={startRouting}
       />
       <div className="app-shell-main">
         <AppHeader
           onMenuToggle={() => setIsSidebarOpen((open) => !open)}
+          onNavigate={startRouting}
           user={user}
-          variant={isBulletin ? "bulletin" : "default"}
+          variant={user?.access_level === "member" ? "bulletin" : "default"}
         />
-        <main className="main">{children}</main>
+        <main className="main">
+          <div className="app-module" key={pathname}>
+            {children}
+          </div>
+          {isRouting ? <RouteLoader /> : null}
+        </main>
       </div>
     </div>
   );

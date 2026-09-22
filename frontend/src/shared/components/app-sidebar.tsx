@@ -22,10 +22,28 @@ interface AppSidebarProps {
   accessLevel: AccessLevel;
   isOpen: boolean;
   onClose: () => void;
+  onNavigate?: (href: string) => void;
 }
 
-function isActivePath(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function flattenHrefs(items: NavigationItem[]): string[] {
+  return items.flatMap((item) => [item.href, ...flattenHrefs(item.children ?? [])]);
+}
+
+function isActivePath(pathname: string, href: string, allHrefs: string[] = []) {
+  if (pathname === href) {
+    return true;
+  }
+
+  if (!pathname.startsWith(`${href}/`)) {
+    return false;
+  }
+
+  return !allHrefs.some(
+    (other) =>
+      other !== href &&
+      other.length > href.length &&
+      (pathname === other || pathname.startsWith(`${other}/`)),
+  );
 }
 
 function SidebarChevron({ open }: { open: boolean }) {
@@ -51,16 +69,20 @@ function SidebarItem({
   item,
   pathname,
   onClose,
+  onNavigate,
+  allHrefs,
 }: {
   item: NavigationItem;
   pathname: string;
   onClose: () => void;
+  onNavigate?: (href: string) => void;
+  allHrefs: string[];
 }) {
   const router = useRouter();
   const children = item.children ?? [];
   const hasChildren = children.length > 0;
-  const childActive = children.some((child) => isActivePath(pathname, child.href));
-  const groupActive = childActive || isActivePath(pathname, item.href);
+  const childActive = children.some((child) => isActivePath(pathname, child.href, allHrefs));
+  const groupActive = childActive || isActivePath(pathname, item.href, allHrefs);
   const [open, setOpen] = useState(groupActive);
 
   useEffect(() => {
@@ -72,7 +94,7 @@ function SidebarItem({
   if (!hasChildren) {
     return (
       <Link
-        aria-current={isActivePath(pathname, item.href) ? "page" : undefined}
+        aria-current={isActivePath(pathname, item.href, allHrefs) ? "page" : undefined}
         href={item.href}
         onClick={onClose}
       >
@@ -90,8 +112,10 @@ function SidebarItem({
         onClick={() => {
           const next = !open;
           setOpen(next);
-          if (next && !isActivePath(pathname, item.href)) {
-            router.push(children[0]?.href || item.href);
+          if (next && !isActivePath(pathname, item.href, allHrefs)) {
+            const href = children[0]?.href || item.href;
+            onNavigate?.(href);
+            router.push(href);
           }
         }}
         type="button"
@@ -104,7 +128,7 @@ function SidebarItem({
         <div className="app-sidebar-subnav">
           {children.map((child) => (
             <Link
-              aria-current={isActivePath(pathname, child.href) ? "page" : undefined}
+              aria-current={isActivePath(pathname, child.href, allHrefs) ? "page" : undefined}
               href={child.href}
               key={child.href}
               onClick={onClose}
@@ -118,8 +142,9 @@ function SidebarItem({
   );
 }
 
-export function AppSidebar({ navigation, accessLevel, isOpen, onClose }: AppSidebarProps) {
+export function AppSidebar({ navigation, accessLevel, isOpen, onClose, onNavigate }: AppSidebarProps) {
   const pathname = usePathname();
+  const allHrefs = flattenHrefs(navigation);
 
   return (
     <>
@@ -141,7 +166,14 @@ export function AppSidebar({ navigation, accessLevel, isOpen, onClose }: AppSide
 
           <nav aria-label="Navegación principal" className="app-sidebar-nav">
             {navigation.map((item) => (
-              <SidebarItem item={item} key={item.href} onClose={onClose} pathname={pathname} />
+              <SidebarItem
+                allHrefs={allHrefs}
+                item={item}
+                key={item.href}
+                onClose={onClose}
+                onNavigate={onNavigate}
+                pathname={pathname}
+              />
             ))}
           </nav>
 
