@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import type { AccessPolicy, User } from "@/modules/auth/domain/types";
@@ -34,7 +34,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isRouting, setIsRouting] = useState(false);
-  const hideTimer = useRef(0);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -81,17 +80,15 @@ export function DashboardShell({ children }: DashboardShellProps) {
 
   function startRouting(href?: string) {
     if (href && sameLocation(href, pathname)) {
+      setIsRouting(false);
       return;
     }
 
-    window.clearTimeout(hideTimer.current);
     setIsRouting(true);
   }
 
   useEffect(() => {
-    window.clearTimeout(hideTimer.current);
-    hideTimer.current = window.setTimeout(() => setIsRouting(false), 320);
-    return () => window.clearTimeout(hideTimer.current);
+    setIsRouting(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -99,7 +96,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
       return;
     }
 
-    const timeout = window.setTimeout(() => setIsRouting(false), 8000);
+    const timeout = window.setTimeout(() => setIsRouting(false), 2500);
     return () => window.clearTimeout(timeout);
   }, [isRouting]);
 
