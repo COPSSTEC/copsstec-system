@@ -6,6 +6,20 @@ from app.modules.documents.domain.exceptions import InvalidDocumentFileError
 
 ALLOWED_CONTENT_TYPES = {"application/pdf"}
 MAX_PDF_BYTES = 20 * 1024 * 1024
+MEDIA_PREFIX = "/media/member-documents/"
+
+
+def document_file_size(file_path: str | None, base_path: str = "storage/member-documents") -> int | None:
+    if not file_path or not file_path.startswith(MEDIA_PREFIX):
+        return None
+    relative = Path(file_path[len(MEDIA_PREFIX) :])
+    if relative.is_absolute() or ".." in relative.parts:
+        return None
+    root = Path(base_path).resolve()
+    target = (root / relative).resolve()
+    if not str(target).startswith(str(root)) or not target.is_file():
+        return None
+    return target.stat().st_size
 
 
 class LocalMemberDocumentStorage:

@@ -16,6 +16,7 @@ export interface MemberDocument {
   original_filename?: string | null;
   available: boolean;
   updated_at?: string | null;
+  file_size?: number | null;
 }
 
 export function documentFileSrc(path: string | null | undefined): string | null {

@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.modules.documents.domain.entities import MemberDocument
+from app.modules.documents.infrastructure.files import document_file_size
 
 
 class MemberDocumentResponse(BaseModel):
@@ -12,6 +13,7 @@ class MemberDocumentResponse(BaseModel):
     original_filename: str | None
     available: bool
     updated_at: datetime | None
+    file_size: int | None = None
 
     @classmethod
     def from_domain(cls, document: MemberDocument) -> "MemberDocumentResponse":
@@ -22,4 +24,5 @@ class MemberDocumentResponse(BaseModel):
             original_filename=document.original_filename,
             available=document.available,
             updated_at=document.updated_at,
+            file_size=document_file_size(document.file_path),
         )
