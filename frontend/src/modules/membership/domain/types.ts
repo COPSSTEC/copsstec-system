@@ -19,6 +19,11 @@ export interface MembershipStatus {
   must_wait_approval: boolean;
   has_signed_authorization: boolean;
   has_identity_document: boolean;
+  has_signed_solicitud?: boolean;
+  accepted_affiliation_year?: boolean;
+  member_account_type?: string;
+  member_account_number?: string;
+  member_bank_name?: string;
   gate: MembershipGate;
   payment_status: string | null;
   state_id: number;
@@ -58,6 +63,7 @@ export interface ApprovalPreview {
   voucher_url: string | null;
   signed_authorization_url: string | null;
   identity_document_url: string | null;
+  signed_solicitud_url?: string | null;
   amount: string;
 }
 
@@ -142,7 +148,12 @@ export function membershipRedirect(gate: MembershipGate): string {
 
 export function membershipPathForStatus(status: MembershipStatus): string {
   if (status.state_id === 2) {
-    const documentsReady = Boolean(status.has_signed_authorization && status.has_identity_document);
+    const documentsReady = Boolean(
+      status.has_signed_authorization &&
+        status.has_identity_document &&
+        status.has_signed_solicitud &&
+        status.accepted_affiliation_year,
+    );
     if (status.gate === "pending_approval" || (status.payment_status === "pending_review" && documentsReady)) {
       return "/afiliacion/en-revision";
     }

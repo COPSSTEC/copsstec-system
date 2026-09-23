@@ -1,0 +1,19 @@
+[Unit]
+Description=COPSSTEC Next.js frontend
+After=network.target copsstec-backend.service
+
+[Service]
+Type=simple
+User=copsstec
+Group=copsstec
+WorkingDirectory=/var/www/copsstec-system/frontend
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=PATH=/usr/bin:/usr/local/bin:/bin
+ExecStart=/usr/bin/node /var/www/copsstec-system/frontend/node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

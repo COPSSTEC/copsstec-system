@@ -45,11 +45,22 @@ class MembershipRepository(Protocol):
     def save_voucher(self, user_id: int, voucher_path: str) -> MembershipPayment:
         ...
 
+    def save_bank_details(
+        self,
+        user_id: int,
+        account_type: str,
+        account_number: str,
+        bank_name: str,
+    ) -> MembershipPayment:
+        ...
+
     def save_onboarding_documents(
         self,
         user_id: int,
         signed_authorization_path: str | None,
         identity_document_path: str | None,
+        signed_solicitud_path: str | None = None,
+        accepted_affiliation_year: bool | None = None,
     ) -> MembershipPayment:
         ...
 
@@ -104,6 +115,9 @@ class AuthorizationPdfGenerator(Protocol):
         identifier: str,
         city: str,
         issued_on: date,
+        account_type: str = "",
+        account_number: str = "",
+        bank_name: str = "",
     ) -> bytes:
         ...
 

@@ -163,7 +163,7 @@ def _write_data(**overrides: object) -> MemberWriteData:
     data = MemberWriteData(
         names="Ana",
         lastname="Pérez",
-        identifier="0102030405",
+        identifier="1710034065",
         email="ana@example.com",
         login_email="ana.login@example.com",
         birtday="01/01/1990",
@@ -182,6 +182,17 @@ def test_create_member_generates_password_and_notifies() -> None:
     assert password
     assert verify_password(password, repository.passwords[member.user_id])
     assert notifier.sent[0][0] == "ana.login@example.com"
+
+
+def test_create_member_rejects_invalid_cedula() -> None:
+    repository = FakeMemberRepository()
+    notifier = FakeNotifier()
+    try:
+        CreateMemberUseCase(repository, notifier).execute(_write_data(identifier="1710034066"))
+    except MemberValidationError as exc:
+        assert "cédula" in str(exc).lower() or "cedula" in str(exc).lower()
+    else:
+        raise AssertionError("Expected invalid cedula to fail")
 
 
 def test_create_member_rejects_duplicate_identifier() -> None:

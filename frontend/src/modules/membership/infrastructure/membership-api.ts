@@ -8,7 +8,17 @@ import type {
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 interface ApiErrorBody {
-  detail?: string;
+  detail?: string | { message?: string; code?: string };
+}
+
+export class MembershipApiError extends Error {
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "MembershipApiError";
+    this.code = code;
+  }
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -20,13 +30,19 @@ async function parseResponse<T>(response: Response): Promise<T> {
   }
 
   let message = "No fue posible completar la solicitud.";
+  let code: string | undefined;
   try {
     const body = (await response.json()) as ApiErrorBody;
-    message = typeof body.detail === "string" ? body.detail : message;
+    if (typeof body.detail === "string") {
+      message = body.detail;
+    } else if (body.detail && typeof body.detail === "object") {
+      message = body.detail.message || message;
+      code = body.detail.code;
+    }
   } catch {
     message = response.statusText || message;
   }
-  throw new Error(message);
+  throw new MembershipApiError(message, code);
 }
 
 function authHeaders(token: string): HeadersInit {
@@ -121,8 +137,20 @@ export async function downloadMembershipInvoice(token: string): Promise<void> {
   window.URL.revokeObjectURL(url);
 }
 
-export async function downloadAuthorizationPdf(token: string): Promise<void> {
-  const response = await fetch(`${API_URL}/api/membership/authorization-pdf`, {
+export async function saveBankDetails(
+  token: string,
+  details: { account_type: string; account_number: string; bank_name: string },
+): Promise<MembershipStatus> {
+  const response = await fetch(`${API_URL}/api/membership/bank-details`, {
+    method: "PUT",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify(details),
+  });
+  return parseResponse<MembershipStatus>(response);
+}
+
+async function downloadPdfFile(token: string, path: string, filename: string): Promise<void> {
+  const response = await fetch(`${API_URL}${path}`, {
     headers: authHeaders(token),
   });
   if (!response.ok) {
@@ -133,18 +161,33 @@ export async function downloadAuthorizationPdf(token: string): Promise<void> {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "autorizacion-debito-copsstec.pdf";
+  link.download = filename;
   link.click();
   window.URL.revokeObjectURL(url);
 }
 
+export async function downloadAuthorizationPdf(token: string): Promise<void> {
+  await downloadPdfFile(token, "/api/membership/authorization-pdf", "autorizacion-debito-copsstec.pdf");
+}
+
+export async function downloadSolicitudPdf(token: string): Promise<void> {
+  await downloadPdfFile(token, "/api/membership/solicitud-pdf", "solicitud-afiliacion-copsstec.pdf");
+}
+
 export async function uploadOnboardingDocuments(
   token: string,
-  files: { signedAuthorization?: File; identityDocument?: File },
+  files: {
+    signedAuthorization?: File;
+    identityDocument?: File;
+    signedSolicitud?: File;
+    acceptedAffiliationYear?: boolean;
+  },
 ): Promise<{
   status: string;
   has_signed_authorization: boolean;
   has_identity_document: boolean;
+  has_signed_solicitud?: boolean;
+  accepted_affiliation_year?: boolean;
   gate: string;
   message: string;
 }> {
@@ -155,6 +198,10 @@ export async function uploadOnboardingDocuments(
   if (files.identityDocument) {
     body.append("identity_document", files.identityDocument);
   }
+  if (files.signedSolicitud) {
+    body.append("signed_solicitud", files.signedSolicitud);
+  }
+  body.append("accepted_affiliation_year", String(Boolean(files.acceptedAffiliationYear)));
   const response = await fetch(`${API_URL}/api/membership/onboarding-documents`, {
     method: "POST",
     headers: authHeaders(token),
@@ -187,12 +234,13 @@ export async function approveMember(
 export async function downloadOnboardingDocument(
   token: string,
   memberId: number,
-  kind: "authorization" | "identity" | "voucher",
+  kind: "authorization" | "identity" | "voucher" | "solicitud",
 ): Promise<void> {
   const filenames = {
     authorization: "autorizacion-firmada.pdf",
     identity: "cedula.pdf",
     voucher: "comprobante",
+    solicitud: "solicitud-firmada.pdf",
   };
   const response = await fetch(`${API_URL}/api/members/${memberId}/onboarding-documents/${kind}`, {
     headers: authHeaders(token),

@@ -16,8 +16,10 @@ from app.modules.membership.application.ports import (
     MembershipRepository,
     RecordAffiliationPaymentPort,
 )
+from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula
 from app.modules.membership.domain.corporate_email import is_corporate_email, suggest_corporate_email
 from app.modules.membership.domain.entities import (
+    ACCOUNT_TYPES,
     BLOOD_TYPES,
     ENABLED_STATE_ID,
     GATE_DOCUMENTS,
@@ -67,6 +69,9 @@ def _validate_registration(data: MembershipRegistrationData) -> None:
     if missing:
         raise MembershipValidationError(f"Campos obligatorios: {', '.join(missing)}.")
 
+    if not is_valid_ecuadorian_cedula(data.identifier):
+        raise MembershipValidationError(CEDULA_INVALID_MESSAGE)
+
     if not data.accept_birthday_notifications or not data.accept_data_policy:
         raise MembershipValidationError("Debe aceptar las notificaciones de cumpleaños y la política de tratamiento de datos.")
 
@@ -114,7 +119,8 @@ class RegisterMembershipUseCase:
 
         conflict = self.repository.find_conflict(data.identifier.strip(), data.email.strip())
         if conflict:
-            raise MembershipConflictError(conflict)
+            code = "identifier_taken" if "cédula" in conflict.lower() else "email_taken"
+            raise MembershipConflictError(conflict, code=code)
 
         settings = get_settings()
         member = self.repository.register_member(
@@ -199,7 +205,10 @@ class GetMembershipStatusUseCase:
             status.state_id,
             status.payment_status,
             status.has_invoice,
-            status.has_signed_authorization and status.has_identity_document,
+            status.has_signed_authorization
+            and status.has_identity_document
+            and status.has_signed_solicitud
+            and status.accepted_affiliation_year,
         )
         if gate == GATE_NONE:
             gate = apply_subscription_gate(
@@ -314,6 +323,7 @@ class GetApprovalPreviewUseCase:
             "voucher_url": payment.voucher_path,
             "signed_authorization_url": payment.signed_authorization_path,
             "identity_document_url": payment.identity_document_path,
+            "signed_solicitud_url": payment.signed_solicitud_path,
             "amount": str(payment.amount),
         }
 
@@ -350,8 +360,15 @@ class ApproveMembershipUseCase:
         payment = self.repository.get_payment(user_id)
         if payment is None:
             raise MembershipNotFoundError()
-        if not onboarding_documents_complete(payment.signed_authorization_path, payment.identity_document_path):
-            raise MembershipValidationError("Faltan la autorización firmada y/o la copia de cédula.")
+        if not onboarding_documents_complete(
+            payment.signed_authorization_path,
+            payment.identity_document_path,
+            payment.signed_solicitud_path,
+            payment.accepted_affiliation_year,
+        ):
+            raise MembershipValidationError(
+                "Faltan la autorización firmada, la cédula, la solicitud firmada o la aceptación de afiliación por 1 año.",
+            )
 
         from datetime import UTC, datetime
 
@@ -422,13 +439,80 @@ class DownloadAuthorizationPdfUseCase:
         if status is None:
             raise MembershipNotFoundError()
 
+        account_type = (payment.member_account_type or "").strip()
+        account_number = (payment.member_account_number or "").strip()
+        bank_name = (payment.member_bank_name or "").strip()
+        if account_type not in ACCOUNT_TYPES or not account_number or not bank_name:
+            raise MembershipValidationError(
+                "Debes registrar el tipo de cuenta, el número y la entidad bancaria antes de descargar la autorización.",
+            )
+
         return self.pdf_generator.generate(
             names=status.names,
             lastname=status.lastname,
             identifier=status.identifier,
             city=status.city,
             issued_on=today or date.today(),
+            account_type=account_type,
+            account_number=account_number,
+            bank_name=bank_name,
         )
+
+
+class SaveBankDetailsUseCase:
+    def __init__(self, repository: MembershipRepository) -> None:
+        self.repository = repository
+
+    def execute(
+        self,
+        user_id: int,
+        account_type: str,
+        account_number: str,
+        bank_name: str,
+    ) -> MembershipStatus:
+        payment = self.repository.get_payment(user_id)
+        if payment is None:
+            raise MembershipNotFoundError()
+        if payment.status == PAYMENT_APPROVED:
+            raise MembershipForbiddenError("Tu afiliación ya fue aprobada.")
+        if payment.status != PAYMENT_REVIEW:
+            raise MembershipForbiddenError("Debes subir el comprobante de pago antes de registrar los datos bancarios.")
+
+        kind = account_type.strip().capitalize()
+        if kind == "Ahorro":
+            kind = "Ahorros"
+        if kind not in ACCOUNT_TYPES:
+            raise MembershipValidationError("El tipo de cuenta debe ser Corriente o Ahorros.")
+        number = "".join(character for character in account_number if character.isdigit() or character.isalnum())
+        bank = bank_name.strip()
+        if len(number) < 6:
+            raise MembershipValidationError("El número de cuenta es obligatorio.")
+        if len(bank) < 3:
+            raise MembershipValidationError("La entidad bancaria es obligatoria.")
+
+        self.repository.save_bank_details(user_id, kind, number.strip(), bank)
+        status = self.repository.get_status(user_id)
+        if status is None:
+            raise MembershipNotFoundError()
+        return status
+
+
+class DownloadSolicitudPdfUseCase:
+    def __init__(self, member_lookup, pdf_generator, membership_repository: MembershipRepository) -> None:
+        self.member_lookup = member_lookup
+        self.pdf_generator = pdf_generator
+        self.membership_repository = membership_repository
+
+    def execute(self, user_id: int) -> bytes:
+        payment = self.membership_repository.get_payment(user_id)
+        if payment is None:
+            raise MembershipNotFoundError()
+        if payment.status != PAYMENT_REVIEW:
+            raise MembershipForbiddenError("La solicitud solo está disponible después de subir el comprobante.")
+        member = self.member_lookup.get_member(user_id)
+        if member is None:
+            raise MembershipNotFoundError()
+        return self.pdf_generator.generate_solicitud(member)
 
 
 class UploadOnboardingDocumentsUseCase:
@@ -441,6 +525,8 @@ class UploadOnboardingDocumentsUseCase:
         user_id: int,
         signed_authorization: tuple[str, bytes, str] | None,
         identity_document: tuple[str, bytes, str] | None,
+        signed_solicitud: tuple[str, bytes, str] | None = None,
+        accepted_affiliation_year: bool | None = None,
     ) -> tuple[MembershipPayment, MembershipStatus]:
         payment = self.repository.get_payment(user_id)
         if payment is None:
@@ -452,26 +538,42 @@ class UploadOnboardingDocumentsUseCase:
 
         auth_upload = signed_authorization if signed_authorization and signed_authorization[1] else None
         identity_upload = identity_document if identity_document and identity_document[1] else None
-        if auth_upload is None and identity_upload is None:
-            raise MembershipValidationError("Debe adjuntar al menos un archivo PDF.")
+        solicitud_upload = signed_solicitud if signed_solicitud and signed_solicitud[1] else None
+        if auth_upload is None and identity_upload is None and solicitud_upload is None and accepted_affiliation_year is None:
+            raise MembershipValidationError("Debe adjuntar al menos un archivo PDF o aceptar la afiliación de 1 año.")
 
         has_signed = bool((payment.signed_authorization_path or "").strip())
         has_identity = bool((payment.identity_document_path or "").strip())
+        has_solicitud = bool((payment.signed_solicitud_path or "").strip())
         if not has_signed and auth_upload is None:
             raise MembershipValidationError("La autorización firmada es obligatoria.")
         if not has_identity and identity_upload is None:
             raise MembershipValidationError("La copia de cédula es obligatoria.")
+        if not has_solicitud and solicitud_upload is None:
+            raise MembershipValidationError("La solicitud firmada a mano es obligatoria.")
+        if not payment.accepted_affiliation_year and not accepted_affiliation_year:
+            raise MembershipValidationError("Debes aceptar permanecer afiliado 1 año al colegio.")
 
         signed_path = None
         identity_path = None
+        solicitud_path = None
         if auth_upload is not None:
             filename, content, content_type = auth_upload
             signed_path = self.storage.save_pdf(user_id, "authorization", filename, content, content_type)
         if identity_upload is not None:
             filename, content, content_type = identity_upload
             identity_path = self.storage.save_pdf(user_id, "identity", filename, content, content_type)
+        if solicitud_upload is not None:
+            filename, content, content_type = solicitud_upload
+            solicitud_path = self.storage.save_pdf(user_id, "solicitud", filename, content, content_type)
 
-        updated = self.repository.save_onboarding_documents(user_id, signed_path, identity_path)
+        updated = self.repository.save_onboarding_documents(
+            user_id,
+            signed_path,
+            identity_path,
+            solicitud_path,
+            True if accepted_affiliation_year else None,
+        )
         status = self.repository.get_status(user_id)
         if status is None:
             raise MembershipNotFoundError()
@@ -483,7 +585,7 @@ class DownloadOnboardingDocumentUseCase:
         self.repository = repository
 
     def execute(self, user_id: int, kind: str) -> tuple[str, Path]:
-        if kind not in {"authorization", "identity", "voucher"}:
+        if kind not in {"authorization", "identity", "voucher", "solicitud"}:
             raise MembershipValidationError("Documento no válido.")
         payment = self.repository.get_payment(user_id)
         if payment is None:
@@ -492,6 +594,7 @@ class DownloadOnboardingDocumentUseCase:
             "authorization": payment.signed_authorization_path,
             "identity": payment.identity_document_path,
             "voucher": payment.voucher_path,
+            "solicitud": payment.signed_solicitud_path,
         }[kind]
         if not (stored or "").strip():
             raise MembershipNotFoundError()
@@ -511,5 +614,6 @@ class DownloadOnboardingDocumentUseCase:
             "authorization": f"autorizacion-firmada{suffix}",
             "identity": f"cedula{suffix}",
             "voucher": f"comprobante{suffix}",
+            "solicitud": f"solicitud-firmada{suffix}",
         }
         return filenames[kind], file_path

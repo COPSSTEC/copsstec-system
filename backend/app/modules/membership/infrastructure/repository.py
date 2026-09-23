@@ -243,6 +243,11 @@ class SqlAlchemyMembershipRepository:
                     mp.status AS payment_status,
                     mp.signed_authorization_path,
                     mp.identity_document_path,
+                    mp.signed_solicitud_path,
+                    COALESCE(mp.accepted_affiliation_year, false) AS accepted_affiliation_year,
+                    COALESCE(mp.member_account_type, '') AS member_account_type,
+                    COALESCE(mp.member_account_number, '') AS member_account_number,
+                    COALESCE(mp.member_bank_name, '') AS member_bank_name,
                     EXISTS(
                         SELECT 1 FROM membership_invoices mi WHERE mi.user_id = u.id
                     ) AS has_invoice,
@@ -274,9 +279,17 @@ class SqlAlchemyMembershipRepository:
         has_invoice = bool(row["has_invoice"])
         signed_path = row["signed_authorization_path"]
         identity_path = row["identity_document_path"]
+        solicitud_path = row["signed_solicitud_path"]
+        accepted_year = bool(row["accepted_affiliation_year"])
         has_signed = bool((signed_path or "").strip())
         has_identity = bool((identity_path or "").strip())
-        documents_ok = onboarding_documents_complete(signed_path, identity_path)
+        has_solicitud = bool((solicitud_path or "").strip())
+        documents_ok = onboarding_documents_complete(
+            signed_path,
+            identity_path,
+            solicitud_path,
+            accepted_year,
+        )
         gate = membership_gate_from_payment(state_id, payment_status, has_invoice, documents_ok)
         return MembershipStatus(
             user_id=int(row["user_id"]),
@@ -299,6 +312,11 @@ class SqlAlchemyMembershipRepository:
             must_upload_documents=gate == GATE_DOCUMENTS,
             has_signed_authorization=has_signed,
             has_identity_document=has_identity,
+            has_signed_solicitud=has_solicitud,
+            accepted_affiliation_year=accepted_year,
+            member_account_type=row["member_account_type"] or "",
+            member_account_number=row["member_account_number"] or "",
+            member_bank_name=row["member_bank_name"] or "",
             city=row["city"] or "",
         )
 
@@ -309,7 +327,9 @@ class SqlAlchemyMembershipRepository:
                 SELECT id, user_id, profile_id, amount, currency, bank_name, account_type,
                        account_number, account_holder, account_ruc, reference, voucher_path,
                        status, reviewed_by, reviewed_at, signed_authorization_path,
-                       identity_document_path, documents_uploaded_at
+                       identity_document_path, documents_uploaded_at, member_account_type,
+                       member_account_number, member_bank_name, signed_solicitud_path,
+                       COALESCE(accepted_affiliation_year, false) AS accepted_affiliation_year
                 FROM membership_payments
                 WHERE user_id = :user_id
                 LIMIT 1
@@ -348,11 +368,48 @@ class SqlAlchemyMembershipRepository:
             raise MembershipNotFoundError()
         return payment
 
+    def save_bank_details(
+        self,
+        user_id: int,
+        account_type: str,
+        account_number: str,
+        bank_name: str,
+    ) -> MembershipPayment:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        updated = self.session.execute(
+            text(
+                """
+                UPDATE membership_payments
+                SET member_account_type = :account_type,
+                    member_account_number = :account_number,
+                    member_bank_name = :bank_name,
+                    updated_at = :now
+                WHERE user_id = :user_id
+                """,
+            ),
+            {
+                "account_type": account_type,
+                "account_number": account_number,
+                "bank_name": bank_name,
+                "now": now,
+                "user_id": user_id,
+            },
+        ).rowcount
+        if not updated:
+            raise MembershipNotFoundError()
+        self.session.commit()
+        payment = self.get_payment(user_id)
+        if payment is None:
+            raise MembershipNotFoundError()
+        return payment
+
     def save_onboarding_documents(
         self,
         user_id: int,
         signed_authorization_path: str | None,
         identity_document_path: str | None,
+        signed_solicitud_path: str | None = None,
+        accepted_affiliation_year: bool | None = None,
     ) -> MembershipPayment:
         now = datetime.now(UTC).replace(tzinfo=None)
         updated = self.session.execute(
@@ -361,11 +418,19 @@ class SqlAlchemyMembershipRepository:
                 UPDATE membership_payments
                 SET signed_authorization_path = COALESCE(:signed_authorization_path, signed_authorization_path),
                     identity_document_path = COALESCE(:identity_document_path, identity_document_path),
+                    signed_solicitud_path = COALESCE(:signed_solicitud_path, signed_solicitud_path),
+                    accepted_affiliation_year = CASE
+                        WHEN :accepted_affiliation_year IS NULL THEN accepted_affiliation_year
+                        ELSE :accepted_affiliation_year
+                    END,
                     documents_uploaded_at = CASE
                         WHEN COALESCE(:signed_authorization_path, signed_authorization_path) IS NOT NULL
                          AND COALESCE(:signed_authorization_path, signed_authorization_path) <> ''
                          AND COALESCE(:identity_document_path, identity_document_path) IS NOT NULL
                          AND COALESCE(:identity_document_path, identity_document_path) <> ''
+                         AND COALESCE(:signed_solicitud_path, signed_solicitud_path) IS NOT NULL
+                         AND COALESCE(:signed_solicitud_path, signed_solicitud_path) <> ''
+                         AND COALESCE(:accepted_affiliation_year, accepted_affiliation_year, false) = true
                         THEN :now
                         ELSE documents_uploaded_at
                     END,
@@ -376,6 +441,8 @@ class SqlAlchemyMembershipRepository:
             {
                 "signed_authorization_path": signed_authorization_path,
                 "identity_document_path": identity_document_path,
+                "signed_solicitud_path": signed_solicitud_path,
+                "accepted_affiliation_year": accepted_affiliation_year,
                 "now": now,
                 "user_id": user_id,
             },
@@ -542,4 +609,9 @@ class SqlAlchemyMembershipRepository:
             signed_authorization_path=row["signed_authorization_path"],
             identity_document_path=row["identity_document_path"],
             documents_uploaded_at=row["documents_uploaded_at"],
+            member_account_type=row.get("member_account_type"),
+            member_account_number=row.get("member_account_number"),
+            member_bank_name=row.get("member_bank_name"),
+            signed_solicitud_path=row.get("signed_solicitud_path"),
+            accepted_affiliation_year=bool(row.get("accepted_affiliation_year")),
         )

@@ -116,7 +116,7 @@ export function AdminElectionsPage({ section }: { section: AdminTab }) {
         {election ? (
           <>
             {section === "calendario" || section === "votantes" || section === "reportes" || section === "configuracion" ? null : (
-              <PeriodBar admin={admin} election={election} showPeriodActions={section === "configuracion"} />
+              <PeriodBar admin={admin} election={election} showPeriodActions={false} />
             )}
             {showGuide ? <GuideModal election={election} onClose={closeGuide} /> : null}
 

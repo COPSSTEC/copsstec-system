@@ -73,9 +73,11 @@ export function ApproveMemberModal({
   const hasVoucher = Boolean(preview?.voucher_url);
   const hasSignedAuthorization = Boolean(preview?.signed_authorization_url);
   const hasIdentityDocument = Boolean(preview?.identity_document_url);
-  const missingDocuments = Boolean(preview) && (!hasVoucher || !hasSignedAuthorization || !hasIdentityDocument);
+  const hasSignedSolicitud = Boolean(preview?.signed_solicitud_url);
+  const missingDocuments = Boolean(preview)
+    && (!hasVoucher || !hasSignedAuthorization || !hasIdentityDocument || !hasSignedSolicitud);
 
-  async function handleDownload(kind: "authorization" | "identity" | "voucher") {
+  async function handleDownload(kind: "authorization" | "identity" | "voucher" | "solicitud") {
     if (!token) {
       return;
     }
@@ -133,10 +135,17 @@ export function ApproveMemberModal({
               ) : (
                 <p className="muted">No hay copia de cédula.</p>
               )}
+              {hasSignedSolicitud ? (
+                <button className="secondary-button" onClick={() => void handleDownload("solicitud")} type="button">
+                  Descargar solicitud firmada
+                </button>
+              ) : (
+                <p className="muted">No hay solicitud firmada.</p>
+              )}
             </div>
             {missingDocuments ? (
               <p className="form-error">
-                Faltan documentos. No se puede aprobar sin comprobante, autorización firmada y cédula.
+                Faltan documentos. No se puede aprobar sin comprobante, autorización firmada, cédula y solicitud.
               </p>
             ) : null}
           </div>

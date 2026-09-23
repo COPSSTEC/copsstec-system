@@ -13,7 +13,9 @@ import {
   GENDERS,
   type AffiliationForm,
 } from "@/modules/membership/domain/types";
-import { registerAffiliation } from "@/modules/membership/infrastructure/membership-api";
+import { MembershipApiError, registerAffiliation } from "@/modules/membership/infrastructure/membership-api";
+import { mapAffiliationError, type AffiliationFieldError } from "@/modules/membership/presentation/lib/affiliation-errors";
+import { CEDULA_INVALID_MESSAGE, isValidEcuadorianCedula } from "@/modules/membership/presentation/lib/cedula";
 import { storeToken } from "@/modules/auth/infrastructure/auth-storage";
 import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
@@ -27,6 +29,7 @@ const STEPS = [
 ];
 
 function Field({
+  id,
   label,
   value,
   onChange,
@@ -34,6 +37,7 @@ function Field({
   required = false,
   placeholder,
 }: {
+  id?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -42,9 +46,10 @@ function Field({
   placeholder?: string;
 }) {
   return (
-    <label className="field">
+    <label className="field" htmlFor={id}>
       {label}
       <input
+        id={id}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
@@ -62,7 +67,7 @@ export function AffiliationWizardPage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [policyOpen, setPolicyOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<AffiliationFieldError[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const cities = useMemo(
@@ -87,41 +92,66 @@ export function AffiliationWizardPage() {
     });
   }
 
-  function validateStep(): string | null {
+  function validateStep(): AffiliationFieldError | null {
     if (step === 1) {
       if (!form.names.trim() || !form.lastname.trim() || !form.identifier.trim() || !form.birtday) {
-        return "Completa nombres, apellidos, cédula y fecha de nacimiento.";
+        return { message: "Completa nombres, apellidos, cédula y fecha de nacimiento.", step: 1 };
+      }
+      if (!isValidEcuadorianCedula(form.identifier)) {
+        return { message: CEDULA_INVALID_MESSAGE, step: 1, field: "identifier" };
       }
       if (!form.blood_type || !form.gender) {
-        return "Selecciona tipo de sangre y género.";
+        return { message: "Selecciona tipo de sangre y género.", step: 1 };
       }
       if (!photo) {
-        return "La foto de perfil es obligatoria.";
+        return { message: "La foto de perfil es obligatoria.", step: 1, field: "photo" };
       }
     }
     if (step === 2) {
       if (!form.email.trim() || !form.mobile_phone.trim() || !form.province || !form.city || !form.street_principal.trim()) {
-        return "Completa correo, celular, provincia, ciudad y calle principal.";
+        return {
+          message: "Completa correo, celular, provincia, ciudad y calle principal.",
+          step: 2,
+          field: "email",
+        };
       }
     }
     if (step === 3) {
       if (!form.title_academic.trim() || !form.cod_senescyt.trim()) {
-        return "El título de tercer nivel y su código Senescyt son obligatorios.";
+        return {
+          message: "El título de tercer nivel y su código Senescyt son obligatorios.",
+          step: 3,
+          field: "title_academic",
+        };
       }
       if (form.fourth_title.trim() && !form.codigo_senescyt_cuarto.trim()) {
-        return "Si tienes título de cuarto nivel, el código Senescyt es obligatorio.";
+        return {
+          message: "Si tienes título de cuarto nivel, el código Senescyt es obligatorio.",
+          step: 3,
+          field: "codigo_senescyt_cuarto",
+        };
       }
     }
     return null;
   }
 
+  function goToError(error: AffiliationFieldError) {
+    setStep(error.step);
+    window.setTimeout(() => {
+      if (!error.field) {
+        return;
+      }
+      document.getElementById(`affiliation-${error.field}`)?.focus();
+    }, 50);
+  }
+
   function goNext() {
-    const message = validateStep();
-    if (message) {
-      setError(message);
+    const issue = validateStep();
+    if (issue) {
+      setErrors([issue]);
       return;
     }
-    setError(null);
+    setErrors([]);
     setStep((current) => Math.min(current + 1, 4));
   }
 
@@ -133,16 +163,27 @@ export function AffiliationWizardPage() {
     }
 
     if (!form.accept_birthday_notifications || !form.accept_data_policy) {
-      setError("Debe aceptar las notificaciones de cumpleaños y la política de tratamiento de datos.");
+      setErrors([
+        {
+          message: "Debe aceptar las notificaciones de cumpleaños y la política de tratamiento de datos.",
+          step: 4,
+        },
+      ]);
+      return;
+    }
+    if (!isValidEcuadorianCedula(form.identifier)) {
+      const issue = { message: CEDULA_INVALID_MESSAGE, step: 1, field: "identifier" };
+      setErrors([issue]);
+      goToError(issue);
       return;
     }
     if (!photo) {
-      setError("La foto de perfil es obligatoria.");
+      setErrors([{ message: "La foto de perfil es obligatoria.", step: 1, field: "photo" }]);
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+    setErrors([]);
     try {
       const result = await registerAffiliation(form, photo);
       trackEvent("generate_lead", { form_name: "afiliacion", method: "signup" });
@@ -150,7 +191,10 @@ export function AffiliationWizardPage() {
       storeToken(result.access_token);
       router.replace("/afiliacion/pago");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo completar el registro.");
+      const message = err instanceof Error ? err.message : "No se pudo completar el registro.";
+      const code = err instanceof MembershipApiError ? err.code : undefined;
+      const issue = mapAffiliationError(message, code);
+      setErrors([issue]);
     } finally {
       setIsSubmitting(false);
     }
@@ -194,9 +238,9 @@ export function AffiliationWizardPage() {
         {step === 1 ? (
           <>
             <h2>Datos Personales</h2>
-            <Field label="Nombres" onChange={(value) => update("names", value)} required value={form.names} />
-            <Field label="Apellidos" onChange={(value) => update("lastname", value)} required value={form.lastname} />
-            <Field label="Cédula" onChange={(value) => update("identifier", value)} required value={form.identifier} />
+            <Field id="affiliation-names" label="Nombres" onChange={(value) => update("names", value)} required value={form.names} />
+            <Field id="affiliation-lastname" label="Apellidos" onChange={(value) => update("lastname", value)} required value={form.lastname} />
+            <Field id="affiliation-identifier" label="Cédula" onChange={(value) => update("identifier", value)} required value={form.identifier} />
             <Field
               label="Fecha de nacimiento"
               onChange={(value) => update("birtday", value)}
@@ -234,6 +278,7 @@ export function AffiliationWizardPage() {
                 <input
                   accept="image/png,image/jpeg,image/webp"
                   hidden
+                  id="affiliation-photo"
                   onChange={(event) => handlePhoto(event.target.files?.[0] ?? null)}
                   type="file"
                 />
@@ -245,7 +290,7 @@ export function AffiliationWizardPage() {
         {step === 2 ? (
           <>
             <h2>Contacto y Ubicación</h2>
-            <Field label="Correo" onChange={(value) => update("email", value)} required type="email" value={form.email} />
+            <Field id="affiliation-email" label="Correo" onChange={(value) => update("email", value)} required type="email" value={form.email} />
             <Field
               label="Teléfono fijo (opcional)"
               onChange={(value) => update("fixed_phone", value)}
@@ -301,12 +346,14 @@ export function AffiliationWizardPage() {
           <>
             <h2>Información Académica</h2>
             <Field
+              id="affiliation-title_academic"
               label="Título de tercer nivel"
               onChange={(value) => update("title_academic", value)}
               required
               value={form.title_academic}
             />
             <Field
+              id="affiliation-cod_senescyt"
               label="Código Senescyt"
               onChange={(value) => update("cod_senescyt", value)}
               required
@@ -318,6 +365,7 @@ export function AffiliationWizardPage() {
               value={form.fourth_title}
             />
             <Field
+              id="affiliation-codigo_senescyt_cuarto"
               label="Código Senescyt (opcional, requerido si tiene título de cuarto nivel)"
               onChange={(value) => update("codigo_senescyt_cuarto", value)}
               value={form.codigo_senescyt_cuarto}
@@ -358,7 +406,20 @@ export function AffiliationWizardPage() {
           </>
         ) : null}
 
-        {error ? <p className="form-error">{error}</p> : null}
+        {errors.length ? (
+          <div className="form-error-list">
+            {errors.map((item) => (
+              <button
+                className="form-error form-error-link"
+                key={`${item.step}-${item.message}`}
+                onClick={() => goToError(item)}
+                type="button"
+              >
+                {item.message}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="affiliation-actions">
           <button

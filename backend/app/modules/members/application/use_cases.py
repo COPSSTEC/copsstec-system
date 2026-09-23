@@ -20,6 +20,7 @@ from app.modules.members.domain.entities import (
     ProfileSelfUpdate,
 )
 from app.modules.members.domain.exceptions import MemberConflictError, MemberNotFoundError, MemberValidationError
+from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula
 
 
 def generate_temporary_password() -> str:
@@ -52,6 +53,8 @@ class CreateMemberUseCase:
 
     def execute(self, data: MemberWriteData) -> tuple[Member, str]:
         _validate(data)
+        if not is_valid_ecuadorian_cedula(data.identifier):
+            raise MemberValidationError(CEDULA_INVALID_MESSAGE)
         conflict = self.repository.find_conflict(
             identifier=data.identifier,
             email=data.email,

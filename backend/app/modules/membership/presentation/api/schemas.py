@@ -31,6 +31,11 @@ class MembershipStatusResponse(BaseModel):
     must_upload_documents: bool = False
     has_signed_authorization: bool = False
     has_identity_document: bool = False
+    has_signed_solicitud: bool = False
+    accepted_affiliation_year: bool = False
+    member_account_type: str = ""
+    member_account_number: str = ""
+    member_bank_name: str = ""
 
     @classmethod
     def from_domain(cls, status: MembershipStatus) -> "MembershipStatusResponse":
@@ -55,6 +60,11 @@ class MembershipStatusResponse(BaseModel):
             must_upload_documents=status.must_upload_documents,
             has_signed_authorization=status.has_signed_authorization,
             has_identity_document=status.has_identity_document,
+            has_signed_solicitud=status.has_signed_solicitud,
+            accepted_affiliation_year=status.accepted_affiliation_year,
+            member_account_type=status.member_account_type,
+            member_account_number=status.member_account_number,
+            member_bank_name=status.member_bank_name,
         )
 
 
@@ -150,6 +160,7 @@ class ApprovalPreviewResponse(BaseModel):
     voucher_url: str | None
     signed_authorization_url: str | None = None
     identity_document_url: str | None = None
+    signed_solicitud_url: str | None = None
     amount: str
 
 
@@ -157,8 +168,16 @@ class OnboardingDocumentsResponse(BaseModel):
     status: str
     has_signed_authorization: bool
     has_identity_document: bool
+    has_signed_solicitud: bool = False
+    accepted_affiliation_year: bool = False
     gate: str
     message: str
+
+
+class BankDetailsRequest(BaseModel):
+    account_type: str
+    account_number: str
+    bank_name: str
 
 
 class ApproveMemberRequest(BaseModel):

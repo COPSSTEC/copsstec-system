@@ -8,10 +8,12 @@ from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import get_current_user
 from app.modules.membership.application.use_cases import (
     DownloadAuthorizationPdfUseCase,
+    DownloadSolicitudPdfUseCase,
     GetMembershipInvoiceUseCase,
     GetMembershipStatusUseCase,
     GetPaymentInfoUseCase,
     RegisterMembershipUseCase,
+    SaveBankDetailsUseCase,
     UploadOnboardingDocumentsUseCase,
     UploadPaymentVoucherUseCase,
 )
@@ -29,10 +31,13 @@ from app.modules.membership.presentation.api.dependencies import (
     get_membership_status_use_case,
     get_payment_info_use_case,
     get_register_membership_use_case,
+    get_save_bank_details_use_case,
+    get_solicitud_pdf_use_case,
     get_upload_onboarding_documents_use_case,
     get_upload_voucher_use_case,
 )
 from app.modules.membership.presentation.api.schemas import (
+    BankDetailsRequest,
     MembershipStatusResponse,
     OnboardingDocumentsResponse,
     PaymentInfoResponse,
@@ -53,7 +58,8 @@ def _http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, MembershipNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No se encontró la afiliación.")
     if isinstance(exc, MembershipConflictError):
-        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.message)
+        detail: object = {"message": exc.message, "code": exc.code} if exc.code else exc.message
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
     if isinstance(exc, MembershipValidationError):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
     if isinstance(exc, MembershipForbiddenError):
@@ -201,7 +207,7 @@ def download_authorization_pdf(
 ) -> Response:
     try:
         pdf_bytes = use_case.execute(user.id)
-    except (MembershipNotFoundError, MembershipForbiddenError) as exc:
+    except (MembershipNotFoundError, MembershipForbiddenError, MembershipValidationError) as exc:
         raise _http_error(exc) from exc
 
     return Response(
@@ -211,18 +217,57 @@ def download_authorization_pdf(
     )
 
 
+@router.put("/bank-details", response_model=MembershipStatusResponse)
+def save_bank_details(
+    user: Annotated[User, Depends(get_current_user)],
+    payload: BankDetailsRequest,
+    use_case: Annotated[SaveBankDetailsUseCase, Depends(get_save_bank_details_use_case)],
+) -> MembershipStatusResponse:
+    try:
+        status_model = use_case.execute(
+            user.id,
+            payload.account_type,
+            payload.account_number,
+            payload.bank_name,
+        )
+    except (MembershipNotFoundError, MembershipForbiddenError, MembershipValidationError) as exc:
+        raise _http_error(exc) from exc
+    return MembershipStatusResponse.from_domain(status_model)
+
+
+@router.get("/solicitud-pdf")
+def download_solicitud_pdf(
+    user: Annotated[User, Depends(get_current_user)],
+    use_case: Annotated[DownloadSolicitudPdfUseCase, Depends(get_solicitud_pdf_use_case)],
+) -> Response:
+    try:
+        pdf_bytes = use_case.execute(user.id)
+    except (MembershipNotFoundError, MembershipForbiddenError) as exc:
+        raise _http_error(exc) from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="solicitud-afiliacion-copsstec.pdf"'},
+    )
+
+
 @router.post("/onboarding-documents", response_model=OnboardingDocumentsResponse)
 async def upload_onboarding_documents(
     user: Annotated[User, Depends(get_current_user)],
     use_case: Annotated[UploadOnboardingDocumentsUseCase, Depends(get_upload_onboarding_documents_use_case)],
     signed_authorization: UploadFile | None = File(None),
     identity_document: UploadFile | None = File(None),
+    signed_solicitud: UploadFile | None = File(None),
+    accepted_affiliation_year: str = Form("false"),
 ) -> OnboardingDocumentsResponse:
     try:
         _, status = use_case.execute(
             user_id=user.id,
             signed_authorization=await _optional_upload(signed_authorization),
             identity_document=await _optional_upload(identity_document),
+            signed_solicitud=await _optional_upload(signed_solicitud),
+            accepted_affiliation_year=_as_bool(accepted_affiliation_year),
         )
     except (
         MembershipNotFoundError,
@@ -236,6 +281,8 @@ async def upload_onboarding_documents(
         status=status.payment_status or "",
         has_signed_authorization=status.has_signed_authorization,
         has_identity_document=status.has_identity_document,
+        has_signed_solicitud=status.has_signed_solicitud,
+        accepted_affiliation_year=status.accepted_affiliation_year,
         gate=status.gate,
         message="Documentos recibidos. El administrador revisará tu solicitud.",
     )

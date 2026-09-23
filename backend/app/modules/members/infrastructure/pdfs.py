@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import io
+from datetime import date
 from pathlib import Path
 from xml.sax.saxutils import escape
 
-from reportlab.lib.colors import black
+from reportlab.lib.colors import HexColor, black, white
 from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
@@ -23,6 +24,16 @@ COOKIE_FONT = ASSETS_DIR / "Cookie-Regular.ttf"
 CARNET_ORG = "COLEGIO DE PROFESIONALES DE SEGURIDAD Y SALUD EN EL TRABAJO DEL ECUADOR"
 NAVY = (0.0, 0.0, 0.20)
 GOLD = (0.95, 0.76, 0.22)
+SOLICITUD_NAVY = HexColor("#1e3a8a")
+SOLICITUD_LINE = HexColor("#94a3b8")
+SOLICITUD_MUTED = HexColor("#475569")
+PORTAL_EMAIL = "administracion@copsstec.com"
+PORTAL_PHONE = "+593 99 876 2480"
+PORTAL_WEB = "www.copsstec.com"
+PORTAL_ADDRESS = "Edificio Centro Amazonas, Gil Ramirez 1-46. Quito 170526"
+SOLICITUD_SLOGAN = (
+    "Unidos por un trabajo seguro y saludable para fortalecer la producción del país"
+)
 
 _COOKIE_REGISTERED = False
 _LOCAL_ORIGINS = (
@@ -184,6 +195,52 @@ def _solicitud_upper(value: str | None) -> str:
     return escape(text.upper()) if text else "—"
 
 
+def build_solicitud_body(member: Member) -> str:
+    names = _solicitud_upper(member.names)
+    lastname = _solicitud_upper(member.lastname)
+    identifier = _solicitud_upper(member.identifier)
+    address_parts = [
+        "domiciliado en la "
+        f"provincia de <font name='Times-Bold'>{_solicitud_upper(member.province)}</font> "
+        f"Ciudad de <font name='Times-Bold'>{_solicitud_upper(member.city)}</font>",
+    ]
+    if (member.street_principal or "").strip():
+        address_parts.append(
+            f"en la calle <font name='Times-Bold'>{_solicitud_upper(member.street_principal)}</font>"
+        )
+    if (member.street_secondary or "").strip():
+        address_parts.append(
+            f"y transversal <font name='Times-Bold'>{_solicitud_upper(member.street_secondary)}</font>"
+        )
+    if (member.fixed_phone or "").strip():
+        address_parts.append(
+            f"Teléfono fijo <font name='Times-Bold'>{_solicitud_upper(member.fixed_phone)}</font>"
+        )
+    if (member.mobile_phone or "").strip():
+        address_parts.append(
+            f"Teléfono Móvil <font name='Times-Bold'>{_solicitud_upper(member.mobile_phone)}</font>"
+        )
+    return (
+        f"Yo, <font name='Times-Bold'>{names} {lastname}</font>, titular de la cédula de "
+        f"identidad Nro. <font name='Times-Bold'>{identifier}</font>, "
+        f"{' '.join(address_parts)}, "
+        "en consideración de ser un profesional de la seguridad y salud en el trabajo con mi "
+        f"título de <font name='Times-Bold'>{_solicitud_upper(member.title_academic)}</font>, "
+        "legalmente registrado en el Sistema Nacional de Información de la Educación Superior "
+        f"del Ecuador, con el código: <font name='Times-Bold'>{_solicitud_upper(member.cod_senescyt)}</font>. "
+        "Solicito a usted Sr. Presidente, se me incluya como miembro activo del "
+        "<font name='Times-Bold'>COLEGIO DE PROFESIONALES DE SEGURIDAD Y SALUD EN EL TRABAJO "
+        "DEL ECUADOR (COPSSTEC)</font>, asumiendo el compromiso de manera voluntaria de "
+        "realizar mi aporte anual por el valor de $120 (ciento veinte dólares americanos); "
+        "en la cuenta corriente No 48403590 del Banco de Guayaquil a nombre del Colegio de "
+        "Profesionales de Seguridad y Salud en el Trabajo del Ecuador Ruc: 1792898633001, "
+        "además declaro que estoy en conocimiento de los estatutos y apruebo mi aporte sea "
+        "destinado a cumplir con los fines y objetivos planteados. Además, autorizo a que se "
+        "registren mis datos ante el Ministerio de Trabajo, para lo cual adjunto la copia de "
+        "mi cédula."
+    )
+
+
 def _certificate_name_lines(names: str, lastname: str) -> list[str]:
     first = (names or "").strip()
     second = (lastname or "").strip()
@@ -243,6 +300,118 @@ def generate_qr_png(url: str) -> bytes:
     return buffer.getvalue()
 
 
+def _draw_solicitud_icon(pdf: canvas.Canvas, kind: str, cx: float, cy: float, radius: float = 4.2) -> None:
+    pdf.setFillColor(SOLICITUD_NAVY)
+    pdf.circle(cx, cy, radius, fill=1, stroke=0)
+    pdf.setStrokeColor(white)
+    pdf.setFillColor(white)
+    pdf.setLineWidth(0.7)
+    pdf.setLineCap(1)
+    pdf.setLineJoin(1)
+    if kind == "mail":
+        left, right = cx - 2.2, cx + 2.2
+        bottom, top = cy - 1.4, cy + 1.3
+        pdf.rect(left, bottom, right - left, top - bottom, fill=0, stroke=1)
+        pdf.line(left, top, cx, cy - 0.1)
+        pdf.line(right, top, cx, cy - 0.1)
+        return
+    if kind == "web":
+        pdf.circle(cx, cy, 2.1, fill=0, stroke=1)
+        pdf.ellipse(cx - 1.0, cy - 2.1, cx + 1.0, cy + 2.1, fill=0, stroke=1)
+        pdf.line(cx - 2.1, cy, cx + 2.1, cy)
+        return
+    if kind == "phone":
+        pdf.roundRect(cx - 1.15, cy - 2.1, 2.3, 4.2, 0.7, fill=0, stroke=1)
+        pdf.line(cx - 0.55, cy + 1.55, cx + 0.55, cy + 1.55)
+        return
+    pdf.setLineWidth(0.8)
+    pdf.circle(cx, cy + 0.55, 1.35, fill=0, stroke=1)
+    pdf.line(cx, cy - 0.7, cx, cy - 2.0)
+
+
+def _draw_solicitud_contacts(pdf: canvas.Canvas, width: float, y: float) -> None:
+    items = [
+        ("mail", PORTAL_EMAIL),
+        ("web", PORTAL_WEB),
+        ("phone", PORTAL_PHONE),
+        ("pin", PORTAL_ADDRESS),
+    ]
+    pdf.setFont("Times-Roman", 7.2)
+    gap = 10
+    icon_gap = 5
+    pieces: list[tuple[str, str, float]] = []
+    total = 0.0
+    for kind, label in items:
+        text_w = pdf.stringWidth(label, "Times-Roman", 7.2)
+        item_w = 8.4 + icon_gap + text_w
+        pieces.append((kind, label, item_w))
+        total += item_w
+    total += gap * (len(pieces) - 1)
+    x = (width - total) / 2
+    for kind, label, item_w in pieces:
+        _draw_solicitud_icon(pdf, kind, x + 4.2, y + 2.2)
+        pdf.setFillColor(SOLICITUD_NAVY)
+        pdf.setFont("Times-Roman", 7.2)
+        pdf.drawString(x + 8.4 + icon_gap, y, label)
+        x += item_w + gap
+
+
+def _draw_solicitud_letterhead(pdf: canvas.Canvas, doc) -> None:
+    width, height = A4
+    bar = 16
+    pdf.saveState()
+    pdf.setFillColor(SOLICITUD_NAVY)
+    pdf.rect(0, height - bar, width, bar, fill=1, stroke=0)
+    pdf.rect(0, 0, width, bar, fill=1, stroke=0)
+
+    logo_size = 46
+    header_top = height - bar - 18
+    left = 42
+    logo_path = resolve_logo_path()
+    if logo_path is not None:
+        pdf.drawImage(
+            str(logo_path),
+            left,
+            header_top - logo_size,
+            width=logo_size,
+            height=logo_size,
+            mask="auto",
+            preserveAspectRatio=True,
+        )
+        text_x = left + logo_size + 10
+    else:
+        text_x = left
+
+    pdf.setFillColor(SOLICITUD_NAVY)
+    pdf.setFont("Times-Bold", 11)
+    pdf.drawString(text_x, header_top - 14, "Colegio de Profesionales de")
+    pdf.drawString(text_x, header_top - 28, "Seguridad y Salud en el Trabajo")
+    pdf.drawString(text_x, header_top - 42, "del Ecuador")
+
+    slogan_width = 210
+    slogan = Paragraph(
+        SOLICITUD_SLOGAN,
+        ParagraphStyle(
+            "SolicitudSloganDraw",
+            fontName="Times-Italic",
+            fontSize=8,
+            leading=10,
+            alignment=TA_RIGHT,
+            textColor=SOLICITUD_MUTED,
+        ),
+    )
+    slogan.wrapOn(pdf, slogan_width, 40)
+    slogan.drawOn(pdf, width - 42 - slogan_width, header_top - 38)
+
+    line_y = header_top - logo_size - 10
+    pdf.setStrokeColor(SOLICITUD_LINE)
+    pdf.setLineWidth(0.7)
+    pdf.line(42, line_y, width - 42, line_y)
+
+    _draw_solicitud_contacts(pdf, width, bar + 10)
+    pdf.restoreState()
+
+
 class MemberDocumentGenerator:
     def generate_certificate(self, member: Member, verify_url: str) -> bytes:
         buffer = io.BytesIO()
@@ -283,127 +452,78 @@ class MemberDocumentGenerator:
         document = SimpleDocTemplate(
             buffer,
             pagesize=A4,
-            leftMargin=35,
-            rightMargin=35,
-            topMargin=35,
-            bottomMargin=65,
-            title="SOLICITUD DE AFILIACIÓN Y COMPROMISO",
+            leftMargin=48,
+            rightMargin=48,
+            topMargin=108,
+            bottomMargin=58,
+            title="SOLICITUD DE AFILIACIÓN",
             author="COPSSTEC",
         )
 
-        header_style = ParagraphStyle(
-            "SolicitudHeader",
-            fontName="Times-Roman",
-            fontSize=20,
-            leading=24,
-            alignment=TA_CENTER,
-            spaceAfter=0,
-        )
-        slogan_style = ParagraphStyle(
-            "SolicitudSlogan",
-            fontName="Times-Roman",
-            fontSize=10,
-            leading=13,
-            alignment=TA_RIGHT,
-            spaceBefore=6,
-            spaceAfter=0,
-        )
         section_style = ParagraphStyle(
             "SolicitudSection",
             fontName="Times-Bold",
-            fontSize=20,
-            leading=24,
+            fontSize=16,
+            leading=20,
             alignment=TA_CENTER,
-            spaceBefore=30,
-            spaceAfter=30,
+            spaceBefore=8,
+            spaceAfter=22,
+            textColor=SOLICITUD_NAVY,
         )
         body_style = ParagraphStyle(
             "SolicitudBody",
             fontName="Times-Roman",
-            fontSize=14,
-            leading=20,
+            fontSize=12,
+            leading=17,
             alignment=TA_JUSTIFY,
-            spaceBefore=12,
-            spaceAfter=12,
+            spaceBefore=6,
+            spaceAfter=10,
         )
-        sign_style = ParagraphStyle(
-            "SolicitudSign",
+        sign_label_style = ParagraphStyle(
+            "SolicitudSignLabel",
             fontName="Times-Roman",
-            fontSize=14,
-            leading=18,
-            alignment=TA_LEFT,
-            leftIndent=12,
-            spaceBefore=12,
-            spaceAfter=4,
+            fontSize=11,
+            leading=14,
+            alignment=TA_CENTER,
+            spaceBefore=4,
+            spaceAfter=16,
         )
         footer_style = ParagraphStyle(
             "SolicitudFooter",
-            fontName="Times-Bold",
-            fontSize=14,
-            leading=20,
+            fontName="Times-Roman",
+            fontSize=11,
+            leading=16,
             alignment=TA_LEFT,
-            leftIndent=12,
             spaceAfter=2,
         )
 
-        names = _solicitud_upper(member.names)
-        lastname = _solicitud_upper(member.lastname)
-        identifier = _solicitud_upper(member.identifier)
-        body = (
-            f"Yo, <font name='Times-Bold'>{names} {lastname}</font>, titular de la cédula de "
-            f"identidad Nro. <font name='Times-Bold'>{identifier}</font>, domiciliado en la "
-            f"provincia de <font name='Times-Bold'>{_solicitud_upper(member.province)}</font> "
-            f"Ciudad de <font name='Times-Bold'>{_solicitud_upper(member.city)}</font> en la "
-            f"calle <font name='Times-Bold'>{_solicitud_upper(member.street_principal)}</font> "
-            f"y transversal <font name='Times-Bold'>{_solicitud_upper(member.street_secondary)}</font> "
-            f"Teléfono fijo <font name='Times-Bold'>{_solicitud_upper(member.fixed_phone)}</font> "
-            f"Teléfono Móvil <font name='Times-Bold'>{_solicitud_upper(member.mobile_phone)}</font>, "
-            "en consideración de ser un profesional de la seguridad y salud en el trabajo con mi "
-            f"título de <font name='Times-Bold'>{_solicitud_upper(member.title_academic)}</font>, "
-            "legalmente registrado en el Sistema Nacional de Información de la Educación Superior "
-            f"del Ecuador, con el código: <font name='Times-Bold'>{_solicitud_upper(member.cod_senescyt)}</font>. "
-            "Solicito a usted Sr. Presidente, se me incluya como miembro activo del "
-            "<font name='Times-Bold'>COLEGIO DE PROFESIONALES DE SEGURIDAD Y SALUD EN EL TRABAJO "
-            "DEL ECUADOR (COPSSTEC)</font>, asumiendo el compromiso de manera voluntaria de "
-            "realizar mi aporte anual por el valor de $120 (ciento veinte dólares americanos); "
-            "en la cuenta corriente No 48403590 del Banco de Guayaquil a nombre del Colegio de "
-            "Profesionales de Seguridad y Salud en el Trabajo del Ecuador Ruc: 1792898633001, "
-            "además declaro que estoy en conocimiento de los estatutos y apruebo mi aporte sea "
-            "destinado a cumplir con los fines y objetivos planteados. Además, autorizo a que se "
-            "registren mis datos ante el Ministerio de Trabajo, para lo cual adjunto la copia de "
-            "mi cédula."
-        )
+        body = build_solicitud_body(member)
         footer_name = f"{_solicitud_value(member.lastname)} {_solicitud_value(member.names)}".strip()
+        today = date.today().strftime("%d/%m/%Y")
 
         story = [
-            Paragraph("COLEGIO DE PROFESIONALES", header_style),
-            Paragraph("DE SEGURIDAD Y SALUD EN EL TRABAJO", header_style),
-            Spacer(1, 8),
-            HRFlowable(width="100%", thickness=1, color=black, spaceBefore=0, spaceAfter=6),
-            Paragraph(
-                "Unidos por un trabajo seguro y saludable para fortalecer la producción del país",
-                slogan_style,
-            ),
-            Paragraph("SOLICITUD DE AFILIACIÓN Y COMPROMISO", section_style),
+            Paragraph("SOLICITUD DE AFILIACIÓN", section_style),
             Paragraph(body, body_style),
             Paragraph("Atentamente:", body_style),
-            Paragraph("Firma:", sign_style),
+            Spacer(1, 28),
             HRFlowable(
-                width=200,
+                width=220,
                 thickness=1,
                 color=black,
                 spaceBefore=0,
-                spaceAfter=30,
-                hAlign="LEFT",
+                spaceAfter=4,
+                hAlign="CENTER",
             ),
-            Paragraph(f"Apellidos y nombres: {footer_name}", footer_style),
-            Paragraph(f"Cédula: {_solicitud_value(member.identifier)}", footer_style),
-            Paragraph(f"Tipo de sangre: {_solicitud_value(member.blood_type)}", footer_style),
-            Paragraph(f"Fecha de ingreso: {_solicitud_value(member.date_register)}", footer_style),
-            Paragraph(f"Fecha de nacimiento: {_solicitud_value(member.birtday)}", footer_style),
-            Paragraph(f"Correo: {_solicitud_value(member.email)}", footer_style),
+            Paragraph("Firma del solicitante", sign_label_style),
+            Paragraph(f"<b>Apellidos y nombres:</b> {footer_name}", footer_style),
+            Paragraph(f"<b>Cédula:</b> {_solicitud_value(member.identifier)}", footer_style),
+            Paragraph(f"<b>Fecha de solicitud:</b> {today}", footer_style),
         ]
-        document.build(story)
+        document.build(
+            story,
+            onFirstPage=_draw_solicitud_letterhead,
+            onLaterPages=_draw_solicitud_letterhead,
+        )
         return buffer.getvalue()
 
     def generate_carnet(self, member: Member, verify_url: str) -> bytes:

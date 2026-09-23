@@ -94,7 +94,25 @@ def _esc(value: str) -> str:
     return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def _checkbox() -> str:
+def build_account_phrase(account_type: str, account_number: str, bank_name: str) -> str:
+    account_kind = account_type.strip().lower()
+    corriente = _checkbox(account_kind == "corriente")
+    ahorros = _checkbox(account_kind == "ahorros")
+    account_label = _esc((account_number or "").strip() or "____________________")
+    bank_label = _esc((bank_name or "").strip() or "(Entidad bancaria)")
+    return (
+        "Autorizo a ustedes a ordenar, en mi nombre, el débito de mi cuenta "
+        f"{corriente} Corriente &nbsp;&nbsp; {ahorros} Ahorros Numero <u>{account_label}</u> "
+        f"que mantengo en <u>{bank_label}</u>, en adelante simplemente "
+        "denominado “IFI”, por los conceptos y valores que se detallan a continuación:"
+    )
+
+
+def _checkbox(checked: bool = False) -> str:
+    if checked:
+        if _HAS_WINGDINGS:
+            return f'<font name="{_WINGDINGS_NAME}">&#xf052;</font>'
+        return f'<font name="{_SYMBOL_NAME}">☑</font>'
     if _HAS_WINGDINGS:
         return f'<font name="{_WINGDINGS_NAME}">&#xf0a3;</font>'
     return f'<font name="{_SYMBOL_NAME}">☐</font>'
@@ -131,6 +149,9 @@ class AuthorizationDebitPdfGenerator:
         identifier: str,
         city: str,
         issued_on: date,
+        account_type: str = "",
+        account_number: str = "",
+        bank_name: str = "",
     ) -> bytes:
         _register_fonts()
         payload, pages = self._render(
@@ -139,6 +160,9 @@ class AuthorizationDebitPdfGenerator:
             identifier=identifier,
             city=city,
             issued_on=issued_on,
+            account_type=account_type,
+            account_number=account_number,
+            bank_name=bank_name,
             line_scale=1.0,
             signature_lines=5,
         )
@@ -151,6 +175,9 @@ class AuthorizationDebitPdfGenerator:
                 identifier=identifier,
                 city=city,
                 issued_on=issued_on,
+                account_type=account_type,
+                account_number=account_number,
+                bank_name=bank_name,
                 line_scale=line_scale,
                 signature_lines=signature_lines,
             )
@@ -166,6 +193,9 @@ class AuthorizationDebitPdfGenerator:
         identifier: str,
         city: str,
         issued_on: date,
+        account_type: str,
+        account_number: str,
+        bank_name: str,
         line_scale: float,
         signature_lines: int,
     ) -> tuple[bytes, int]:
@@ -185,7 +215,8 @@ class AuthorizationDebitPdfGenerator:
         identifier_label = _esc(identifier.strip())
         city_label = _esc(city.strip())
         issued = issued_on.strftime("%d/%m/%Y")
-        box = _checkbox()
+        annual = _checkbox(True)
+        empty = _checkbox()
 
         header_table = Table(
             [
@@ -243,10 +274,7 @@ class AuthorizationDebitPdfGenerator:
             ),
             line,
             Paragraph(
-                "Autorizo a ustedes a ordenar, en mi nombre, el débito de mi cuenta "
-                f"{box} Corriente &nbsp;&nbsp; {box} Ahorros Numero <u>____________________</u> "
-                "que mantengo en <u>(Entidad bancaria)</u>, en adelante simplemente "
-                "denominado “IFI”, por los conceptos y valores que se detallan a continuación:",
+                build_account_phrase(account_type, account_number, bank_name),
                 body,
             ),
             line,
@@ -257,10 +285,10 @@ class AuthorizationDebitPdfGenerator:
                 "<b>(Seleccione una sola modalidad):</b>",
                 body,
             ),
-            Paragraph(f"{box} <b>Mensual:</b> $10,00", option),
-            Paragraph(f"{box} <b>Trimestral:</b> $30,00", option),
-            Paragraph(f"{box} <b>Semestral:</b> $60,00", option),
-            Paragraph(f"{box} <b>Anual:</b> $120,00", option),
+            Paragraph(f"{empty} <b>Mensual:</b> $10,00", option),
+            Paragraph(f"{empty} <b>Trimestral:</b> $30,00", option),
+            Paragraph(f"{empty} <b>Semestral:</b> $60,00", option),
+            Paragraph(f"{annual} <b>Anual:</b> $120,00", option),
             Paragraph(
                 "<b>El valor adicional autorizado será aplicado exclusivamente "
                 "al pago o abono de obligaciones económicas pendientes con </b>COPSSTEC"

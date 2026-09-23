@@ -33,11 +33,21 @@ BLOOD_TYPES = (
 GENDERS = ("Masculino", "Femenino")
 
 
+ACCOUNT_TYPES = ("Corriente", "Ahorros")
+
+
 def onboarding_documents_complete(
     signed_authorization_path: str | None,
     identity_document_path: str | None,
+    signed_solicitud_path: str | None = None,
+    accepted_affiliation_year: bool = False,
 ) -> bool:
-    return bool((signed_authorization_path or "").strip() and (identity_document_path or "").strip())
+    return bool(
+        (signed_authorization_path or "").strip()
+        and (identity_document_path or "").strip()
+        and (signed_solicitud_path or "").strip()
+        and accepted_affiliation_year
+    )
 
 
 def membership_gate_from_payment(
@@ -103,6 +113,11 @@ class MembershipPayment:
     signed_authorization_path: str | None = None
     identity_document_path: str | None = None
     documents_uploaded_at: datetime | None = None
+    member_account_type: str | None = None
+    member_account_number: str | None = None
+    member_bank_name: str | None = None
+    signed_solicitud_path: str | None = None
+    accepted_affiliation_year: bool = False
 
 
 @dataclass(frozen=True)
@@ -138,6 +153,11 @@ class MembershipStatus:
     must_upload_documents: bool = False
     has_signed_authorization: bool = False
     has_identity_document: bool = False
+    has_signed_solicitud: bool = False
+    accepted_affiliation_year: bool = False
+    member_account_type: str = ""
+    member_account_number: str = ""
+    member_bank_name: str = ""
     city: str = ""
 
 

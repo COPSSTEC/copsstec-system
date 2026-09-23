@@ -4,15 +4,19 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
+from app.modules.members.infrastructure.pdfs import MemberDocumentGenerator
+from app.modules.members.infrastructure.repository import SqlAlchemyMemberRepository
 from app.modules.membership.application.use_cases import (
     ApproveMembershipUseCase,
     DownloadAuthorizationPdfUseCase,
     DownloadOnboardingDocumentUseCase,
+    DownloadSolicitudPdfUseCase,
     GetApprovalPreviewUseCase,
     GetMembershipInvoiceUseCase,
     GetMembershipStatusUseCase,
     GetPaymentInfoUseCase,
     RegisterMembershipUseCase,
+    SaveBankDetailsUseCase,
     UploadOnboardingDocumentsUseCase,
     UploadPaymentVoucherUseCase,
 )
@@ -71,6 +75,23 @@ def get_authorization_pdf_use_case(
     repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
 ) -> DownloadAuthorizationPdfUseCase:
     return DownloadAuthorizationPdfUseCase(repository, AuthorizationDebitPdfGenerator())
+
+
+def get_save_bank_details_use_case(
+    repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
+) -> SaveBankDetailsUseCase:
+    return SaveBankDetailsUseCase(repository)
+
+
+def get_solicitud_pdf_use_case(
+    repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> DownloadSolicitudPdfUseCase:
+    return DownloadSolicitudPdfUseCase(
+        member_lookup=SqlAlchemyMemberRepository(session),
+        pdf_generator=MemberDocumentGenerator(),
+        membership_repository=repository,
+    )
 
 
 def get_upload_onboarding_documents_use_case(

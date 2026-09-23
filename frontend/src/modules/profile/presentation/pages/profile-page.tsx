@@ -318,6 +318,13 @@ export function ProfilePage() {
                   <span>{coveragePeriod(subscription)}</span>
                 </div>
               </div>
+              <div className="member-profile-vigencia">
+                <ProfileUiIcon name="badge" />
+                <div>
+                  <strong>Afiliación</strong>
+                  <span>1 año</span>
+                </div>
+              </div>
             </div>
           </article>
 

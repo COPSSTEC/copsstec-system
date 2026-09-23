@@ -25,6 +25,7 @@ import {
 } from "@/modules/members/infrastructure/members-api";
 import { MemberActionsMenu } from "@/modules/members/presentation/components/member-actions-menu";
 import { MemberStatusBadge } from "@/modules/members/presentation/components/member-status-badge";
+import { CEDULA_INVALID_MESSAGE, isValidEcuadorianCedula } from "@/modules/membership/presentation/lib/cedula";
 import { ApproveMemberModal } from "@/modules/members/presentation/modals/approve-member-modal";
 import { ConfirmActionModal } from "@/modules/members/presentation/modals/confirm-action-modal";
 import { MemberFormModal } from "@/modules/members/presentation/modals/member-form-modal";
@@ -197,6 +198,11 @@ export function MembersPage() {
     setFormError(null);
 
     try {
+      if (!editingMember && !isValidEcuadorianCedula(form.identifier)) {
+        setFormError(CEDULA_INVALID_MESSAGE);
+        setIsSubmitting(false);
+        return;
+      }
       if (editingMember) {
         await updateMember(token, editingMember.user_id, form);
         if (photoFile) {
