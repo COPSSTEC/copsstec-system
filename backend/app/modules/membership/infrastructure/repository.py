@@ -248,6 +248,7 @@ class SqlAlchemyMembershipRepository:
                     COALESCE(mp.member_account_type, '') AS member_account_type,
                     COALESCE(mp.member_account_number, '') AS member_account_number,
                     COALESCE(mp.member_bank_name, '') AS member_bank_name,
+                    COALESCE(mp.member_debit_plan, '') AS member_debit_plan,
                     EXISTS(
                         SELECT 1 FROM membership_invoices mi WHERE mi.user_id = u.id
                     ) AS has_invoice,
@@ -317,6 +318,7 @@ class SqlAlchemyMembershipRepository:
             member_account_type=row["member_account_type"] or "",
             member_account_number=row["member_account_number"] or "",
             member_bank_name=row["member_bank_name"] or "",
+            member_debit_plan=row["member_debit_plan"] or "",
             city=row["city"] or "",
         )
 
@@ -328,7 +330,7 @@ class SqlAlchemyMembershipRepository:
                        account_number, account_holder, account_ruc, reference, voucher_path,
                        status, reviewed_by, reviewed_at, signed_authorization_path,
                        identity_document_path, documents_uploaded_at, member_account_type,
-                       member_account_number, member_bank_name, signed_solicitud_path,
+                       member_account_number, member_bank_name, member_debit_plan, signed_solicitud_path,
                        COALESCE(accepted_affiliation_year, false) AS accepted_affiliation_year
                 FROM membership_payments
                 WHERE user_id = :user_id
@@ -374,6 +376,7 @@ class SqlAlchemyMembershipRepository:
         account_type: str,
         account_number: str,
         bank_name: str,
+        debit_plan: str,
     ) -> MembershipPayment:
         now = datetime.now(UTC).replace(tzinfo=None)
         updated = self.session.execute(
@@ -383,6 +386,7 @@ class SqlAlchemyMembershipRepository:
                 SET member_account_type = :account_type,
                     member_account_number = :account_number,
                     member_bank_name = :bank_name,
+                    member_debit_plan = :debit_plan,
                     updated_at = :now
                 WHERE user_id = :user_id
                 """,
@@ -391,6 +395,7 @@ class SqlAlchemyMembershipRepository:
                 "account_type": account_type,
                 "account_number": account_number,
                 "bank_name": bank_name,
+                "debit_plan": debit_plan,
                 "now": now,
                 "user_id": user_id,
             },
@@ -612,6 +617,7 @@ class SqlAlchemyMembershipRepository:
             member_account_type=row.get("member_account_type"),
             member_account_number=row.get("member_account_number"),
             member_bank_name=row.get("member_bank_name"),
+            member_debit_plan=row.get("member_debit_plan"),
             signed_solicitud_path=row.get("signed_solicitud_path"),
             accepted_affiliation_year=bool(row.get("accepted_affiliation_year")),
         )

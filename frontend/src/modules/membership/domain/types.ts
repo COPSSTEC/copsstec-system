@@ -24,6 +24,7 @@ export interface MembershipStatus {
   member_account_type?: string;
   member_account_number?: string;
   member_bank_name?: string;
+  member_debit_plan?: string;
   gate: MembershipGate;
   payment_status: string | null;
   state_id: number;

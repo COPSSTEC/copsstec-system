@@ -34,6 +34,13 @@ GENDERS = ("Masculino", "Femenino")
 
 
 ACCOUNT_TYPES = ("Corriente", "Ahorros")
+DEBIT_PLANS = ("monthly", "quarterly", "semiannual", "annual")
+DEBIT_PLAN_OPTIONS = (
+    ("monthly", "Mensual", "$10,00"),
+    ("quarterly", "Trimestral", "$30,00"),
+    ("semiannual", "Semestral", "$60,00"),
+    ("annual", "Anual", "$120,00"),
+)
 
 
 def onboarding_documents_complete(
@@ -116,6 +123,7 @@ class MembershipPayment:
     member_account_type: str | None = None
     member_account_number: str | None = None
     member_bank_name: str | None = None
+    member_debit_plan: str | None = None
     signed_solicitud_path: str | None = None
     accepted_affiliation_year: bool = False
 
@@ -158,6 +166,7 @@ class MembershipStatus:
     member_account_type: str = ""
     member_account_number: str = ""
     member_bank_name: str = ""
+    member_debit_plan: str = ""
     city: str = ""
 
 

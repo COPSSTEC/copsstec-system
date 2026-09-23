@@ -17,6 +17,12 @@ import { PublicFooter } from "@/shared/components/public-footer";
 
 const MAX_PDF_BYTES = 8 * 1024 * 1024;
 const ACCOUNT_TYPES = ["Corriente", "Ahorros"] as const;
+const DEBIT_PLANS = [
+  { id: "monthly", label: "Mensual: $10,00" },
+  { id: "quarterly", label: "Trimestral: $30,00" },
+  { id: "semiannual", label: "Semestral: $60,00" },
+  { id: "annual", label: "Anual: $120,00" },
+] as const;
 const ECUADOR_BANKS = [
   "Banco Pichincha",
   "Banco Guayaquil",
@@ -217,6 +223,7 @@ export function AuthorizationDocumentsPage() {
   const [accountType, setAccountType] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [bankName, setBankName] = useState("");
+  const [debitPlan, setDebitPlan] = useState("");
   const [signedAuthorization, setSignedAuthorization] = useState<File | null>(null);
   const [identityDocument, setIdentityDocument] = useState<File | null>(null);
   const [signedSolicitud, setSignedSolicitud] = useState<File | null>(null);
@@ -248,6 +255,7 @@ export function AuthorizationDocumentsPage() {
         setAccountType(current.member_account_type || "");
         setAccountNumber(current.member_account_number || "");
         setBankName(current.member_bank_name || "");
+        setDebitPlan(current.member_debit_plan || "");
         setAcceptedYear(Boolean(current.accepted_affiliation_year));
       } catch {
         router.replace("/login");
@@ -261,7 +269,8 @@ export function AuthorizationDocumentsPage() {
     return (
       ACCOUNT_TYPES.includes(accountType as (typeof ACCOUNT_TYPES)[number]) &&
       accountNumber.trim().length >= 6 &&
-      bankName.trim().length >= 3
+      bankName.trim().length >= 3 &&
+      DEBIT_PLANS.some((item) => item.id === debitPlan)
     );
   }
 
@@ -270,12 +279,13 @@ export function AuthorizationDocumentsPage() {
       return;
     }
     if (!bankReady()) {
-      throw new Error("Completa tipo de cuenta, número y entidad bancaria antes de descargar.");
+      throw new Error("Completa tipo de cuenta, número, entidad bancaria y el valor de débito antes de descargar.");
     }
     const next = await saveBankDetails(token, {
       account_type: accountType,
       account_number: accountNumber.trim(),
       bank_name: bankName.trim(),
+      debit_plan: debitPlan,
     });
     setStatus((current) => (current ? { ...current, ...next } : next));
   }
@@ -287,7 +297,8 @@ export function AuthorizationDocumentsPage() {
     const unchanged =
       status.member_account_type === accountType &&
       status.member_account_number === accountNumber.trim() &&
-      status.member_bank_name === bankName.trim();
+      status.member_bank_name === bankName.trim() &&
+      status.member_debit_plan === debitPlan;
     if (unchanged) {
       return;
     }
@@ -297,7 +308,7 @@ export function AuthorizationDocumentsPage() {
     return () => window.clearTimeout(timer);
     // persistBankDetails is recreated each render; the compared fields are enough.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountType, accountNumber, bankName, status, token]);
+  }, [accountType, accountNumber, bankName, debitPlan, status, token]);
 
   async function handleDownloadAuthorization() {
     if (!token) {
@@ -526,8 +537,19 @@ export function AuthorizationDocumentsPage() {
               </select>
             </label>
           </div>
+          <label className="field">
+            Valor de débito *
+            <select onChange={(event) => setDebitPlan(event.target.value)} required value={debitPlan}>
+              <option value="">Selecciona el valor a debitar</option>
+              {DEBIT_PLANS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </label>
           {bankComplete ? (
-            <p className="affiliation-docs-success">Datos bancarios completados correctamente.</p>
+            <p className="affiliation-docs-success">Datos bancarios y valor de débito completados correctamente.</p>
           ) : null}
         </section>
 

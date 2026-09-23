@@ -229,6 +229,7 @@ def save_bank_details(
             payload.account_type,
             payload.account_number,
             payload.bank_name,
+            payload.debit_plan,
         )
     except (MembershipNotFoundError, MembershipForbiddenError, MembershipValidationError) as exc:
         raise _http_error(exc) from exc

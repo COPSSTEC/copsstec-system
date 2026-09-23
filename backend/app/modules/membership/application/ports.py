@@ -51,6 +51,7 @@ class MembershipRepository(Protocol):
         account_type: str,
         account_number: str,
         bank_name: str,
+        debit_plan: str,
     ) -> MembershipPayment:
         ...
 
@@ -118,6 +119,7 @@ class AuthorizationPdfGenerator(Protocol):
         account_type: str = "",
         account_number: str = "",
         bank_name: str = "",
+        debit_plan: str = "",
     ) -> bytes:
         ...
 

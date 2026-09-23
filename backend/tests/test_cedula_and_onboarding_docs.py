@@ -1,7 +1,11 @@
 from datetime import date
 
 from app.modules.members.domain.entities import ENABLED_STATE_ID, Member
-from app.modules.members.infrastructure.pdfs import MemberDocumentGenerator, build_solicitud_body
+from app.modules.members.infrastructure.pdfs import (
+    MemberDocumentGenerator,
+    SOLICITUD_OBLIGATIONS,
+    build_solicitud_body,
+)
 from app.modules.membership.application.use_cases import _validate_registration
 from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula
 from app.modules.membership.domain.entities import MembershipRegistrationData, onboarding_documents_complete
@@ -68,6 +72,7 @@ def test_authorization_pdf_contains_bank_data() -> None:
         account_type="Ahorros",
         account_number="2211447788",
         bank_name="Banco Pichincha",
+        debit_plan="monthly",
     )
     assert pdf.startswith(b"%PDF")
     _register_fonts()
@@ -121,3 +126,10 @@ def test_solicitud_omits_empty_optional_fields() -> None:
     assert "0990000000" in body
     assert "transversal" not in body.lower()
     assert "Teléfono fijo" not in body
+    titles = [title for title, _ in SOLICITUD_OBLIGATIONS]
+    assert titles == [
+        "AFILIACIÓN Y OBLIGACIÓN DE LOS MIEMBROS",
+        "SOCIOS CON VALORES PENDIENTES",
+        "SOCIOS AL DÍA EN SUS OBLIGACIONES",
+    ]
+    assert any("artículo 13 literal a)" in paragraph for _, paragraphs in SOLICITUD_OBLIGATIONS for paragraph in paragraphs)

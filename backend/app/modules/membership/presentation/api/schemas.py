@@ -36,6 +36,7 @@ class MembershipStatusResponse(BaseModel):
     member_account_type: str = ""
     member_account_number: str = ""
     member_bank_name: str = ""
+    member_debit_plan: str = ""
 
     @classmethod
     def from_domain(cls, status: MembershipStatus) -> "MembershipStatusResponse":
@@ -65,6 +66,7 @@ class MembershipStatusResponse(BaseModel):
             member_account_type=status.member_account_type,
             member_account_number=status.member_account_number,
             member_bank_name=status.member_bank_name,
+            member_debit_plan=status.member_debit_plan,
         )
 
 
@@ -178,6 +180,7 @@ class BankDetailsRequest(BaseModel):
     account_type: str
     account_number: str
     bank_name: str
+    debit_plan: str
 
 
 class ApproveMemberRequest(BaseModel):

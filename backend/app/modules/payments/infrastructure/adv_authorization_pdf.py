@@ -182,13 +182,13 @@ class AdvDebitAuthorizationPdfGenerator:
             Paragraph("☐ No mantengo deuda pendiente", option_style),
             Spacer(1, 8),
             Paragraph(
-                "El valor adicional autorizado será aplicado exclusivamente al pago o abono "
+                "El valor autorizado será aplicado exclusivamente al pago o abono "
                 "de obligaciones económicas pendientes con COPSSTEC y se debitará "
                 "conjuntamente con la cuota de membresía seleccionada.",
                 body_style,
             ),
             Paragraph(
-                "Estos valores serán debitados y acreditados a la cuenta que el Colegio de "
+                "Este valor será debitado y acreditado a la cuenta que el Colegio de "
                 "Profesionales de Seguridad y Salud en el Trabajo del Ecuador - COPSSTEC designe.",
                 body_style,
             ),

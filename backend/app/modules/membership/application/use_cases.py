@@ -20,6 +20,7 @@ from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_vali
 from app.modules.membership.domain.corporate_email import is_corporate_email, suggest_corporate_email
 from app.modules.membership.domain.entities import (
     ACCOUNT_TYPES,
+    DEBIT_PLANS,
     BLOOD_TYPES,
     ENABLED_STATE_ID,
     GATE_DOCUMENTS,
@@ -442,9 +443,14 @@ class DownloadAuthorizationPdfUseCase:
         account_type = (payment.member_account_type or "").strip()
         account_number = (payment.member_account_number or "").strip()
         bank_name = (payment.member_bank_name or "").strip()
+        debit_plan = (payment.member_debit_plan or "").strip()
         if account_type not in ACCOUNT_TYPES or not account_number or not bank_name:
             raise MembershipValidationError(
                 "Debes registrar el tipo de cuenta, el número y la entidad bancaria antes de descargar la autorización.",
+            )
+        if debit_plan not in DEBIT_PLANS:
+            raise MembershipValidationError(
+                "Debes elegir el valor de débito (mensual, trimestral, semestral o anual) antes de descargar la autorización.",
             )
 
         return self.pdf_generator.generate(
@@ -456,6 +462,7 @@ class DownloadAuthorizationPdfUseCase:
             account_type=account_type,
             account_number=account_number,
             bank_name=bank_name,
+            debit_plan=debit_plan,
         )
 
 
@@ -469,6 +476,7 @@ class SaveBankDetailsUseCase:
         account_type: str,
         account_number: str,
         bank_name: str,
+        debit_plan: str,
     ) -> MembershipStatus:
         payment = self.repository.get_payment(user_id)
         if payment is None:
@@ -489,8 +497,13 @@ class SaveBankDetailsUseCase:
             raise MembershipValidationError("El número de cuenta es obligatorio.")
         if len(bank) < 3:
             raise MembershipValidationError("La entidad bancaria es obligatoria.")
+        plan = debit_plan.strip()
+        if plan not in DEBIT_PLANS:
+            raise MembershipValidationError(
+                "Debes elegir el valor de débito: mensual, trimestral, semestral o anual.",
+            )
 
-        self.repository.save_bank_details(user_id, kind, number.strip(), bank)
+        self.repository.save_bank_details(user_id, kind, number.strip(), bank, plan)
         status = self.repository.get_status(user_id)
         if status is None:
             raise MembershipNotFoundError()

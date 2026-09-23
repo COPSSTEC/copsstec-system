@@ -139,7 +139,7 @@ export async function downloadMembershipInvoice(token: string): Promise<void> {
 
 export async function saveBankDetails(
   token: string,
-  details: { account_type: string; account_number: string; bank_name: string },
+  details: { account_type: string; account_number: string; bank_name: string; debit_plan: string },
 ): Promise<MembershipStatus> {
   const response = await fetch(`${API_URL}/api/membership/bank-details`, {
     method: "PUT",

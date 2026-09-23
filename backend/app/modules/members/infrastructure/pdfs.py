@@ -13,7 +13,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
-from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import HRFlowable, PageBreak, Paragraph, SimpleDocTemplate, Spacer
 
 from app.modules.members.domain.entities import ENABLED_STATE_ID, Member
 
@@ -193,6 +193,82 @@ def _solicitud_value(value: str | None) -> str:
 def _solicitud_upper(value: str | None) -> str:
     text = (value or "").strip()
     return escape(text.upper()) if text else "—"
+
+
+SOLICITUD_OBLIGATIONS: list[tuple[str, list[str]]] = [
+    (
+        "AFILIACIÓN Y OBLIGACIÓN DE LOS MIEMBROS",
+        [
+            (
+                "La afiliación al COPSSTEC se realiza de manera voluntaria. Una vez que el "
+                "profesional adquiere la calidad de miembro, debe cumplir las disposiciones "
+                "establecidas en el Estatuto y los reglamentos institucionales."
+            ),
+            (
+                "De conformidad con el artículo 13 literal (a), constituye obligación de los "
+                "miembros cumplir estrictamente las disposiciones contenidas en el Estatuto, "
+                "su Reglamento Interno y las resoluciones de la Asamblea General y del Directorio."
+            ),
+            (
+                "De igual manera, el artículo 13 literal d) impone la obligación de cumplir con "
+                "los valores voluntarios anuales de aporte y demás obligaciones económicas que "
+                "correspondan."
+            ),
+        ],
+    ),
+    (
+        "SOCIOS CON VALORES PENDIENTES",
+        [
+            (
+                "Los miembros que actualmente mantengan valores pendientes podrán acogerse a "
+                "las facilidades de pago establecidas por el COPSSTEC, con la finalidad de "
+                "regularizar progresivamente sus obligaciones económicas y evitar la "
+                "acumulación de nuevos valores pendientes."
+            ),
+            (
+                "Esta medida busca brindar una alternativa accesible para que los socios puedan "
+                "ponerse al día de manera ordenada."
+            ),
+            (
+                "El Estatuto contempla expresamente el incumplimiento en el pago de cuotas "
+                "ordinarias o extraordinarias como una infracción, conforme al artículo 66 "
+                "literal g)."
+            ),
+            (
+                "Asimismo, el artículo 70 establece que la Asamblea General, previa investigación "
+                "e informe de la Comisión Especial correspondiente, podrá suspender a dignatarios "
+                "y miembros en el ejercicio de sus derechos por incumplimiento en el pago de "
+                "obligaciones económicas, cuotas, aportes u obligaciones pecuniarias en mora "
+                "con el Colegio."
+            ),
+            (
+                "Por ello, el COPSSTEC invita a los miembros que mantienen valores pendientes a "
+                "aprovechar estas facilidades y regularizar voluntariamente su situación."
+            ),
+        ],
+    ),
+    (
+        "SOCIOS AL DÍA EN SUS OBLIGACIONES",
+        [
+            (
+                "Los miembros que se encuentren al día en el cumplimiento de sus obligaciones "
+                "económicas podrán continuar realizando sus pagos bajo las alternativas "
+                "disponibles o conforme a las facilidades establecidas por el Colegio."
+            ),
+            (
+                "El objetivo es mantener un sistema de pago organizado que facilite la "
+                "continuidad de la membresía y contribuya al sostenimiento de las actividades "
+                "institucionales."
+            ),
+            (
+                "El artículo 59 literal a) del Estatuto establece que las cuotas y aportes de "
+                "los miembros constituyen una de las fuentes de ingresos del COPSSTEC, mientras "
+                "que el artículo 56 dispone que los fondos del Colegio serán utilizados "
+                "únicamente para el cumplimiento de sus fines y objetivos institucionales."
+            ),
+        ],
+    ),
+]
 
 
 def build_solicitud_body(member: Member) -> str:
@@ -496,6 +572,24 @@ class MemberDocumentGenerator:
             alignment=TA_LEFT,
             spaceAfter=2,
         )
+        obligation_title_style = ParagraphStyle(
+            "SolicitudObligationTitle",
+            fontName="Times-Bold",
+            fontSize=12,
+            leading=15,
+            alignment=TA_LEFT,
+            spaceBefore=12,
+            spaceAfter=8,
+        )
+        obligation_body_style = ParagraphStyle(
+            "SolicitudObligationBody",
+            fontName="Times-Roman",
+            fontSize=11,
+            leading=15,
+            alignment=TA_JUSTIFY,
+            spaceBefore=2,
+            spaceAfter=8,
+        )
 
         body = build_solicitud_body(member)
         footer_name = f"{_solicitud_value(member.lastname)} {_solicitud_value(member.names)}".strip()
@@ -518,7 +612,18 @@ class MemberDocumentGenerator:
             Paragraph(f"<b>Apellidos y nombres:</b> {footer_name}", footer_style),
             Paragraph(f"<b>Cédula:</b> {_solicitud_value(member.identifier)}", footer_style),
             Paragraph(f"<b>Fecha de solicitud:</b> {today}", footer_style),
+            PageBreak(),
         ]
+        for index, (title, paragraphs) in enumerate(SOLICITUD_OBLIGATIONS):
+            title_style = obligation_title_style
+            if index == 0:
+                title_style = ParagraphStyle(
+                    "SolicitudObligationTitleFirst",
+                    parent=obligation_title_style,
+                    spaceBefore=0,
+                )
+            story.append(Paragraph(title, title_style))
+            story.extend(Paragraph(text, obligation_body_style) for text in paragraphs)
         document.build(
             story,
             onFirstPage=_draw_solicitud_letterhead,

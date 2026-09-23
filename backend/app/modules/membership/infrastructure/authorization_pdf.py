@@ -152,6 +152,7 @@ class AuthorizationDebitPdfGenerator:
         account_type: str = "",
         account_number: str = "",
         bank_name: str = "",
+        debit_plan: str = "",
     ) -> bytes:
         _register_fonts()
         payload, pages = self._render(
@@ -163,6 +164,7 @@ class AuthorizationDebitPdfGenerator:
             account_type=account_type,
             account_number=account_number,
             bank_name=bank_name,
+            debit_plan=debit_plan,
             line_scale=1.0,
             signature_lines=5,
         )
@@ -178,6 +180,7 @@ class AuthorizationDebitPdfGenerator:
                 account_type=account_type,
                 account_number=account_number,
                 bank_name=bank_name,
+                debit_plan=debit_plan,
                 line_scale=line_scale,
                 signature_lines=signature_lines,
             )
@@ -196,6 +199,7 @@ class AuthorizationDebitPdfGenerator:
         account_type: str,
         account_number: str,
         bank_name: str,
+        debit_plan: str,
         line_scale: float,
         signature_lines: int,
     ) -> tuple[bytes, int]:
@@ -215,8 +219,10 @@ class AuthorizationDebitPdfGenerator:
         identifier_label = _esc(identifier.strip())
         city_label = _esc(city.strip())
         issued = issued_on.strftime("%d/%m/%Y")
-        annual = _checkbox(True)
-        empty = _checkbox()
+        monthly = _checkbox(debit_plan == "monthly")
+        quarterly = _checkbox(debit_plan == "quarterly")
+        semiannual = _checkbox(debit_plan == "semiannual")
+        annual = _checkbox(debit_plan == "annual")
 
         header_table = Table(
             [
@@ -285,19 +291,19 @@ class AuthorizationDebitPdfGenerator:
                 "<b>(Seleccione una sola modalidad):</b>",
                 body,
             ),
-            Paragraph(f"{empty} <b>Mensual:</b> $10,00", option),
-            Paragraph(f"{empty} <b>Trimestral:</b> $30,00", option),
-            Paragraph(f"{empty} <b>Semestral:</b> $60,00", option),
+            Paragraph(f"{monthly} <b>Mensual:</b> $10,00", option),
+            Paragraph(f"{quarterly} <b>Trimestral:</b> $30,00", option),
+            Paragraph(f"{semiannual} <b>Semestral:</b> $60,00", option),
             Paragraph(f"{annual} <b>Anual:</b> $120,00", option),
             Paragraph(
-                "<b>El valor adicional autorizado será aplicado exclusivamente "
+                "<b>El valor autorizado será aplicado exclusivamente "
                 "al pago o abono de obligaciones económicas pendientes con </b>COPSSTEC"
                 "<b> y se debitará conjuntamente con la cuota de membresía "
                 "seleccionada.</b>",
                 body,
             ),
             Paragraph(
-                f"Estos valores serán debitados y acreditados a la cuenta que el "
+                f"Este valor será debitado y acreditado a la cuenta que el "
                 f"<b>{_COLEGIO}</b> designe.",
                 body,
             ),
