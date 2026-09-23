@@ -431,7 +431,7 @@ export function isVotingPending(election: Election): boolean {
   }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  return date > today || election.status !== "en_votacion";
+  return date > today;
 }
 
 export function formatLongSpanishDate(value: string | null | undefined): string {

@@ -82,7 +82,7 @@ export function AdminDocumentCard({ document, isUploading, onUpload }: AdminDocu
             </div>
           </div>
           <div className="admin-document-actions">
-            <a className="admin-document-view" href={href} rel="noreferrer" target="_blank">
+            <a className="admin-document-view" href={href ?? undefined} rel="noreferrer" target="_blank">
               Ver archivo actual
             </a>
             <button
