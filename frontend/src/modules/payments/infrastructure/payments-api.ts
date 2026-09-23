@@ -1,4 +1,5 @@
 import type {
+  AdminPaymentStats,
   AdminPaymentsQuery,
   MembershipPaymentsAdminResponse,
   MembershipPaymentsQuery,
@@ -8,7 +9,10 @@ import type {
   PaymentWriteInput,
   PaymentWriteResponse,
   PaginatedPayments,
+  PublicAgreementDocumentsResponse,
+  PublicDebitAgreement,
   RenewalPlan,
+  SendDebitAgreementResponse,
 } from "@/modules/payments/domain/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -99,12 +103,29 @@ export async function listMembershipPaymentsAdmin(
   if (query.subscriptionStatus) {
     params.set("subscription_status", query.subscriptionStatus);
   }
+  if (query.balanceStatus) {
+    params.set("balance_status", query.balanceStatus);
+  }
+  if (query.agreementStatus) {
+    params.set("agreement_status", query.agreementStatus);
+  }
+  if (query.period) {
+    params.set("period", query.period);
+  }
 
   const response = await fetch(`${API_URL}/api/payments/admin/membership?${params.toString()}`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
   return parseResponse<MembershipPaymentsAdminResponse>(response);
+}
+
+export async function getAdminPaymentStats(token: string): Promise<AdminPaymentStats> {
+  const response = await fetch(`${API_URL}/api/payments/admin/stats`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+  return parseResponse<AdminPaymentStats>(response);
 }
 
 export async function listMemberPaymentsAdmin(
@@ -217,4 +238,72 @@ export function paymentVoucherUrl(path: string | null): string | null {
     return path;
   }
   return `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+const INVALID_AGREEMENT_LINK = "Este enlace no es válido o ya expiró";
+
+async function downloadBlob(response: Response, filename: string): Promise<void> {
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function sendDebitAgreement(
+  token: string,
+  memberId: number,
+): Promise<SendDebitAgreementResponse> {
+  const response = await fetch(`${API_URL}/api/payments/admin/members/${memberId}/send-agreement`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  return parseResponse<SendDebitAgreementResponse>(response);
+}
+
+export async function getPublicAgreement(token: string): Promise<PublicDebitAgreement> {
+  const response = await fetch(`${API_URL}/api/payments/agreements/${token}`, {
+    cache: "no-store",
+  });
+  if (response.status === 404) {
+    throw new Error(INVALID_AGREEMENT_LINK);
+  }
+  return parseResponse<PublicDebitAgreement>(response);
+}
+
+export async function downloadPublicAgreementPdf(token: string): Promise<void> {
+  const response = await fetch(`${API_URL}/api/payments/agreements/${token}/pdf`, {
+    cache: "no-store",
+  });
+  if (response.status === 404) {
+    throw new Error(INVALID_AGREEMENT_LINK);
+  }
+  if (!response.ok) {
+    await parseResponse<void>(response);
+    return;
+  }
+  await downloadBlob(response, "autorizacion-debito-adv-copsstec.pdf");
+}
+
+export async function uploadPublicAgreementDocuments(
+  token: string,
+  files: { signedAuthorization?: File; identityDocument?: File },
+): Promise<PublicAgreementDocumentsResponse> {
+  const body = new FormData();
+  if (files.signedAuthorization) {
+    body.append("signed_authorization", files.signedAuthorization);
+  }
+  if (files.identityDocument) {
+    body.append("identity_document", files.identityDocument);
+  }
+  const response = await fetch(`${API_URL}/api/payments/agreements/${token}/documents`, {
+    method: "POST",
+    body,
+  });
+  if (response.status === 404) {
+    throw new Error(INVALID_AGREEMENT_LINK);
+  }
+  return parseResponse<PublicAgreementDocumentsResponse>(response);
 }

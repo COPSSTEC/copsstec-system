@@ -249,3 +249,36 @@ export async function downloadMemberCertificate(token: string, memberId: number)
     `certificado-miembro-${memberId}.pdf`,
   );
 }
+
+export type DebitAgreementKind = "authorization" | "identity";
+
+export async function downloadMemberDebitDocument(
+  token: string,
+  memberId: number,
+  kind: DebitAgreementKind,
+): Promise<void> {
+  const filename =
+    kind === "authorization"
+      ? `autorizacion-adv-${memberId}.pdf`
+      : `cedula-acuerdo-${memberId}.pdf`;
+  const response = await fetch(`${API_URL}/api/members/${memberId}/debit-agreement/${kind}`, {
+    headers: authHeaders(token),
+  });
+
+  if (response.status === 404) {
+    throw new Error("Este miembro aún no ha subido los documentos del acuerdo");
+  }
+
+  if (!response.ok) {
+    await parseResponse<void>(response);
+    return;
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+}

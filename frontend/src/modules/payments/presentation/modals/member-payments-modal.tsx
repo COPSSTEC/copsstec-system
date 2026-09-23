@@ -13,11 +13,14 @@ import {
   type PaymentType,
   type PaymentWriteInput,
 } from "@/modules/payments/domain/types";
+import { MemberPaymentKpis } from "@/modules/payments/presentation/components/member-payment-kpis";
 import { PaymentListItem } from "@/modules/payments/presentation/components/payment-list-item";
 import { PaymentTypeSelect } from "@/modules/payments/presentation/components/payment-type-select";
 import { SubscriptionStatusBadge } from "@/modules/payments/presentation/components/subscription-status-badge";
 import { useMemberPayments } from "@/modules/payments/presentation/hooks/use-member-payments";
 import { ApproveRenewalModal } from "@/modules/payments/presentation/modals/approve-renewal-modal";
+
+export type MemberPaymentsModalMode = "register" | "history";
 
 interface MemberPaymentsModalProps {
   member: {
@@ -26,6 +29,7 @@ interface MemberPaymentsModalProps {
     lastname: string;
   };
   open: boolean;
+  mode?: MemberPaymentsModalMode;
   onClose: () => void;
 }
 
@@ -40,7 +44,12 @@ function isPaymentType(value: string): value is PaymentType {
   return (PAYMENT_TYPES as readonly string[]).includes(value);
 }
 
-export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsModalProps) {
+export function MemberPaymentsModal({
+  member,
+  open,
+  mode = "register",
+  onClose,
+}: MemberPaymentsModalProps) {
   const payments = useMemberPayments(member.user_id, open);
   const [form, setForm] = useState<PaymentWriteInput>({
     ...EMPTY_FORM,
@@ -49,7 +58,9 @@ export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsMod
   const [editing, setEditing] = useState<Payment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
   const [reviewTarget, setReviewTarget] = useState<Payment | null>(null);
+  const [formVisible, setFormVisible] = useState(mode === "register");
   const typeSelectRef = useRef<HTMLSelectElement | null>(null);
+  const isHistory = mode === "history";
 
   useEffect(() => {
     if (!open) {
@@ -59,19 +70,24 @@ export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsMod
     setEditing(null);
     setDeleteTarget(null);
     setReviewTarget(null);
-  }, [open, member.user_id]);
+    setFormVisible(mode === "register");
+  }, [open, member.user_id, mode]);
 
   if (!open) {
     return null;
   }
 
-  function resetForm() {
+  function resetForm(options?: { collapse?: boolean }) {
     setEditing(null);
     setForm({ ...EMPTY_FORM, date_register: todayRegisterDate() });
+    if (options?.collapse && isHistory) {
+      setFormVisible(false);
+    }
   }
 
   function focusForm() {
     resetForm();
+    setFormVisible(true);
     window.requestAnimationFrame(() => {
       typeSelectRef.current?.focus();
     });
@@ -79,6 +95,7 @@ export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsMod
 
   function startEdit(payment: Payment) {
     setEditing(payment);
+    setFormVisible(true);
     setForm({
       type: isPaymentType(payment.type) ? payment.type : "membresía",
       description: payment.description,
@@ -110,18 +127,31 @@ export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsMod
       } else {
         await payments.save(payload);
       }
-      resetForm();
+      resetForm({ collapse: isHistory });
     } catch {
       return;
     }
   }
 
+  const subscriptionSummary = payments.subscription
+    ? {
+        coverage_until: payments.subscription.coverage_until,
+        credit_balance: payments.subscription.credit_balance,
+        status: payments.subscription.status,
+        days_overdue: "days_overdue" in payments.subscription ? payments.subscription.days_overdue : 0,
+        pending_balance:
+          "pending_balance" in payments.subscription ? payments.subscription.pending_balance : undefined,
+        balance_status:
+          "balance_status" in payments.subscription ? payments.subscription.balance_status : undefined,
+      }
+    : null;
+
   return (
     <div className="modal-backdrop">
-      <div className="confirm-dialog member-payments-dialog">
+      <div className={`confirm-dialog member-payments-dialog${isHistory ? " is-history" : ""}`}>
         <div className="member-payments-header">
           <div>
-            <h2>Pagos</h2>
+            <h2>{isHistory ? "Historial de pagos" : "Pagos"}</h2>
             <p className="muted">
               {member.names} {member.lastname}
             </p>
@@ -135,8 +165,18 @@ export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsMod
             </button>
           </div>
         </div>
-        <p>Aquí encontrarás los pagos realizados y en proceso.</p>
-        {payments.subscription ? (
+        <p>
+          {isHistory
+            ? "Consulta los pagos registrados y el estado de la membresía."
+            : "Aquí encontrarás los pagos realizados y en proceso."}
+        </p>
+        {isHistory ? (
+          <MemberPaymentKpis
+            isLoading={payments.isLoading}
+            items={payments.items}
+            subscription={subscriptionSummary}
+          />
+        ) : payments.subscription ? (
           <p className="muted">
             Cobertura: {formatIsoDate(payments.subscription.coverage_until)} · Saldo{" "}
             {formatUsd(payments.subscription.credit_balance)} ·{" "}
@@ -144,6 +184,15 @@ export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsMod
           </p>
         ) : null}
 
+        {isHistory && !formVisible ? (
+          <div className="member-payments-history-actions">
+            <button className="secondary-button" onClick={focusForm} type="button">
+              Registrar pago
+            </button>
+          </div>
+        ) : null}
+
+        {formVisible ? (
         <form className="form-stack member-payment-form" onSubmit={(event) => void handleSubmit(event)}>
           <div className="member-form-grid">
             <PaymentTypeSelect
@@ -191,7 +240,17 @@ export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsMod
           <div className="table-actions">
             <button
               className="secondary-button"
-              onClick={editing ? resetForm : onClose}
+              onClick={() => {
+                if (editing) {
+                  resetForm();
+                  return;
+                }
+                if (isHistory) {
+                  resetForm({ collapse: true });
+                  return;
+                }
+                onClose();
+              }}
               type="button"
             >
               Cancelar
@@ -201,6 +260,7 @@ export function MemberPaymentsModal({ member, open, onClose }: MemberPaymentsMod
             </button>
           </div>
         </form>
+        ) : null}
 
         {payments.isLoading ? <p className="muted">Cargando pagos...</p> : null}
         <div className="payment-card-list">

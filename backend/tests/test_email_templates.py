@@ -59,6 +59,11 @@ def test_email_templates_include_logo_and_copy() -> None:
             "valor_pendiente": "50.00",
             "url_pago": "http://localhost:3000/afiliacion/pago",
         },
+        "debit_agreement": {
+            "nombres": "Ana Pérez",
+            "pending_balance": "240.00",
+            "url": "http://localhost:3000/acuerdo-debito/tok",
+        },
     }
 
     for key in RENDERERS:

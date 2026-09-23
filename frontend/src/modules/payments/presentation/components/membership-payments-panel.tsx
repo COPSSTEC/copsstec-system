@@ -1,19 +1,30 @@
 "use client";
 
 import {
+  AGREEMENT_STATUSES,
+  AGREEMENT_STATUS_LABELS,
+  BALANCE_STATUSES,
+  BALANCE_STATUS_LABELS,
   SUBSCRIPTION_STATUSES,
   SUBSCRIPTION_STATUS_LABELS,
   formatIsoDate,
   formatUsd,
   type AffiliationPaymentRow,
+  type AgreementStatus,
+  type BalanceStatus,
+  type MemberSubscriptionRow,
   type MembershipPaymentsAdminResponse,
   type PendingVoucher,
   type SubscriptionStatus,
 } from "@/modules/payments/domain/types";
 import { paymentVoucherUrl } from "@/modules/payments/infrastructure/payments-api";
+import { AgreementStatusBadge } from "@/modules/payments/presentation/components/agreement-status-badge";
+import { BalanceStatusBadge } from "@/modules/payments/presentation/components/balance-status-badge";
 import { PaymentStatusBadge } from "@/modules/payments/presentation/components/payment-status-badge";
 import { SubscriptionStatusBadge } from "@/modules/payments/presentation/components/subscription-status-badge";
 import { DataTable, type DataTableColumn } from "@/shared/components/data-table";
+
+const ENABLED_STATE_ID = 1;
 
 interface MembershipPaymentsPanelProps {
   data: MembershipPaymentsAdminResponse | null;
@@ -22,12 +33,45 @@ interface MembershipPaymentsPanelProps {
   pageSize: number;
   q: string;
   subscriptionStatus: SubscriptionStatus | "";
+  balanceStatus: BalanceStatus | "";
+  agreementStatus: AgreementStatus | "";
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onQueryChange: (value: string) => void;
   onStatusChange: (value: SubscriptionStatus | "") => void;
+  onBalanceStatusChange: (value: BalanceStatus | "") => void;
+  onAgreementStatusChange: (value: AgreementStatus | "") => void;
   onReview: (voucher: PendingVoucher) => void;
   onRegister: (member: { user_id: number; names: string; lastname: string }) => void;
+  onHistory: (member: { user_id: number; names: string; lastname: string }) => void;
+  onSendAgreement: (member: MemberSubscriptionRow) => void;
+}
+
+function hasPendingBalance(row: MemberSubscriptionRow): boolean {
+  if (row.balance_status === "saldo_pendiente") {
+    return true;
+  }
+  if (row.balance_status === "al_dia") {
+    return false;
+  }
+  return Number(row.pending_balance ?? 0) > 0;
+}
+
+function canSendAgreement(row: MemberSubscriptionRow): boolean {
+  if (!hasPendingBalance(row)) {
+    return false;
+  }
+  if (row.state_id == null) {
+    return true;
+  }
+  return row.state_id === ENABLED_STATE_ID;
+}
+
+function rowBalanceStatus(row: MemberSubscriptionRow): string {
+  if (row.balance_status) {
+    return row.balance_status;
+  }
+  return Number(row.pending_balance ?? 0) > 0 ? "saldo_pendiente" : "al_dia";
 }
 
 export function MembershipPaymentsPanel({
@@ -37,12 +81,18 @@ export function MembershipPaymentsPanel({
   pageSize,
   q,
   subscriptionStatus,
+  balanceStatus,
+  agreementStatus,
   onPageChange,
   onPageSizeChange,
   onQueryChange,
   onStatusChange,
+  onBalanceStatusChange,
+  onAgreementStatusChange,
   onReview,
   onRegister,
+  onHistory,
+  onSendAgreement,
 }: MembershipPaymentsPanelProps) {
   const subscriptions = data?.subscriptions.items ?? [];
   const pending = data?.pending_vouchers ?? [];
@@ -62,6 +112,13 @@ export function MembershipPaymentsPanel({
       ),
     },
     {
+      id: "enrolled_on",
+      header: "Fecha de inscripción",
+      sortable: false,
+      filterable: false,
+      cell: (row) => formatIsoDate(row.enrolled_on),
+    },
+    {
       id: "coverage",
       header: "Cobertura",
       sortable: false,
@@ -76,11 +133,30 @@ export function MembershipPaymentsPanel({
       cell: (row) => formatUsd(row.credit_balance),
     },
     {
+      id: "pending_balance",
+      header: "Saldo pendiente",
+      sortable: false,
+      filterable: false,
+      cell: (row) =>
+        row.pending_balance == null && !row.balance_status ? (
+          "—"
+        ) : (
+          <BalanceStatusBadge amount={row.pending_balance} status={rowBalanceStatus(row)} />
+        ),
+    },
+    {
       id: "status",
       header: "Estado",
       sortable: false,
       filterable: false,
       cell: (row) => <SubscriptionStatusBadge status={row.status} />,
+    },
+    {
+      id: "agreement",
+      header: "Acuerdo",
+      sortable: false,
+      filterable: false,
+      cell: (row) => <AgreementStatusBadge status={row.agreement_status ?? "none"} />,
     },
     {
       id: "overdue",
@@ -110,22 +186,33 @@ export function MembershipPaymentsPanel({
       sortable: false,
       filterable: false,
       hideable: false,
-      width: "140px",
-      cell: (row) => (
-        <button
-          className="secondary-button"
-          onClick={() =>
-            onRegister({
-              user_id: row.user_id,
-              names: row.member_name,
-              lastname: "",
-            })
-          }
-          type="button"
-        >
-          Registrar
-        </button>
-      ),
+      width: "160px",
+      cell: (row) => {
+        const member = {
+          user_id: row.user_id,
+          names: row.member_name,
+          lastname: "",
+        };
+        return (
+          <div className="membership-row-actions">
+            <button className="secondary-button" onClick={() => onRegister(member)} type="button">
+              Registrar
+            </button>
+            <button className="secondary-button" onClick={() => onHistory(member)} type="button">
+              Historial
+            </button>
+            {canSendAgreement(row) ? (
+              <button
+                className="primary-button send-agreement-button"
+                onClick={() => onSendAgreement(row)}
+                type="button"
+              >
+                Enviar acuerdo
+              </button>
+            ) : null}
+          </div>
+        );
+      },
     },
   ];
 
@@ -147,7 +234,9 @@ export function MembershipPaymentsPanel({
 
       <section className="card">
         <h2>Suscripciones</h2>
-        <p className="muted">Cobertura, saldo a favor y estado de mora de cada miembro.</p>
+        <p className="muted">
+          Fecha de inscripción, saldo pendiente y estado del acuerdo de débito de cada miembro.
+        </p>
         <DataTable
           columns={columns}
           data={subscriptions}
@@ -191,6 +280,40 @@ export function MembershipPaymentsPanel({
                   {SUBSCRIPTION_STATUSES.map((status) => (
                     <option key={status} value={status}>
                       {SUBSCRIPTION_STATUS_LABELS[status]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                Saldo
+                <select
+                  onChange={(event) => {
+                    onBalanceStatusChange(event.target.value as BalanceStatus | "");
+                    onPageChange(1);
+                  }}
+                  value={balanceStatus}
+                >
+                  <option value="">Todos</option>
+                  {BALANCE_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {BALANCE_STATUS_LABELS[status]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                Acuerdo
+                <select
+                  onChange={(event) => {
+                    onAgreementStatusChange(event.target.value as AgreementStatus | "");
+                    onPageChange(1);
+                  }}
+                  value={agreementStatus}
+                >
+                  <option value="">Todos</option>
+                  {AGREEMENT_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {AGREEMENT_STATUS_LABELS[status]}
                     </option>
                   ))}
                 </select>

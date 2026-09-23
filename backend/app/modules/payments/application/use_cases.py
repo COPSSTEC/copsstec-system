@@ -1,9 +1,16 @@
 from dataclasses import dataclass, replace
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from secrets import token_urlsafe
 
 from app.core.config import get_settings
-from app.modules.payments.application.ports import PaymentFileStorage, PaymentsRepository
+from app.modules.payments.application.ports import (
+    AdvAuthorizationPdfGenerator,
+    AgreementEmailSender,
+    AgreementFileStorage,
+    PaymentFileStorage,
+    PaymentsRepository,
+)
 from app.modules.payments.domain.entities import (
     AdminPaymentQuery,
     BankTransferInfo,
@@ -11,8 +18,12 @@ from app.modules.payments.domain.entities import (
     MemberPaymentsView,
     MyPaymentsView,
     Payment,
+    PaymentAdminStats,
     PaymentMutationResult,
+    PublicAgreementView,
+    SendAgreementResult,
     SubscriptionListQuery,
+    UploadAgreementResult,
 )
 from app.modules.payments.domain.exceptions import (
     PaymentConflictError,
@@ -21,20 +32,28 @@ from app.modules.payments.domain.exceptions import (
     PaymentValidationError,
 )
 from app.modules.payments.domain.subscription import (
+    AGREEMENT_TOKEN_DAYS,
+    AGREEMENT_UPLOADED,
+    ENABLED_MEMBER_STATE_ID,
     MONTHLY_FEE,
     RENEWAL_REFERENCE,
     STATUS_APPROVED,
     STATUS_PENDING_PAYMENT,
     STATUS_PENDING_REVIEW,
     STATUS_REJECTED,
+    agreement_status_from_documents,
     amount_for_plan,
     as_money,
+    balance_status_from_pending,
     canonicalize_payment_type,
+    days_overdue,
+    first_renewal_date,
     format_register_date,
     is_coverage_current,
+    money_str,
     parse_register_date,
+    pending_membership_balance,
     subscription_status_label,
-    days_overdue,
 )
 
 
@@ -119,6 +138,24 @@ def _bank_info() -> BankTransferInfo:
     )
 
 
+def _parse_payment_method(raw: str | None) -> str:
+    value = (raw or "").strip().lower()
+    if value in {"", "any", "na", "transferencia"}:
+        return "any"
+    if value in {"deposito", "depósito"}:
+        return "deposito"
+    if value in {"efectivo", "tarjeta"}:
+        return value
+    if value.isdigit() and 1 <= len(value) <= 4:
+        return value
+    return "any"
+
+
+def _parse_trans_id(raw: str | None) -> str:
+    value = (raw or "").strip()
+    return value[:80] if value else "NA"
+
+
 @dataclass(frozen=True)
 class CreatePaymentCommand:
     member_id: int
@@ -126,6 +163,8 @@ class CreatePaymentCommand:
     description: str
     amount: Decimal | str
     date_register: str
+    last_digits: str | None = None
+    trans_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -135,6 +174,8 @@ class UpdatePaymentCommand:
     description: str
     amount: Decimal | str
     date_register: str
+    last_digits: str | None = None
+    trans_id: str | None = None
 
 
 class ListAdminPaymentsUseCase:
@@ -143,6 +184,14 @@ class ListAdminPaymentsUseCase:
 
     def execute(self, query: AdminPaymentQuery):
         return self.repository.list_admin_payments(query)
+
+
+class GetAdminPaymentStatsUseCase:
+    def __init__(self, repository: PaymentsRepository) -> None:
+        self.repository = repository
+
+    def execute(self) -> PaymentAdminStats:
+        return self.repository.get_admin_stats()
 
 
 class GetAdminMembershipDashboardUseCase:
@@ -170,10 +219,22 @@ class GetMemberPaymentsAdminUseCase:
         if member is None:
             raise PaymentNotFoundError()
         _discard_stale_pending(self.repository, member_id, today)
+        subscription = _with_subscription_view(self.repository.get_subscription(member_id), today)
+        context = self.repository.get_agreement_member_context(member_id)
+        if subscription is not None and context is not None:
+            pending = _pending_for_member(self.repository, member_id, context.enrolled_on, today)
+            subscription = replace(
+                subscription,
+                enrolled_on=context.enrolled_on,
+                first_renewal_on=first_renewal_date(context.enrolled_on) if context.enrolled_on else None,
+                pending_balance=pending,
+                balance_status=balance_status_from_pending(pending),
+                email=context.email,
+            )
         return MemberPaymentsView(
             member=member,
             items=self.repository.list_payments_for_user(member_id),
-            subscription=_with_subscription_view(self.repository.get_subscription(member_id), today),
+            subscription=subscription,
         )
 
 
@@ -193,6 +254,8 @@ class CreateAdminPaymentUseCase:
             amount=_parse_amount(command.amount),
             date_register=_parse_date(command.date_register),
             status=STATUS_APPROVED,
+            last_digits=_parse_payment_method(command.last_digits),
+            trans_id=_parse_trans_id(command.trans_id),
         )
         _discard_stale_pending(self.repository, command.member_id, today)
         subscription = self.repository.get_subscription(command.member_id)
@@ -212,6 +275,8 @@ class UpdateAdminPaymentUseCase:
             description=_parse_description(command.description),
             amount=_parse_amount(command.amount),
             date_register=_parse_date(command.date_register),
+            last_digits=_parse_payment_method(command.last_digits) if command.last_digits is not None else None,
+            trans_id=_parse_trans_id(command.trans_id) if command.trans_id is not None else None,
         )
         subscription = self.repository.get_subscription(payment.user_id)
         return PaymentMutationResult(payment=payment, subscription=_with_subscription_view(subscription, today))
@@ -369,3 +434,210 @@ class GetPaymentMediaUseCase:
         if path is None or not path.exists():
             raise PaymentNotFoundError()
         return str(path), path.name
+
+
+def _now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _pending_for_member(repository: PaymentsRepository, user_id: int, enrolled_on: date | None, today: date) -> Decimal:
+    if enrolled_on is None:
+        return Decimal("0.00")
+    renewals = repository.list_approved_membership_payments([user_id]).get(user_id, [])
+    return pending_membership_balance(enrolled_on, today, renewals)
+
+
+class SendDebitAgreementUseCase:
+    def __init__(
+        self,
+        repository: PaymentsRepository,
+        email_sender: AgreementEmailSender,
+    ) -> None:
+        self.repository = repository
+        self.email_sender = email_sender
+
+    def execute(self, member_id: int, today: date | None = None) -> SendAgreementResult:
+        today = today or _today()
+        member = self.repository.get_agreement_member_context(member_id)
+        if member is None:
+            raise PaymentNotFoundError()
+        if member.state_id != ENABLED_MEMBER_STATE_ID:
+            raise PaymentValidationError("El miembro no está habilitado.")
+        if not member.email.strip():
+            raise PaymentValidationError("El miembro no tiene un correo electrónico.")
+
+        pending = _pending_for_member(self.repository, member.user_id, member.enrolled_on, today)
+        if pending <= 0:
+            raise PaymentValidationError("El miembro no tiene saldo pendiente.")
+
+        sent_at = _now()
+        expires_at = sent_at + timedelta(days=AGREEMENT_TOKEN_DAYS)
+        self.repository.revoke_current_agreement(member.user_id)
+        token = token_urlsafe(32)
+        agreement = self.repository.create_debit_agreement(
+            user_id=member.user_id,
+            token=token,
+            pending_balance=pending,
+            sent_at=sent_at,
+            expires_at=expires_at,
+        )
+
+        settings = get_settings()
+        origin = settings.frontend_origin.rstrip("/")
+        url = f"{origin}/acuerdo-debito/{token}"
+        message = "Acuerdo enviado al correo del miembro."
+        try:
+            self.email_sender.send_template(
+                member.email,
+                "debit_agreement",
+                {
+                    "nombres": member.member_name or member.names,
+                    "pending_balance": money_str(pending),
+                    "url": url,
+                },
+            )
+        except Exception:
+            message = "Acuerdo generado. No se pudo enviar el correo. El enlace quedó registrado."
+
+        return SendAgreementResult(
+            user_id=agreement.user_id,
+            email=member.email,
+            pending_balance=pending,
+            agreement_status=agreement.status,
+            expires_at=agreement.expires_at,
+            message=message,
+        )
+
+
+class GetPublicAgreementUseCase:
+    def __init__(self, repository: PaymentsRepository) -> None:
+        self.repository = repository
+
+    def execute(self, token: str) -> PublicAgreementView:
+        view = self.repository.get_public_agreement(token)
+        if view is None:
+            raise PaymentNotFoundError()
+        return view
+
+
+class DownloadPublicAgreementPdfUseCase:
+    def __init__(
+        self,
+        repository: PaymentsRepository,
+        pdf_generator: AdvAuthorizationPdfGenerator,
+    ) -> None:
+        self.repository = repository
+        self.pdf_generator = pdf_generator
+
+    def execute(self, token: str, today: date | None = None) -> bytes:
+        today = today or _today()
+        view = self.repository.get_public_agreement(token)
+        if view is None:
+            raise PaymentNotFoundError()
+        return self.pdf_generator.generate(
+            names=view.names,
+            lastname=view.lastname,
+            identifier=view.identifier,
+            city=view.city,
+            issued_on=today,
+        )
+
+
+class UploadPublicAgreementDocumentsUseCase:
+    def __init__(
+        self,
+        repository: PaymentsRepository,
+        storage: AgreementFileStorage,
+    ) -> None:
+        self.repository = repository
+        self.storage = storage
+
+    def execute(
+        self,
+        token: str,
+        signed_authorization: tuple[str, bytes, str] | None,
+        identity_document: tuple[str, bytes, str] | None,
+    ) -> UploadAgreementResult:
+        view = self.repository.get_public_agreement(token)
+        if view is None:
+            raise PaymentNotFoundError()
+
+        auth_upload = signed_authorization if signed_authorization and signed_authorization[1] else None
+        identity_upload = identity_document if identity_document and identity_document[1] else None
+        if auth_upload is None and identity_upload is None:
+            raise PaymentValidationError("Debe adjuntar al menos un archivo PDF.")
+
+        has_signed = view.has_signed_authorization
+        has_identity = view.has_identity_document
+        if not has_signed and auth_upload is None:
+            raise PaymentValidationError("La autorización firmada es obligatoria.")
+        if not has_identity and identity_upload is None:
+            raise PaymentValidationError("La copia de cédula es obligatoria.")
+
+        agreement = self.repository.get_current_agreement(view.user_id)
+        if agreement is None:
+            raise PaymentNotFoundError()
+
+        signed_path = None
+        identity_path = None
+        if auth_upload is not None:
+            filename, content, content_type = auth_upload
+            signed_path = self.storage.save_pdf(view.user_id, "authorization", filename, content, content_type)
+            has_signed = True
+        if identity_upload is not None:
+            filename, content, content_type = identity_upload
+            identity_path = self.storage.save_pdf(view.user_id, "identity", filename, content, content_type)
+            has_identity = True
+
+        status = agreement_status_from_documents(has_signed, has_identity)
+        uploaded_at = agreement.documents_uploaded_at
+        if status == AGREEMENT_UPLOADED and uploaded_at is None:
+            uploaded_at = _now()
+
+        updated = self.repository.save_agreement_documents(
+            agreement.id,
+            signed_path,
+            identity_path,
+            status,
+            uploaded_at,
+        )
+        return UploadAgreementResult(
+            status=updated.status,
+            has_signed_authorization=updated.has_signed_authorization,
+            has_identity_document=updated.has_identity_document,
+            message="Documentos recibidos. El administrador los revisará.",
+        )
+
+
+class DownloadAdminAgreementDocumentUseCase:
+    def __init__(
+        self,
+        repository: PaymentsRepository,
+        storage: AgreementFileStorage,
+    ) -> None:
+        self.repository = repository
+        self.storage = storage
+
+    def execute(self, member_id: int, kind: str) -> tuple[str, str]:
+        if kind not in {"authorization", "identity"}:
+            raise PaymentValidationError("Documento no válido.")
+        if self.repository.get_agreement_member_context(member_id) is None:
+            raise PaymentNotFoundError()
+        agreement = self.repository.get_current_agreement(member_id)
+        if agreement is None:
+            raise PaymentNotFoundError()
+        stored = (
+            agreement.signed_authorization_path
+            if kind == "authorization"
+            else agreement.identity_document_path
+        )
+        if not (stored or "").strip():
+            raise PaymentNotFoundError()
+        path = self.storage.resolve_path(stored)
+        if path is None or not path.exists():
+            raise PaymentNotFoundError()
+        filenames = {
+            "authorization": "autorizacion-debito-adv-firmada.pdf",
+            "identity": "cedula-adv.pdf",
+        }
+        return str(path), filenames[kind]

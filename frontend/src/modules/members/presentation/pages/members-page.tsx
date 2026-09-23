@@ -16,6 +16,7 @@ import {
   deleteMember,
   disableMember,
   downloadMemberCertificate,
+  downloadMemberDebitDocument,
   downloadMemberFile,
   enableMember,
   listMembers,
@@ -267,6 +268,22 @@ export function MembersPage() {
     }
   }
 
+  async function handleDownloadDebit(member: Member, kind: "authorization" | "identity") {
+    if (!token) {
+      return;
+    }
+
+    try {
+      await downloadMemberDebitDocument(token, member.user_id, kind);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Este miembro aún no ha subido los documentos del acuerdo",
+      );
+    }
+  }
+
   const tableColumns = useMemo<DataTableColumn<Member>[]>(() => {
     const renderers: Record<string, (member: Member) => ReactNode> = {
       member: (member) => (
@@ -346,7 +363,9 @@ export function MembersPage() {
             member={member}
             onDelete={(item) => setConfirm({ type: "delete", member: item })}
             onDownload={(item) => void handleDownload(item, "file")}
+            onDownloadAuthorization={(item) => void handleDownloadDebit(item, "authorization")}
             onDownloadCertificate={(item) => void handleDownload(item, "certificate")}
+            onDownloadIdentity={(item) => void handleDownloadDebit(item, "identity")}
             onEdit={openEdit}
             onApprove={(item) => setApprovingMember(item)}
             onPayments={(item) => setPaymentsMember(item)}

@@ -420,6 +420,42 @@ def render_branded_content(context: dict) -> tuple[str, str, str]:
     return subject, text, html
 
 
+def render_debit_agreement(context: dict) -> tuple[str, str, str]:
+    nombres = context.get("nombres") or "miembro"
+    amount = context.get("pending_balance") or "0.00"
+    url = context.get("url") or f"{_site_url()}/acuerdo-debito"
+    subject = f"Autorización de débito pendiente - {nombres}"
+    text = (
+        f"Hola {nombres},\n\n"
+        f"Tienes un saldo pendiente de membresía por USD {amount}.\n"
+        "Descarga la autorización de débito, fírmala y súbela junto con tu cédula. "
+        "El enlace vence en 30 días.\n"
+        f"{url}\n"
+    )
+    inner = f"""
+      <p style="margin:0 0 16px;font-size:16px;">Hola <strong>{_esc(nombres)}</strong>,</p>
+      <p style="margin:0 0 16px;">
+        Tienes un saldo pendiente de membresía. Para regularizar el débito, descarga
+        la autorización ADV, fírmala y súbela junto con la copia de tu cédula.
+      </p>
+      <table role="presentation" width="100%" style="background:#f3f4f6;border-radius:8px;margin:16px 0;">
+        <tr><td align="center" style="padding:16px;font-size:24px;font-weight:700;">USD ${_esc(amount)}</td></tr>
+      </table>
+      <p style="margin:0 0 16px;">
+        El enlace es personal y vence en 30 días. No necesitas iniciar sesión.
+      </p>
+      <p style="margin:0;">Si ya enviaste los documentos, puedes ignorar este mensaje.</p>
+    """
+    html = branded_layout(
+        preview=subject,
+        heading="<strong>Autorización de débito pendiente</strong>",
+        inner_html=inner,
+        cta_label="Completar autorización",
+        cta_href=url,
+    )
+    return subject, text, html
+
+
 def render_payment_reminder(context: dict) -> tuple[str, str, str]:
     nombres = context.get("nombres") or "miembro"
     amount = context.get("valor_pendiente") or "0.00"
@@ -460,6 +496,7 @@ RENDERERS = {
     "course_feedback": render_course_feedback,
     "branded_content": render_branded_content,
     "payment_reminder": render_payment_reminder,
+    "debit_agreement": render_debit_agreement,
 }
 
 

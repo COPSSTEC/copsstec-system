@@ -12,11 +12,21 @@ from app.modules.payments.domain.entities import (
     MembershipDashboard,
     MyPaymentsView,
     Payment,
+    PaymentAdminStats,
     PaymentListResult,
     PaymentMutationResult,
+    PublicAgreementView,
+    SendAgreementResult,
     SubscriptionListResult,
+    UploadAgreementResult,
 )
-from app.modules.payments.domain.subscription import GRACE_DAYS, money_str, plan_from_amount
+from app.modules.payments.domain.subscription import (
+    AGREEMENT_NONE,
+    BALANCE_AL_DIA,
+    GRACE_DAYS,
+    money_str,
+    plan_from_amount,
+)
 
 
 def _dt(value: datetime | None) -> str | None:
@@ -36,6 +46,7 @@ class PaymentItemResponse(BaseModel):
     currency: str = "USD"
     date_register: str
     last_digits: str
+    trans_id: str = "NA"
     status: str
     voucher_url: str | None
     created_at: str | None
@@ -54,6 +65,7 @@ class PaymentItemResponse(BaseModel):
             amount=money_str(payment.amount),
             date_register=payment.date_register,
             last_digits=payment.last_digits,
+            trans_id=payment.trans_id,
             status=payment.status,
             voucher_url=payment.voucher_url,
             created_at=_dt(payment.created_at),
@@ -90,6 +102,15 @@ class SubscriptionResponse(BaseModel):
     payments_count: int | None = None
     open_payment_status: str | None = None
     grace_days: int = GRACE_DAYS
+    enrolled_on: date | None = None
+    first_renewal_on: date | None = None
+    pending_balance: str = "0.00"
+    balance_status: str = BALANCE_AL_DIA
+    agreement_status: str = AGREEMENT_NONE
+    agreement_sent_at: str | None = None
+    has_signed_authorization: bool = False
+    has_identity_document: bool = False
+    email: str | None = None
 
     @classmethod
     def from_domain(cls, subscription: MemberSubscription | None, include_member: bool = False) -> "SubscriptionResponse | None":
@@ -103,6 +124,15 @@ class SubscriptionResponse(BaseModel):
             "last_payment_at": subscription.last_payment_at,
             "open_payment_status": subscription.open_payment_status,
             "grace_days": GRACE_DAYS,
+            "enrolled_on": subscription.enrolled_on,
+            "first_renewal_on": subscription.first_renewal_on,
+            "pending_balance": money_str(subscription.pending_balance),
+            "balance_status": subscription.balance_status,
+            "agreement_status": subscription.agreement_status,
+            "agreement_sent_at": _dt(subscription.agreement_sent_at),
+            "has_signed_authorization": subscription.has_signed_authorization,
+            "has_identity_document": subscription.has_identity_document,
+            "email": subscription.email or None,
         }
         if include_member:
             payload.update(
@@ -227,6 +257,42 @@ class CreatePaymentRequest(BaseModel):
     description: str = Field(min_length=1, max_length=255)
     amount: Decimal
     date_register: str = Field(min_length=8, max_length=10)
+    last_digits: str | None = None
+    trans_id: str | None = None
+
+
+class PaymentAdminStatsResponse(BaseModel):
+    payments_total: int
+    approved_count: int
+    approved_month: int
+    approved_prev_month: int
+    pending_count: int
+    pending_month: int
+    pending_prev_month: int
+    members_total: int
+    members_al_dia: int
+    members_gracia: int
+    members_vencidas: int
+    members_sin_historial: int
+    pending_balance_total: str
+
+    @classmethod
+    def from_domain(cls, stats: PaymentAdminStats) -> "PaymentAdminStatsResponse":
+        return cls(
+            payments_total=stats.payments_total,
+            approved_count=stats.approved_count,
+            approved_month=stats.approved_month,
+            approved_prev_month=stats.approved_prev_month,
+            pending_count=stats.pending_count,
+            pending_month=stats.pending_month,
+            pending_prev_month=stats.pending_prev_month,
+            members_total=stats.members_total,
+            members_al_dia=stats.members_al_dia,
+            members_gracia=stats.members_gracia,
+            members_vencidas=stats.members_vencidas,
+            members_sin_historial=stats.members_sin_historial,
+            pending_balance_total=money_str(stats.pending_balance_total),
+        )
 
 
 class RejectPaymentRequest(BaseModel):
@@ -292,6 +358,64 @@ class PaymentInfoResponse(BaseModel):
             account_holder=info.account_holder,
             account_ruc=info.account_ruc,
             qr_payload=info.qr_payload,
+        )
+
+
+class SendAgreementResponse(BaseModel):
+    user_id: int
+    email: str
+    pending_balance: str
+    agreement_status: str
+    expires_at: str
+    message: str
+
+    @classmethod
+    def from_domain(cls, result: SendAgreementResult) -> "SendAgreementResponse":
+        return cls(
+            user_id=result.user_id,
+            email=result.email,
+            pending_balance=money_str(result.pending_balance),
+            agreement_status=result.agreement_status,
+            expires_at=_dt(result.expires_at) or "",
+            message=result.message,
+        )
+
+
+class PublicAgreementResponse(BaseModel):
+    member_name: str
+    identifier: str
+    pending_balance: str
+    has_signed_authorization: bool
+    has_identity_document: bool
+    status: str
+    expires_at: str
+
+    @classmethod
+    def from_domain(cls, view: PublicAgreementView) -> "PublicAgreementResponse":
+        return cls(
+            member_name=view.member_name,
+            identifier=view.identifier,
+            pending_balance=money_str(view.pending_balance),
+            has_signed_authorization=view.has_signed_authorization,
+            has_identity_document=view.has_identity_document,
+            status=view.status,
+            expires_at=_dt(view.expires_at) or "",
+        )
+
+
+class UploadAgreementDocumentsResponse(BaseModel):
+    status: str
+    has_signed_authorization: bool
+    has_identity_document: bool
+    message: str
+
+    @classmethod
+    def from_domain(cls, result: UploadAgreementResult) -> "UploadAgreementDocumentsResponse":
+        return cls(
+            status=result.status,
+            has_signed_authorization=result.has_signed_authorization,
+            has_identity_document=result.has_identity_document,
+            message=result.message,
         )
 
 

@@ -63,6 +63,14 @@ from app.modules.membership.presentation.api.schemas import (
     ApproveMemberRequest,
     ApproveMemberResponse,
 )
+from app.modules.payments.application.use_cases import DownloadAdminAgreementDocumentUseCase
+from app.modules.payments.domain.exceptions import (
+    PaymentNotFoundError,
+    PaymentValidationError,
+)
+from app.modules.payments.presentation.api.dependencies import (
+    get_download_admin_agreement_document_use_case,
+)
 
 router = APIRouter(prefix="/api/members", tags=["members"])
 
@@ -84,6 +92,10 @@ def _http_error(exc: Exception) -> HTTPException:
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
     if isinstance(exc, MailboxError):
         return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=exc.message)
+    if isinstance(exc, PaymentNotFoundError):
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado.")
+    if isinstance(exc, PaymentValidationError):
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno.")
 
 
@@ -308,6 +320,23 @@ def download_member_certificate(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/{member_id}/debit-agreement/{kind}")
+def download_debit_agreement_document(
+    member_id: int,
+    kind: str,
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[
+        DownloadAdminAgreementDocumentUseCase,
+        Depends(get_download_admin_agreement_document_use_case),
+    ],
+) -> FileResponse:
+    try:
+        path, filename = use_case.execute(member_id, kind)
+    except (PaymentNotFoundError, PaymentValidationError) as exc:
+        raise _http_error(exc) from exc
+    return FileResponse(path=path, media_type="application/pdf", filename=filename)
 
 
 @router.get("/{member_id}/onboarding-documents/{document_kind}")

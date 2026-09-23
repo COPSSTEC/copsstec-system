@@ -32,7 +32,14 @@ export type PaymentIconName =
   | "printer"
   | "share"
   | "arrow"
-  | "clock";
+  | "clock"
+  | "plus"
+  | "eye"
+  | "pencil"
+  | "trash"
+  | "warning"
+  | "dollar"
+  | "filter";
 
 export interface PaymentVisual {
   icon: PaymentIconName;

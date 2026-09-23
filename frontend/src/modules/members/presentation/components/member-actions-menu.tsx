@@ -10,6 +10,8 @@ interface MemberActionsMenuProps {
   onEdit: (member: Member) => void;
   onDownload: (member: Member) => void;
   onDownloadCertificate: (member: Member) => void;
+  onDownloadAuthorization: (member: Member) => void;
+  onDownloadIdentity: (member: Member) => void;
   onResendCredentials: (member: Member) => void;
   onDelete: (member: Member) => void;
   onToggleState: (member: Member) => void;
@@ -41,6 +43,8 @@ export function MemberActionsMenu({
   onEdit,
   onDownload,
   onDownloadCertificate,
+  onDownloadAuthorization,
+  onDownloadIdentity,
   onResendCredentials,
   onDelete,
   onToggleState,
@@ -122,6 +126,12 @@ export function MemberActionsMenu({
             </button>
             <button onClick={() => run(onDownloadCertificate)} type="button">
               Descargar certificado
+            </button>
+            <button onClick={() => run(onDownloadAuthorization)} type="button">
+              Descargar autorización ADV
+            </button>
+            <button onClick={() => run(onDownloadIdentity)} type="button">
+              Descargar cédula
             </button>
             {enabled ? (
               <button onClick={() => run(onResendCredentials)} type="button">

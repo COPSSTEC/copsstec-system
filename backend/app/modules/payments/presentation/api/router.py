@@ -13,14 +13,19 @@ from app.modules.payments.application.use_cases import (
     CreatePaymentCommand,
     CreateRenewalUseCase,
     DeleteAdminPaymentUseCase,
+    DownloadPublicAgreementPdfUseCase,
     GetAdminMembershipDashboardUseCase,
+    GetAdminPaymentStatsUseCase,
     GetMemberPaymentsAdminUseCase,
     GetMyPaymentsUseCase,
     GetPaymentMediaUseCase,
+    GetPublicAgreementUseCase,
     ListAdminPaymentsUseCase,
     RejectPaymentUseCase,
+    SendDebitAgreementUseCase,
     UpdateAdminPaymentUseCase,
     UpdatePaymentCommand,
+    UploadPublicAgreementDocumentsUseCase,
     UploadVoucherUseCase,
 )
 from app.modules.payments.domain.entities import AdminPaymentQuery, SubscriptionListQuery
@@ -30,9 +35,11 @@ from app.modules.payments.domain.exceptions import (
     PaymentNotFoundError,
     PaymentValidationError,
 )
+from app.modules.payments.infrastructure.agreement_files import InvalidAgreementFileError
 from app.modules.payments.infrastructure.files import InvalidPaymentFileError
 from app.modules.payments.presentation.api.dependencies import (
     get_admin_membership_dashboard_use_case,
+    get_admin_payment_stats_use_case,
     get_approve_payment_use_case,
     get_create_admin_payment_use_case,
     get_create_renewal_use_case,
@@ -41,21 +48,29 @@ from app.modules.payments.presentation.api.dependencies import (
     get_member_payments_admin_use_case,
     get_my_payments_use_case,
     get_payment_media_use_case,
+    get_public_agreement_pdf_use_case,
+    get_public_agreement_use_case,
     get_reject_payment_use_case,
+    get_send_debit_agreement_use_case,
     get_update_admin_payment_use_case,
+    get_upload_agreement_documents_use_case,
     get_upload_voucher_use_case,
 )
 from app.modules.payments.presentation.api.schemas import (
     CreatePaymentRequest,
     MembershipDashboardResponse,
     MemberPaymentsResponse,
+    PaymentAdminStatsResponse,
     MyPaymentsResponse,
     OpenPaymentResponse,
     PaymentItemResponse,
     PaymentListResponse,
     PaymentMutationResponse,
+    PublicAgreementResponse,
     RejectPaymentRequest,
     RenewalRequest,
+    SendAgreementResponse,
+    UploadAgreementDocumentsResponse,
 )
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
@@ -71,6 +86,8 @@ def _http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, PaymentForbiddenError):
         return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=exc.message)
     if isinstance(exc, InvalidPaymentFileError):
+        return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
+    if isinstance(exc, InvalidAgreementFileError):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno.")
 
@@ -107,6 +124,14 @@ def list_admin_payments(
     return PaymentListResponse.from_domain(result)
 
 
+@router.get("/admin/stats", response_model=PaymentAdminStatsResponse)
+def admin_payment_stats(
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[GetAdminPaymentStatsUseCase, Depends(get_admin_payment_stats_use_case)],
+) -> PaymentAdminStatsResponse:
+    return PaymentAdminStatsResponse.from_domain(use_case.execute())
+
+
 @router.get("/admin/membership", response_model=MembershipDashboardResponse)
 def admin_membership_dashboard(
     _: Annotated[User, Depends(require_access("admin"))],
@@ -115,6 +140,9 @@ def admin_membership_dashboard(
     page_size: int = Query(15, ge=1, le=100),
     q: str | None = None,
     subscription_status: str | None = None,
+    balance_status: str | None = None,
+    agreement_status: str | None = None,
+    period: str | None = None,
 ) -> MembershipDashboardResponse:
     dashboard = use_case.execute(
         SubscriptionListQuery(
@@ -122,9 +150,94 @@ def admin_membership_dashboard(
             page_size=page_size,
             q=q,
             subscription_status=subscription_status,
+            balance_status=balance_status,
+            agreement_status=agreement_status,
+            period=period,
         ),
     )
     return MembershipDashboardResponse.from_domain(dashboard)
+
+
+@router.post("/admin/members/{member_id}/send-agreement", response_model=SendAgreementResponse)
+def send_debit_agreement(
+    member_id: int,
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[SendDebitAgreementUseCase, Depends(get_send_debit_agreement_use_case)],
+) -> SendAgreementResponse:
+    try:
+        return SendAgreementResponse.from_domain(use_case.execute(member_id))
+    except PaymentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Miembro no encontrado.") from exc
+    except PaymentValidationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/agreements/{token}", response_model=PublicAgreementResponse)
+def get_public_agreement(
+    token: str,
+    use_case: Annotated[GetPublicAgreementUseCase, Depends(get_public_agreement_use_case)],
+) -> PublicAgreementResponse:
+    try:
+        return PublicAgreementResponse.from_domain(use_case.execute(token))
+    except PaymentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El enlace no es válido o expiró.",
+        ) from exc
+
+
+@router.get("/agreements/{token}/pdf")
+def download_public_agreement_pdf(
+    token: str,
+    use_case: Annotated[DownloadPublicAgreementPdfUseCase, Depends(get_public_agreement_pdf_use_case)],
+) -> Response:
+    try:
+        pdf_bytes = use_case.execute(token)
+    except PaymentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El enlace no es válido o expiró.",
+        ) from exc
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="autorizacion-debito-adv-copsstec.pdf"'},
+    )
+
+
+@router.post("/agreements/{token}/documents", response_model=UploadAgreementDocumentsResponse)
+async def upload_public_agreement_documents(
+    token: str,
+    use_case: Annotated[
+        UploadPublicAgreementDocumentsUseCase,
+        Depends(get_upload_agreement_documents_use_case),
+    ],
+    signed_authorization: UploadFile | None = File(None),
+    identity_document: UploadFile | None = File(None),
+) -> UploadAgreementDocumentsResponse:
+    try:
+        result = use_case.execute(
+            token=token,
+            signed_authorization=await _optional_upload(signed_authorization),
+            identity_document=await _optional_upload(identity_document),
+        )
+    except PaymentNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El enlace no es válido o expiró.",
+        ) from exc
+    except (PaymentValidationError, InvalidAgreementFileError) as exc:
+        raise _http_error(exc) from exc
+    return UploadAgreementDocumentsResponse.from_domain(result)
+
+
+async def _optional_upload(upload: UploadFile | None) -> tuple[str, bytes, str] | None:
+    if upload is None:
+        return None
+    content = await upload.read()
+    if not content:
+        return None
+    return upload.filename or "documento.pdf", content, upload.content_type or ""
 
 
 @router.get("/admin/members/{member_id}", response_model=MemberPaymentsResponse)
@@ -158,6 +271,8 @@ def create_admin_payment(
                 description=request.description,
                 amount=request.amount,
                 date_register=request.date_register,
+                last_digits=request.last_digits,
+                trans_id=request.trans_id,
             ),
         )
     except (PaymentNotFoundError, PaymentValidationError) as exc:
@@ -180,6 +295,8 @@ def update_admin_payment(
                 description=request.description,
                 amount=request.amount,
                 date_register=request.date_register,
+                last_digits=request.last_digits,
+                trans_id=request.trans_id,
             ),
         )
     except (PaymentNotFoundError, PaymentValidationError) as exc:

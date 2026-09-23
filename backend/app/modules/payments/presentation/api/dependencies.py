@@ -9,15 +9,24 @@ from app.modules.payments.application.use_cases import (
     CreateAdminPaymentUseCase,
     CreateRenewalUseCase,
     DeleteAdminPaymentUseCase,
+    DownloadAdminAgreementDocumentUseCase,
+    DownloadPublicAgreementPdfUseCase,
     GetAdminMembershipDashboardUseCase,
+    GetAdminPaymentStatsUseCase,
     GetMemberPaymentsAdminUseCase,
     GetMyPaymentsUseCase,
     GetPaymentMediaUseCase,
+    GetPublicAgreementUseCase,
     ListAdminPaymentsUseCase,
     RejectPaymentUseCase,
+    SendDebitAgreementUseCase,
     UpdateAdminPaymentUseCase,
+    UploadPublicAgreementDocumentsUseCase,
     UploadVoucherUseCase,
 )
+from app.modules.payments.infrastructure.adv_authorization_pdf import AdvDebitAuthorizationPdfGenerator
+from app.modules.payments.infrastructure.agreement_files import LocalAgreementFileStorage
+from app.modules.payments.infrastructure.email import PaymentsEmailSender
 from app.modules.payments.infrastructure.files import LocalPaymentFileStorage
 from app.modules.payments.infrastructure.repository import SqlAlchemyPaymentsRepository
 
@@ -42,6 +51,12 @@ def get_admin_membership_dashboard_use_case(
     repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
 ) -> GetAdminMembershipDashboardUseCase:
     return GetAdminMembershipDashboardUseCase(repository)
+
+
+def get_admin_payment_stats_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+) -> GetAdminPaymentStatsUseCase:
+    return GetAdminPaymentStatsUseCase(repository)
 
 
 def get_member_payments_admin_use_case(
@@ -104,3 +119,49 @@ def get_payment_media_use_case(
     storage: Annotated[LocalPaymentFileStorage, Depends(get_payment_storage)],
 ) -> GetPaymentMediaUseCase:
     return GetPaymentMediaUseCase(repository, storage)
+
+
+def get_agreement_storage() -> LocalAgreementFileStorage:
+    return LocalAgreementFileStorage()
+
+
+def get_agreement_email_sender() -> PaymentsEmailSender:
+    return PaymentsEmailSender(raise_on_error=False)
+
+
+def get_adv_pdf_generator() -> AdvDebitAuthorizationPdfGenerator:
+    return AdvDebitAuthorizationPdfGenerator()
+
+
+def get_send_debit_agreement_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+    email_sender: Annotated[PaymentsEmailSender, Depends(get_agreement_email_sender)],
+) -> SendDebitAgreementUseCase:
+    return SendDebitAgreementUseCase(repository, email_sender)
+
+
+def get_public_agreement_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+) -> GetPublicAgreementUseCase:
+    return GetPublicAgreementUseCase(repository)
+
+
+def get_public_agreement_pdf_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+    pdf_generator: Annotated[AdvDebitAuthorizationPdfGenerator, Depends(get_adv_pdf_generator)],
+) -> DownloadPublicAgreementPdfUseCase:
+    return DownloadPublicAgreementPdfUseCase(repository, pdf_generator)
+
+
+def get_upload_agreement_documents_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+    storage: Annotated[LocalAgreementFileStorage, Depends(get_agreement_storage)],
+) -> UploadPublicAgreementDocumentsUseCase:
+    return UploadPublicAgreementDocumentsUseCase(repository, storage)
+
+
+def get_download_admin_agreement_document_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+    storage: Annotated[LocalAgreementFileStorage, Depends(get_agreement_storage)],
+) -> DownloadAdminAgreementDocumentUseCase:
+    return DownloadAdminAgreementDocumentUseCase(repository, storage)

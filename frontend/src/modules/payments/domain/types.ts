@@ -22,6 +22,14 @@ export const SUBSCRIPTION_STATUSES = ["al_dia", "gracia", "vencida", "sin_histor
 
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
+export const BALANCE_STATUSES = ["al_dia", "saldo_pendiente"] as const;
+
+export type BalanceStatus = (typeof BALANCE_STATUSES)[number];
+
+export const AGREEMENT_STATUSES = ["none", "sent", "partial", "uploaded"] as const;
+
+export type AgreementStatus = (typeof AGREEMENT_STATUSES)[number];
+
 export type RenewalPlan = "monthly" | "yearly";
 
 export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
@@ -47,6 +55,18 @@ export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatus, string> = {
   sin_historial: "Sin historial",
 };
 
+export const BALANCE_STATUS_LABELS: Record<BalanceStatus, string> = {
+  al_dia: "Al día",
+  saldo_pendiente: "Saldo pendiente",
+};
+
+export const AGREEMENT_STATUS_LABELS: Record<AgreementStatus, string> = {
+  none: "Sin enviar",
+  sent: "Enviado",
+  partial: "Parcial",
+  uploaded: "Subido",
+};
+
 export const RENEWAL_PLAN_LABELS: Record<RenewalPlan, string> = {
   monthly: "Mensual USD 10",
   yearly: "Anual USD 120",
@@ -54,6 +74,26 @@ export const RENEWAL_PLAN_LABELS: Record<RenewalPlan, string> = {
 
 export const MONTHLY_FEE = "10.00";
 export const YEARLY_FEE = "120.00";
+
+export const PAYMENT_METHODS = ["transferencia", "deposito", "efectivo", "tarjeta"] as const;
+
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  transferencia: "Transferencia",
+  deposito: "Depósito",
+  efectivo: "Efectivo",
+  tarjeta: "Tarjeta",
+};
+
+export const MEMBERSHIP_PERIODS = ["this_month", "this_year"] as const;
+
+export type MembershipPeriod = (typeof MEMBERSHIP_PERIODS)[number];
+
+export const MEMBERSHIP_PERIOD_LABELS: Record<MembershipPeriod, string> = {
+  this_month: "Este mes",
+  this_year: "Este año",
+};
 
 export interface Payment {
   id: number;
@@ -67,6 +107,7 @@ export interface Payment {
   currency?: string;
   date_register: string;
   last_digits: string;
+  trans_id?: string;
   status: PaymentStatus | string;
   voucher_url: string | null;
   admin_observation?: string | null;
@@ -79,6 +120,8 @@ export interface PaymentWriteInput {
   description: string;
   amount: string;
   date_register: string;
+  last_digits?: string;
+  trans_id?: string;
 }
 
 export interface OpenPayment {
@@ -99,6 +142,8 @@ export interface SubscriptionSummary {
   grace_days?: number;
   days_overdue: number;
   last_payment_at?: string | null;
+  pending_balance?: string;
+  balance_status?: BalanceStatus | string;
 }
 
 export interface MemberSubscriptionRow {
@@ -112,6 +157,16 @@ export interface MemberSubscriptionRow {
   last_payment_at: string | null;
   payments_count: number;
   open_payment_status: PaymentStatus | string | null;
+  enrolled_on?: string | null;
+  first_renewal_on?: string | null;
+  pending_balance?: string;
+  balance_status?: BalanceStatus | string;
+  agreement_status?: AgreementStatus | string;
+  agreement_sent_at?: string | null;
+  has_signed_authorization?: boolean;
+  has_identity_document?: boolean;
+  email?: string;
+  state_id?: number;
 }
 
 export interface PendingVoucher {
@@ -199,6 +254,51 @@ export interface MembershipPaymentsQuery {
   pageSize: number;
   q?: string;
   subscriptionStatus?: SubscriptionStatus | "";
+  balanceStatus?: BalanceStatus | "";
+  agreementStatus?: AgreementStatus | "";
+  period?: MembershipPeriod | "";
+}
+
+export interface AdminPaymentStats {
+  payments_total: number;
+  approved_count: number;
+  approved_month: number;
+  approved_prev_month: number;
+  pending_count: number;
+  pending_month: number;
+  pending_prev_month: number;
+  members_total: number;
+  members_al_dia: number;
+  members_gracia: number;
+  members_vencidas: number;
+  members_sin_historial: number;
+  pending_balance_total: string;
+}
+
+export interface SendDebitAgreementResponse {
+  user_id: number;
+  email: string;
+  pending_balance: string;
+  agreement_status: AgreementStatus | string;
+  expires_at: string;
+  message: string;
+}
+
+export interface PublicDebitAgreement {
+  member_name: string;
+  identifier: string;
+  pending_balance: string;
+  has_signed_authorization: boolean;
+  has_identity_document: boolean;
+  status: AgreementStatus | string;
+  expires_at: string;
+}
+
+export interface PublicAgreementDocumentsResponse {
+  status: AgreementStatus | string;
+  has_signed_authorization: boolean;
+  has_identity_document: boolean;
+  message: string;
 }
 
 export interface PaymentWriteResponse {
@@ -233,6 +333,20 @@ export function subscriptionStatusLabel(status: string): string {
   return status;
 }
 
+export function balanceStatusLabel(status: string): string {
+  if (status in BALANCE_STATUS_LABELS) {
+    return BALANCE_STATUS_LABELS[status as BalanceStatus];
+  }
+  return status;
+}
+
+export function agreementStatusLabel(status: string): string {
+  if (status in AGREEMENT_STATUS_LABELS) {
+    return AGREEMENT_STATUS_LABELS[status as AgreementStatus];
+  }
+  return status;
+}
+
 export function formatUsd(amount: string | number): string {
   const value = typeof amount === "number" ? amount : Number(amount);
   if (Number.isNaN(value)) {
@@ -241,11 +355,40 @@ export function formatUsd(amount: string | number): string {
   return `${value.toFixed(2)} US$`;
 }
 
-export function formatPaymentMethod(lastDigits: string | null | undefined): string {
-  if (!lastDigits || lastDigits === "any" || lastDigits === "NA") {
-    return "Transferencia";
+export function paymentMethodFromDigits(lastDigits: string | null | undefined): PaymentMethod {
+  const value = (lastDigits || "").trim().toLowerCase();
+  if (value === "deposito" || value === "depósito") {
+    return "deposito";
   }
-  return `**** **** **** ${lastDigits}`;
+  if (value === "efectivo") {
+    return "efectivo";
+  }
+  if (value === "tarjeta" || (/^\d{1,4}$/.test(value) && value !== "any")) {
+    return "tarjeta";
+  }
+  return "transferencia";
+}
+
+export function formatPaymentMethod(lastDigits: string | null | undefined): string {
+  const method = paymentMethodFromDigits(lastDigits);
+  if (method === "tarjeta" && lastDigits && /^\d{1,4}$/.test(lastDigits)) {
+    return `**** ${lastDigits}`;
+  }
+  return PAYMENT_METHOD_LABELS[method];
+}
+
+export function memberInitials(name: string): string {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) {
+    return "—";
+  }
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 export function todayRegisterDate(): string {

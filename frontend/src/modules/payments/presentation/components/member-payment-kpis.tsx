@@ -22,7 +22,9 @@ interface MemberPaymentKpisProps {
 }
 
 export function MemberPaymentKpis({ isLoading, items, subscription }: MemberPaymentKpisProps) {
-  const pending = pendingAmountTotal(items);
+  const openPending = pendingAmountTotal(items);
+  const debt = Number(subscription?.pending_balance || 0);
+  const pending = Math.max(openPending, Number.isNaN(debt) ? 0 : debt);
   const active = isMembershipActive(subscription?.status);
 
   return (
@@ -45,7 +47,7 @@ export function MemberPaymentKpis({ isLoading, items, subscription }: MemberPaym
         hint={
           Number(subscription?.credit_balance || 0) > 0
             ? "Disponible para próximas cuotas."
-            : "Sin saldo pendiente."
+            : "Sin saldo a favor."
         }
         icon="wallet"
         label="Saldo a favor"
@@ -53,7 +55,7 @@ export function MemberPaymentKpis({ isLoading, items, subscription }: MemberPaym
         value={isLoading ? "—" : formatUsd(subscription?.credit_balance || "0")}
       />
       <KpiCard
-        hint={pending > 0 ? "Tienes pagos por regularizar." : "No tienes cargos vencidos."}
+        hint={pending > 0 ? "Cuotas de membresía adeudadas." : "No tienes cargos vencidos."}
         icon="invoice"
         label="Pendiente por pagar"
         tone={pending > 0 ? "rose" : "slate"}

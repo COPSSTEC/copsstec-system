@@ -9,6 +9,10 @@ from app.shared.infrastructure.email.templates import render_email
 
 
 class MailtrapEmailSender:
+    raise_on_error = False
+    smtp_timeout = 20
+    smtp_attempts = 4
+
     def send(self, to_email: str, subject: str, body: str) -> None:
         _, _, html = render_email("branded_content", {"subject": subject, "content": _text_to_html(body), "text": body})
         self.send_html(to_email, subject, body, html)
@@ -82,9 +86,11 @@ class MailtrapEmailSender:
 
     def _deliver(self, settings, envelope: EmailMessage) -> None:
         last_error: Exception | None = None
-        for attempt in range(4):
+        attempts = max(1, int(getattr(self, "smtp_attempts", 4)))
+        timeout = max(1, int(getattr(self, "smtp_timeout", 20)))
+        for attempt in range(attempts):
             try:
-                with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
+                with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=timeout) as smtp:
                     if getattr(settings, "smtp_use_tls", True):
                         smtp.starttls()
                     if settings.smtp_user:
