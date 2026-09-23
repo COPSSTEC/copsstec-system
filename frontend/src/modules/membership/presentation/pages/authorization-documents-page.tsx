@@ -242,11 +242,12 @@ export function AuthorizationDocumentsPage() {
       router.replace("/login");
       return;
     }
-    setToken(sessionToken);
+    const accessToken = sessionToken;
+    setToken(accessToken);
 
     async function load() {
       try {
-        const current = await getMembershipStatus(sessionToken);
+        const current = await getMembershipStatus(accessToken);
         if (membershipPathForStatus(current) !== "/afiliacion/documentos") {
           router.replace(membershipPathForStatus(current));
           return;
