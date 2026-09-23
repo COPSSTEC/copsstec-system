@@ -175,8 +175,13 @@ class DownloadMemberPdfUseCase:
         verify_url = public_verify_url(member)
         if kind == "certificate":
             return (
-                f"certificado-miembro-{member.user_id}.pdf",
+                f"certificado-afiliacion-{member.user_id}.pdf",
                 self.pdf_generator.generate_certificate(member, verify_url),
+            )
+        if kind == "solicitud":
+            return (
+                f"solicitud-afiliacion-{member.user_id}.pdf",
+                self.pdf_generator.generate_solicitud(member),
             )
         return (
             f"carnet-miembro-{member.user_id}.pdf",

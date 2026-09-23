@@ -16,7 +16,6 @@ import {
   deleteMember,
   disableMember,
   downloadMemberCertificate,
-  downloadMemberDebitDocument,
   downloadMemberFile,
   enableMember,
   listMembers,
@@ -252,35 +251,19 @@ export function MembersPage() {
     }
   }
 
-  async function handleDownload(member: Member, kind: "file" | "certificate") {
+  async function handleDownload(member: Member, kind: "solicitud" | "certificate") {
     if (!token) {
       return;
     }
 
     try {
-      if (kind === "file") {
+      if (kind === "solicitud") {
         await downloadMemberFile(token, member.user_id);
       } else {
         await downloadMemberCertificate(token, member.user_id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo descargar el PDF.");
-    }
-  }
-
-  async function handleDownloadDebit(member: Member, kind: "authorization" | "identity") {
-    if (!token) {
-      return;
-    }
-
-    try {
-      await downloadMemberDebitDocument(token, member.user_id, kind);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Este miembro aún no ha subido los documentos del acuerdo",
-      );
     }
   }
 
@@ -362,10 +345,8 @@ export function MembersPage() {
           <MemberActionsMenu
             member={member}
             onDelete={(item) => setConfirm({ type: "delete", member: item })}
-            onDownload={(item) => void handleDownload(item, "file")}
-            onDownloadAuthorization={(item) => void handleDownloadDebit(item, "authorization")}
+            onDownload={(item) => void handleDownload(item, "solicitud")}
             onDownloadCertificate={(item) => void handleDownload(item, "certificate")}
-            onDownloadIdentity={(item) => void handleDownloadDebit(item, "identity")}
             onEdit={openEdit}
             onApprove={(item) => setApprovingMember(item)}
             onPayments={(item) => setPaymentsMember(item)}

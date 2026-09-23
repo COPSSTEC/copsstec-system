@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from xml.sax.saxutils import escape
 
+from reportlab.lib.colors import black
+from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
 
 from app.modules.members.domain.entities import ENABLED_STATE_ID, Member
 
@@ -169,6 +174,63 @@ def _qr_reader(url: str, box_size: int = 8) -> ImageReader:
     return ImageReader(buffer)
 
 
+def _solicitud_value(value: str | None) -> str:
+    text = (value or "").strip()
+    return escape(text) if text else "—"
+
+
+def _solicitud_upper(value: str | None) -> str:
+    text = (value or "").strip()
+    return escape(text.upper()) if text else "—"
+
+
+def _certificate_name_lines(names: str, lastname: str) -> list[str]:
+    first = (names or "").strip()
+    second = (lastname or "").strip()
+    if first and second:
+        return [first, second]
+    full = f"{first} {second}".strip()
+    return [full] if full else ["—"]
+
+
+def _draw_fitted_centered_lines(
+    pdf: canvas.Canvas,
+    lines: list[str],
+    font_name: str,
+    max_width: float,
+    center_x: float,
+    y: float,
+    max_size: float = 36,
+    min_size: float = 16,
+) -> None:
+    visible = [line for line in lines if line]
+    if not visible:
+        return
+    size = max_size
+    while size > min_size:
+        if all(pdf.stringWidth(line, font_name, size) <= max_width for line in visible):
+            break
+        size -= 0.5
+    if any(pdf.stringWidth(line, font_name, size) > max_width for line in visible) and len(visible) == 1:
+        words = visible[0].split()
+        if len(words) > 1:
+            mid = max(1, len(words) // 2)
+            visible = [" ".join(words[:mid]), " ".join(words[mid:])]
+            size = max_size
+            while size > min_size:
+                if all(pdf.stringWidth(line, font_name, size) <= max_width for line in visible):
+                    break
+                size -= 0.5
+    pdf.setFont(font_name, size)
+    if len(visible) == 1:
+        pdf.drawCentredString(center_x, y, visible[0])
+        return
+    gap = size * 0.95
+    start = y + gap * (len(visible) - 1) / 2
+    for index, line in enumerate(visible):
+        pdf.drawCentredString(center_x, start - index * gap, line)
+
+
 def generate_qr_png(url: str) -> bytes:
     import qrcode
 
@@ -189,11 +251,16 @@ class MemberDocumentGenerator:
         if CERTIFICATE_BG.is_file():
             pdf.drawImage(str(CERTIFICATE_BG), 0, 0, width=width, height=height, preserveAspectRatio=False, mask="auto")
 
-        full_name = f"{member.names} {member.lastname}".strip()
         font_name = _register_cookie()
         pdf.setFillColorRGB(0.10, 0.14, 0.49)
-        pdf.setFont(font_name, 36)
-        pdf.drawCentredString(width / 2, 558, full_name)
+        _draw_fitted_centered_lines(
+            pdf,
+            _certificate_name_lines(member.names, member.lastname),
+            font_name,
+            max_width=width - 110,
+            center_x=width / 2,
+            y=558,
+        )
 
         pdf.setFillColorRGB(0.12, 0.14, 0.20)
         pdf.setFont("Times-Roman", 12)
@@ -201,11 +268,142 @@ class MemberDocumentGenerator:
 
         pdf.setFont("Times-Bold", 11)
         pdf.drawString(width / 2 + 14, 228, format_register_month_year(member.date_register))
-        pdf.drawString(width / 2 + 58, 178, member_code(member))
 
-        qr_size = 62
-        pdf.drawImage(_qr_reader(verify_url), 36, 36, width=qr_size, height=qr_size, mask="auto")
+        qr_size = 68
+        qr_x = (width - qr_size) / 2
+        qr_y = 46
+        pdf.drawImage(_qr_reader(verify_url), qr_x, qr_y, width=qr_size, height=qr_size, mask="auto")
+        pdf.setFont("Times-Bold", 11)
+        pdf.drawCentredString(width / 2, 32, member_code(member))
         pdf.save()
+        return buffer.getvalue()
+
+    def generate_solicitud(self, member: Member) -> bytes:
+        buffer = io.BytesIO()
+        document = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=35,
+            rightMargin=35,
+            topMargin=35,
+            bottomMargin=65,
+            title="SOLICITUD DE AFILIACIÓN Y COMPROMISO",
+            author="COPSSTEC",
+        )
+
+        header_style = ParagraphStyle(
+            "SolicitudHeader",
+            fontName="Times-Roman",
+            fontSize=20,
+            leading=24,
+            alignment=TA_CENTER,
+            spaceAfter=0,
+        )
+        slogan_style = ParagraphStyle(
+            "SolicitudSlogan",
+            fontName="Times-Roman",
+            fontSize=10,
+            leading=13,
+            alignment=TA_RIGHT,
+            spaceBefore=6,
+            spaceAfter=0,
+        )
+        section_style = ParagraphStyle(
+            "SolicitudSection",
+            fontName="Times-Bold",
+            fontSize=20,
+            leading=24,
+            alignment=TA_CENTER,
+            spaceBefore=30,
+            spaceAfter=30,
+        )
+        body_style = ParagraphStyle(
+            "SolicitudBody",
+            fontName="Times-Roman",
+            fontSize=14,
+            leading=20,
+            alignment=TA_JUSTIFY,
+            spaceBefore=12,
+            spaceAfter=12,
+        )
+        sign_style = ParagraphStyle(
+            "SolicitudSign",
+            fontName="Times-Roman",
+            fontSize=14,
+            leading=18,
+            alignment=TA_LEFT,
+            leftIndent=12,
+            spaceBefore=12,
+            spaceAfter=4,
+        )
+        footer_style = ParagraphStyle(
+            "SolicitudFooter",
+            fontName="Times-Bold",
+            fontSize=14,
+            leading=20,
+            alignment=TA_LEFT,
+            leftIndent=12,
+            spaceAfter=2,
+        )
+
+        names = _solicitud_upper(member.names)
+        lastname = _solicitud_upper(member.lastname)
+        identifier = _solicitud_upper(member.identifier)
+        body = (
+            f"Yo, <font name='Times-Bold'>{names} {lastname}</font>, titular de la cédula de "
+            f"identidad Nro. <font name='Times-Bold'>{identifier}</font>, domiciliado en la "
+            f"provincia de <font name='Times-Bold'>{_solicitud_upper(member.province)}</font> "
+            f"Ciudad de <font name='Times-Bold'>{_solicitud_upper(member.city)}</font> en la "
+            f"calle <font name='Times-Bold'>{_solicitud_upper(member.street_principal)}</font> "
+            f"y transversal <font name='Times-Bold'>{_solicitud_upper(member.street_secondary)}</font> "
+            f"Teléfono fijo <font name='Times-Bold'>{_solicitud_upper(member.fixed_phone)}</font> "
+            f"Teléfono Móvil <font name='Times-Bold'>{_solicitud_upper(member.mobile_phone)}</font>, "
+            "en consideración de ser un profesional de la seguridad y salud en el trabajo con mi "
+            f"título de <font name='Times-Bold'>{_solicitud_upper(member.title_academic)}</font>, "
+            "legalmente registrado en el Sistema Nacional de Información de la Educación Superior "
+            f"del Ecuador, con el código: <font name='Times-Bold'>{_solicitud_upper(member.cod_senescyt)}</font>. "
+            "Solicito a usted Sr. Presidente, se me incluya como miembro activo del "
+            "<font name='Times-Bold'>COLEGIO DE PROFESIONALES DE SEGURIDAD Y SALUD EN EL TRABAJO "
+            "DEL ECUADOR (COPSSTEC)</font>, asumiendo el compromiso de manera voluntaria de "
+            "realizar mi aporte anual por el valor de $120 (ciento veinte dólares americanos); "
+            "en la cuenta corriente No 48403590 del Banco de Guayaquil a nombre del Colegio de "
+            "Profesionales de Seguridad y Salud en el Trabajo del Ecuador Ruc: 1792898633001, "
+            "además declaro que estoy en conocimiento de los estatutos y apruebo mi aporte sea "
+            "destinado a cumplir con los fines y objetivos planteados. Además, autorizo a que se "
+            "registren mis datos ante el Ministerio de Trabajo, para lo cual adjunto la copia de "
+            "mi cédula."
+        )
+        footer_name = f"{_solicitud_value(member.lastname)} {_solicitud_value(member.names)}".strip()
+
+        story = [
+            Paragraph("COLEGIO DE PROFESIONALES", header_style),
+            Paragraph("DE SEGURIDAD Y SALUD EN EL TRABAJO", header_style),
+            Spacer(1, 8),
+            HRFlowable(width="100%", thickness=1, color=black, spaceBefore=0, spaceAfter=6),
+            Paragraph(
+                "Unidos por un trabajo seguro y saludable para fortalecer la producción del país",
+                slogan_style,
+            ),
+            Paragraph("SOLICITUD DE AFILIACIÓN Y COMPROMISO", section_style),
+            Paragraph(body, body_style),
+            Paragraph("Atentamente:", body_style),
+            Paragraph("Firma:", sign_style),
+            HRFlowable(
+                width=200,
+                thickness=1,
+                color=black,
+                spaceBefore=0,
+                spaceAfter=30,
+                hAlign="LEFT",
+            ),
+            Paragraph(f"Apellidos y nombres: {footer_name}", footer_style),
+            Paragraph(f"Cédula: {_solicitud_value(member.identifier)}", footer_style),
+            Paragraph(f"Tipo de sangre: {_solicitud_value(member.blood_type)}", footer_style),
+            Paragraph(f"Fecha de ingreso: {_solicitud_value(member.date_register)}", footer_style),
+            Paragraph(f"Fecha de nacimiento: {_solicitud_value(member.birtday)}", footer_style),
+            Paragraph(f"Correo: {_solicitud_value(member.email)}", footer_style),
+        ]
+        document.build(story)
         return buffer.getvalue()
 
     def generate_carnet(self, member: Member, verify_url: str) -> bytes:

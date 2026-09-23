@@ -19,14 +19,24 @@ import {
   type PaymentType,
   type PaymentWriteInput,
 } from "@/modules/payments/domain/types";
-import { paymentVoucherUrl } from "@/modules/payments/infrastructure/payments-api";
+import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import {
+  downloadAdminAgreementDocument,
+  paymentVoucherUrl,
+} from "@/modules/payments/infrastructure/payments-api";
+import { AgreementDocumentsCell } from "@/modules/payments/presentation/components/agreement-documents-cell";
 import { AgreementStatusBadge } from "@/modules/payments/presentation/components/agreement-status-badge";
 import { PaymentStatusBadge } from "@/modules/payments/presentation/components/payment-status-badge";
 import { PaymentTypeSelect } from "@/modules/payments/presentation/components/payment-type-select";
 import { PaymentUiIcon } from "@/modules/payments/presentation/components/payment-ui-icon";
 import { SubscriptionStatusBadge } from "@/modules/payments/presentation/components/subscription-status-badge";
 import { useMemberPayments } from "@/modules/payments/presentation/hooks/use-member-payments";
-import { canSendAgreement, hasPendingBalance } from "@/modules/payments/presentation/lib/admin-payments";
+import {
+  canSendAgreement,
+  hasIdentityDocument,
+  hasPendingBalance,
+  hasSignedAuthorization,
+} from "@/modules/payments/presentation/lib/admin-payments";
 import { ApproveRenewalModal } from "@/modules/payments/presentation/modals/approve-renewal-modal";
 
 interface AdminMemberPaymentPanelProps {
@@ -60,6 +70,8 @@ export function AdminMemberPaymentPanel({
   const [deleteTarget, setDeleteTarget] = useState<Payment | null>(null);
   const [reviewTarget, setReviewTarget] = useState<Payment | null>(null);
   const [showAllHistory, setShowAllHistory] = useState(false);
+  const [docError, setDocError] = useState("");
+  const [downloadingDoc, setDownloadingDoc] = useState<"authorization" | "identity" | null>(null);
 
   const subscription = payments.subscription ?? member;
   const pending = Number(subscription.pending_balance ?? member.pending_balance ?? 0);
@@ -86,7 +98,29 @@ export function AdminMemberPaymentPanel({
     setDeleteTarget(null);
     setReviewTarget(null);
     setShowAllHistory(false);
+    setDocError("");
+    setDownloadingDoc(null);
   }, [member.user_id]);
+
+  async function downloadAgreement(kind: "authorization" | "identity") {
+    const token = getStoredToken();
+    if (!token) {
+      return;
+    }
+    setDocError("");
+    setDownloadingDoc(kind);
+    try {
+      await downloadAdminAgreementDocument(token, member.user_id, kind);
+    } catch (error) {
+      setDocError(
+        error instanceof Error
+          ? error.message
+          : "Este miembro aún no ha subido los documentos del acuerdo",
+      );
+    } finally {
+      setDownloadingDoc(null);
+    }
+  }
 
   function resetForm() {
     setEditing(null);
@@ -197,6 +231,28 @@ export function AdminMemberPaymentPanel({
             Acuerdo: <AgreementStatusBadge status={member.agreement_status} />
           </p>
         ) : null}
+        <div className="admin-payments-docs-block">
+          <AgreementDocumentsCell member={member} />
+          <div className="admin-payments-docs-actions">
+            <button
+              className="secondary-button"
+              disabled={!hasSignedAuthorization(member) || downloadingDoc !== null}
+              onClick={() => void downloadAgreement("authorization")}
+              type="button"
+            >
+              {downloadingDoc === "authorization" ? "Descargando..." : "Descargar ADV"}
+            </button>
+            <button
+              className="secondary-button"
+              disabled={!hasIdentityDocument(member) || downloadingDoc !== null}
+              onClick={() => void downloadAgreement("identity")}
+              type="button"
+            >
+              {downloadingDoc === "identity" ? "Descargando..." : "Descargar cédula"}
+            </button>
+          </div>
+          {docError ? <p className="admin-payments-docs-error">{docError}</p> : null}
+        </div>
       </section>
 
       <section className="admin-payments-detail-block">

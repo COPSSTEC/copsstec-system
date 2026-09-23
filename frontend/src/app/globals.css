@@ -13947,6 +13947,48 @@ textarea {
   margin: 0;
 }
 
+.admin-payments-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-payments-docs span {
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.18rem 0.5rem;
+}
+
+.admin-payments-docs .is-ready {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.admin-payments-docs .is-missing {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.admin-payments-docs-block {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.admin-payments-docs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.admin-payments-docs-error {
+  color: #b91c1c;
+  font-size: 0.78rem;
+  margin: 0;
+}
+
 .admin-payments-form-grid {
   display: grid;
   gap: 0.7rem;

@@ -252,6 +252,39 @@ async function downloadBlob(response: Response, filename: string): Promise<void>
   window.URL.revokeObjectURL(url);
 }
 
+export type AgreementDocumentKind = "authorization" | "identity";
+
+export async function downloadAdminAgreementDocument(
+  token: string,
+  memberId: number,
+  kind: AgreementDocumentKind,
+): Promise<void> {
+  const filename =
+    kind === "authorization"
+      ? `autorizacion-adv-${memberId}.pdf`
+      : `cedula-acuerdo-${memberId}.pdf`;
+  const headers = authHeaders(token);
+  const onboarding = await fetch(
+    `${API_URL}/api/members/${memberId}/onboarding-documents/${kind}`,
+    { headers },
+  );
+  if (onboarding.ok) {
+    await downloadBlob(onboarding, filename);
+    return;
+  }
+  const agreement = await fetch(`${API_URL}/api/members/${memberId}/debit-agreement/${kind}`, {
+    headers,
+  });
+  if (agreement.ok) {
+    await downloadBlob(agreement, filename);
+    return;
+  }
+  if (onboarding.status === 404 && agreement.status === 404) {
+    throw new Error("Este miembro aún no ha subido los documentos del acuerdo");
+  }
+  await parseResponse<void>(agreement.ok ? onboarding : agreement);
+}
+
 export async function sendDebitAgreement(
   token: string,
   memberId: number,

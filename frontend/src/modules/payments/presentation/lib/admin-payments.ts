@@ -25,6 +25,14 @@ export function canSendAgreement(row: MemberSubscriptionRow): boolean {
   return row.state_id === ENABLED_STATE_ID;
 }
 
+export function hasSignedAuthorization(row: MemberSubscriptionRow): boolean {
+  return Boolean(row.has_signed_authorization);
+}
+
+export function hasIdentityDocument(row: MemberSubscriptionRow): boolean {
+  return Boolean(row.has_identity_document);
+}
+
 export function rowBalanceStatus(row: MemberSubscriptionRow): string {
   if (row.balance_status) {
     return row.balance_status;

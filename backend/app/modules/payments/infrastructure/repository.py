@@ -652,6 +652,13 @@ class SqlAlchemyPaymentsRepository:
             LEFT JOIN member_subscriptions ms ON ms.user_id = u.id
             LEFT JOIN membership_debit_agreements da
                 ON da.user_id = u.id AND da.revoked_at IS NULL
+            LEFT JOIN LATERAL (
+                SELECT mp.signed_authorization_path, mp.identity_document_path
+                FROM membership_payments mp
+                WHERE mp.user_id = u.id
+                ORDER BY mp.id DESC
+                LIMIT 1
+            ) onb ON TRUE
             WHERE r.name = :member_role
               AND p.deleted_at IS NULL
         """
@@ -673,6 +680,8 @@ class SqlAlchemyPaymentsRepository:
                     da.sent_at AS agreement_sent_at,
                     da.signed_authorization_path,
                     da.identity_document_path,
+                    onb.signed_authorization_path AS onboarding_authorization_path,
+                    onb.identity_document_path AS onboarding_identity_path,
                     (
                         SELECT COUNT(*) FROM payments pay
                         WHERE pay.user_id = u.id
@@ -834,6 +843,8 @@ class SqlAlchemyPaymentsRepository:
                     NULL AS agreement_sent_at,
                     NULL AS signed_authorization_path,
                     NULL AS identity_document_path,
+                    NULL AS onboarding_authorization_path,
+                    NULL AS onboarding_identity_path,
                     0 AS payments_count,
                     NULL AS open_payment_status,
                     {status_sql} AS computed_status
@@ -1119,8 +1130,14 @@ class SqlAlchemyPaymentsRepository:
                 if enrolled_on
                 else Decimal("0.00")
             )
-            signed = bool((row.get("signed_authorization_path") or "").strip())
-            identity = bool((row.get("identity_document_path") or "").strip())
+            signed = bool(
+                (row.get("signed_authorization_path") or "").strip()
+                or (row.get("onboarding_authorization_path") or "").strip()
+            )
+            identity = bool(
+                (row.get("identity_document_path") or "").strip()
+                or (row.get("onboarding_identity_path") or "").strip()
+            )
             items.append(
                 MemberSubscription(
                     user_id=subscription.user_id,

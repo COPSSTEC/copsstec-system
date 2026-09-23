@@ -15,6 +15,7 @@ import {
   type SubscriptionStatus,
 } from "@/modules/payments/domain/types";
 import { AdminMemberPaymentPanel } from "@/modules/payments/presentation/components/admin-member-payment-panel";
+import { AgreementDocumentsCell } from "@/modules/payments/presentation/components/agreement-documents-cell";
 import { BalanceStatusBadge } from "@/modules/payments/presentation/components/balance-status-badge";
 import { PaymentUiIcon } from "@/modules/payments/presentation/components/payment-ui-icon";
 import { SubscriptionStatusBadge } from "@/modules/payments/presentation/components/subscription-status-badge";
@@ -167,6 +168,7 @@ export function AdminMembershipWorkspace({
                   <th>Cobertura / vigencia</th>
                   <th>Saldo pendiente</th>
                   <th>Estado</th>
+                  <th>Documentos</th>
                   <th>Mora</th>
                   <th>Último pago</th>
                   <th>Acciones</th>
@@ -175,7 +177,7 @@ export function AdminMembershipWorkspace({
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td className="muted" colSpan={7}>
+                    <td className="muted" colSpan={8}>
                       Cargando miembros...
                     </td>
                   </tr>
@@ -203,6 +205,9 @@ export function AdminMembershipWorkspace({
                       <td>
                         <SubscriptionStatusBadge status={row.status} />
                       </td>
+                      <td>
+                        <AgreementDocumentsCell member={row} />
+                      </td>
                       <td>{row.days_overdue > 0 ? `${row.days_overdue} días` : "—"}</td>
                       <td>{formatIsoDate(row.last_payment_at)}</td>
                       <td>
@@ -221,7 +226,7 @@ export function AdminMembershipWorkspace({
                   ))}
                 {!isLoading && rows.length === 0 ? (
                   <tr>
-                    <td className="muted" colSpan={7}>
+                    <td className="muted" colSpan={8}>
                       No hay miembros con esos filtros.
                     </td>
                   </tr>

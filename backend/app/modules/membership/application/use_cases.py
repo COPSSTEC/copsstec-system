@@ -497,8 +497,13 @@ class DownloadOnboardingDocumentUseCase:
             raise MembershipNotFoundError()
 
         relative = stored.replace("/media/membership/", "").lstrip("/")
-        file_path = Path("storage/membership") / relative
-        if not file_path.exists():
+        candidates = [
+            Path("storage/membership") / relative,
+            Path(__file__).resolve().parents[4] / "storage" / "membership" / relative,
+            Path(stored),
+        ]
+        file_path = next((path for path in candidates if path.is_file()), None)
+        if file_path is None:
             raise MembershipNotFoundError()
 
         suffix = file_path.suffix or ".pdf"

@@ -57,6 +57,9 @@ class MemberDocumentGenerator(Protocol):
     def generate_carnet(self, member: Member, verify_url: str) -> bytes:
         ...
 
+    def generate_solicitud(self, member: Member) -> bytes:
+        ...
+
 
 class MemberPhotoStorage(Protocol):
     def save(self, user_id: int, filename: str, content: bytes, content_type: str) -> str:

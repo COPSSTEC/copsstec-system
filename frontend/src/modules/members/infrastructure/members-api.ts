@@ -239,14 +239,18 @@ export async function uploadMemberPhoto(
 }
 
 export async function downloadMemberFile(token: string, memberId: number): Promise<void> {
-  await downloadPdf(token, `/api/members/${memberId}/download`, `miembro-${memberId}.pdf`);
+  await downloadPdf(
+    token,
+    `/api/members/${memberId}/download`,
+    `solicitud-afiliacion-${memberId}.pdf`,
+  );
 }
 
 export async function downloadMemberCertificate(token: string, memberId: number): Promise<void> {
   await downloadPdf(
     token,
     `/api/members/${memberId}/certificate`,
-    `certificado-miembro-${memberId}.pdf`,
+    `certificado-afiliacion-${memberId}.pdf`,
   );
 }
 

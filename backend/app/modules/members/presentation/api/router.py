@@ -293,7 +293,7 @@ def download_member_file(
     use_case: Annotated[DownloadMemberPdfUseCase, Depends(get_download_pdf_use_case)],
 ) -> Response:
     try:
-        filename, content = use_case.execute(member_id, "carnet")
+        filename, content = use_case.execute(member_id, "solicitud")
     except MemberNotFoundError as exc:
         raise _http_error(exc) from exc
 

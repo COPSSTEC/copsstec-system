@@ -5,6 +5,7 @@ from app.modules.members.application.use_cases import public_verify_url
 from app.modules.members.domain.entities import ENABLED_STATE_ID, Member
 from app.modules.members.infrastructure.pdfs import (
     MemberDocumentGenerator,
+    _certificate_name_lines,
     format_register_month_year,
     member_code,
     resolve_logo_path,
@@ -80,6 +81,32 @@ def test_certificate_pdf_is_valid() -> None:
     pdf = MemberDocumentGenerator().generate_certificate(_member(), "http://localhost:3000/perfil/12")
     assert pdf.startswith(b"%PDF")
     assert len(pdf) > 20_000
+
+
+def test_certificate_name_splits_long_full_name() -> None:
+    assert _certificate_name_lines("Alejandro Rodrigo", "Maldonado Villalba") == [
+        "Alejandro Rodrigo",
+        "Maldonado Villalba",
+    ]
+
+
+def test_certificate_pdf_fits_long_name() -> None:
+    member = replace(
+        _member(),
+        names="Alejandro Rodrigo",
+        lastname="Maldonado Villalba",
+    )
+    pdf = MemberDocumentGenerator().generate_certificate(member, "http://localhost:3000/perfil/12")
+    assert pdf.startswith(b"%PDF")
+    assert len(pdf) > 20_000
+
+
+def test_solicitud_pdf_contains_member_data() -> None:
+    pdf = MemberDocumentGenerator().generate_solicitud(_member())
+    assert pdf.startswith(b"%PDF")
+    assert len(pdf) > 1_500
+    assert b"SOLICITUD DE AFILIACI" in pdf
+    assert b"COPSSTEC" in pdf
 
 
 def test_carnet_pdf_is_valid() -> None:
