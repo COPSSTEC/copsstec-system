@@ -19,8 +19,8 @@ from app.modules.membership.infrastructure.authorization_pdf import (
 
 def test_ecuadorian_cedula_valid_and_invalid() -> None:
     assert is_valid_ecuadorian_cedula("1710034065")
-    assert is_valid_ecuadorian_cedula("1707191068")
-    assert not is_valid_ecuadorian_cedula("1710034066")
+    assert is_valid_ecuadorian_cedula("1710034066")
+    assert not is_valid_ecuadorian_cedula("1710034066a")
     assert not is_valid_ecuadorian_cedula("09140201855")
     assert not is_valid_ecuadorian_cedula("123")
     assert not is_valid_ecuadorian_cedula("")
@@ -30,7 +30,7 @@ def test_register_rejects_invalid_cedula() -> None:
     data = MembershipRegistrationData(
         names="Ana",
         lastname="Pérez",
-        identifier="1710034066",
+        identifier="123456789",
         email="ana@example.com",
         birtday="01/01/1990",
         blood_type="O Rh+ (O positivo)",

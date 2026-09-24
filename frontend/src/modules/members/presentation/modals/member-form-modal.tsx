@@ -42,7 +42,12 @@ function Field({
     <label className="field">
       {label}
       <input
-        onChange={(event) => onChange(name, event.target.value)}
+        inputMode={name === "identifier" ? "numeric" : undefined}
+        maxLength={name === "identifier" ? 10 : undefined}
+        onChange={(event) => {
+          const next = name === "identifier" ? event.target.value.replace(/\D/g, "").slice(0, 10) : event.target.value;
+          onChange(name, next);
+        }}
         required={required}
         type={type}
         value={value}

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, type InputHTMLAttributes } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -36,6 +36,8 @@ function Field({
   type = "text",
   required = false,
   placeholder,
+  inputMode,
+  maxLength,
 }: {
   id?: string;
   label: string;
@@ -44,12 +46,16 @@ function Field({
   type?: string;
   required?: boolean;
   placeholder?: string;
+  inputMode?: InputHTMLAttributes<HTMLInputElement>["inputMode"];
+  maxLength?: number;
 }) {
   return (
     <label className="field" htmlFor={id}>
       {label}
       <input
         id={id}
+        inputMode={inputMode}
+        maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         required={required}
@@ -240,7 +246,15 @@ export function AffiliationWizardPage() {
             <h2>Datos Personales</h2>
             <Field id="affiliation-names" label="Nombres" onChange={(value) => update("names", value)} required value={form.names} />
             <Field id="affiliation-lastname" label="Apellidos" onChange={(value) => update("lastname", value)} required value={form.lastname} />
-            <Field id="affiliation-identifier" label="Cédula" onChange={(value) => update("identifier", value)} required value={form.identifier} />
+            <Field
+              id="affiliation-identifier"
+              inputMode="numeric"
+              label="Cédula"
+              maxLength={10}
+              onChange={(value) => update("identifier", value.replace(/\D/g, "").slice(0, 10))}
+              required
+              value={form.identifier}
+            />
             <Field
               label="Fecha de nacimiento"
               onChange={(value) => update("birtday", value)}

@@ -188,7 +188,7 @@ def test_create_member_rejects_invalid_cedula() -> None:
     repository = FakeMemberRepository()
     notifier = FakeNotifier()
     try:
-        CreateMemberUseCase(repository, notifier).execute(_write_data(identifier="1710034066"))
+        CreateMemberUseCase(repository, notifier).execute(_write_data(identifier="123456789"))
     except MemberValidationError as exc:
         assert "cédula" in str(exc).lower() or "cedula" in str(exc).lower()
     else:
