@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 
 from app.modules.auth.application.rbac import resolve_access_policy
 from app.modules.auth.application.use_cases import (
@@ -8,12 +8,18 @@ from app.modules.auth.application.use_cases import (
     ChangePasswordUseCase,
     ForgotPasswordUseCase,
     InvalidCredentialsError,
+    InvalidRefreshTokenError,
     InvalidResetTokenError,
+    InvalidResumeCodeError,
     LoginUseCase,
+    LogoutUseCase,
     MemberCorporateEmailRequiredError,
     PasswordConfirmationError,
     PasswordReuseError,
+    RefreshSessionUseCase,
+    RequestAffiliationResumeUseCase,
     ResetPasswordUseCase,
+    VerifyAffiliationResumeUseCase,
     WeakPasswordError,
 )
 from app.modules.auth.domain.entities import User
@@ -26,12 +32,18 @@ from app.modules.auth.presentation.api.dependencies import (
 from app.modules.membership.infrastructure.email import SmtpOrLogEmailSender
 from app.modules.auth.presentation.api.schemas import (
     AccessPolicyResponse,
+    AffiliationResumeRequest,
+    AffiliationResumeResponse,
+    AffiliationVerifyRequest,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
     LoginRequest,
     LoginResponse,
+    LogoutRequest,
     MessageResponse,
+    RefreshRequest,
+    RefreshResponse,
     ResetPasswordRequest,
     UserResponse,
 )
@@ -67,6 +79,7 @@ def login(
 
     return LoginResponse(
         access_token=result.access_token,
+        refresh_token=result.refresh_token,
         user=UserResponse.from_domain(
             result.user,
             result.access_policy,
@@ -130,6 +143,73 @@ def reset_password(
         ) from exc
 
     return MessageResponse(message="Contraseña actualizada correctamente.")
+
+
+VERIFY_RESUME_ERROR = "No pudimos validar el código. Revisa el correo o solicita uno nuevo."
+
+
+@router.post("/affiliation/resume", response_model=AffiliationResumeResponse)
+def request_affiliation_resume(
+    request: AffiliationResumeRequest,
+    repository: Annotated[AuthRepository, Depends(get_auth_repository)],
+) -> AffiliationResumeResponse:
+    result = RequestAffiliationResumeUseCase(
+        repository,
+        email_sender=SmtpOrLogEmailSender(),
+    ).execute(request.email)
+    return AffiliationResumeResponse(message=result.message, debug_code=result.debug_code)
+
+
+@router.post("/affiliation/verify", response_model=LoginResponse)
+def verify_affiliation_resume(
+    request: AffiliationVerifyRequest,
+    repository: Annotated[AuthRepository, Depends(get_auth_repository)],
+) -> LoginResponse:
+    try:
+        result = VerifyAffiliationResumeUseCase(repository).execute(
+            email=request.email,
+            code=request.code,
+        )
+    except InvalidResumeCodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=VERIFY_RESUME_ERROR,
+        ) from exc
+
+    return LoginResponse(
+        access_token=result.access_token,
+        refresh_token=result.refresh_token,
+        user=UserResponse.from_domain(result.user, result.access_policy),
+    )
+
+
+@router.post("/refresh", response_model=RefreshResponse)
+def refresh_session(
+    request: RefreshRequest,
+    repository: Annotated[AuthRepository, Depends(get_auth_repository)],
+) -> RefreshResponse:
+    try:
+        result = RefreshSessionUseCase(repository).execute(request.refresh_token)
+    except InvalidRefreshTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sesión inválida o expirada.",
+        ) from exc
+
+    return RefreshResponse(
+        access_token=result.access_token,
+        refresh_token=result.refresh_token,
+    )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    repository: Annotated[AuthRepository, Depends(get_auth_repository)],
+    payload: Annotated[LogoutRequest | None, Body()] = None,
+) -> Response:
+    token = payload.refresh_token if payload is not None else None
+    LogoutUseCase(repository).execute(token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/change-password", response_model=UserResponse)

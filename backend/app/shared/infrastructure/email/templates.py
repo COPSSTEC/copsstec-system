@@ -184,6 +184,45 @@ def render_corporate_mailbox(context: dict) -> tuple[str, str, str]:
     return subject, text, html
 
 
+def _resume_url() -> str:
+    return f"{_settings().frontend_origin.rstrip('/')}/continuar-afiliacion"
+
+
+def render_affiliation_resume(context: dict) -> tuple[str, str, str]:
+    nombres = context.get("nombres") or "aspirante"
+    code = context.get("code") or ""
+    minutes = context.get("expire_minutes") or 15
+    resume_url = context.get("resume_url") or _resume_url()
+    subject = "Continúa tu afiliación a COPSSTEC"
+    text = (
+        f"Hola {nombres},\n\n"
+        "Usa este código para continuar tu afiliación a COPSSTEC:\n"
+        f"{code}\n\n"
+        f"El código vence en {minutes} minutos y solo se puede usar una vez.\n"
+        f"Continúa aquí: {resume_url}\n"
+    )
+    inner = f"""
+      <p style="margin:0 0 16px;">Hola {_esc(nombres)},</p>
+      <p style="margin:0 0 16px;">
+        Recibimos una solicitud para continuar tu afiliación a COPSSTEC.
+        Ingresa el siguiente código. Vence en {_esc(minutes)} minutos y es de un solo uso.
+      </p>
+      <p style="margin:0 0 8px;">Código para continuar:</p>
+      <p style="background:#e5e7eb;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:28px;letter-spacing:6px;line-height:32px;margin:0 0 24px;padding:24px;text-align:center;">
+        {_esc(code)}
+      </p>
+      <p style="margin:0;">Si no solicitaste este código, ignora el mensaje o responde a este correo.</p>
+    """
+    html = branded_layout(
+        preview=f"{nombres}, continúa tu afiliación a COPSSTEC",
+        heading="<strong>Continúa tu afiliación</strong>",
+        inner_html=inner,
+        cta_label="Continuar afiliación",
+        cta_href=resume_url,
+    )
+    return subject, text, html
+
+
 def render_password_reset(context: dict) -> tuple[str, str, str]:
     nombres = context.get("nombres") or "usuario"
     token = context.get("token") or ""
@@ -488,6 +527,7 @@ RENDERERS = {
     "access_credentials": render_access_credentials,
     "corporate_mailbox": render_corporate_mailbox,
     "password_reset": render_password_reset,
+    "affiliation_resume": render_affiliation_resume,
     "new_member_admin": render_new_member_admin,
     "course_inscription_received": lambda ctx: render_course_inscription({**ctx, "pending_payment": True}),
     "course_inscription_confirmed": render_course_inscription,

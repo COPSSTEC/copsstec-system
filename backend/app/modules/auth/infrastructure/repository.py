@@ -5,7 +5,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.modules.auth.domain.entities import Profile, User
+from app.modules.auth.domain.entities import (
+    AffiliationResumeCode,
+    Profile,
+    StoredRefreshToken,
+    User,
+)
 
 
 class AuthRepository:
@@ -123,6 +128,199 @@ class AuthRepository:
             {"email": email},
         )
         self.session.commit()
+
+    def create_refresh_token(
+        self,
+        user_id: int,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> None:
+        self.session.execute(
+            text(
+                """
+                INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+                VALUES (:user_id, :token_hash, :expires_at)
+                """,
+            ),
+            {
+                "user_id": user_id,
+                "token_hash": token_hash,
+                "expires_at": expires_at,
+            },
+        )
+        self.session.commit()
+
+    def get_valid_refresh_token(self, token_hash: str) -> StoredRefreshToken | None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        row = self.session.execute(
+            text(
+                """
+                SELECT id, user_id, token_hash, expires_at, revoked_at, created_at
+                FROM refresh_tokens
+                WHERE token_hash = :token_hash
+                  AND revoked_at IS NULL
+                  AND expires_at > :now
+                LIMIT 1
+                """,
+            ),
+            {"token_hash": token_hash, "now": now},
+        ).mappings().first()
+
+        if row is None:
+            return None
+
+        return StoredRefreshToken(**dict(row))
+
+    def revoke_refresh_token(self, token_hash: str) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        self.session.execute(
+            text(
+                """
+                UPDATE refresh_tokens
+                SET revoked_at = :now
+                WHERE token_hash = :token_hash
+                  AND revoked_at IS NULL
+                """,
+            ),
+            {"token_hash": token_hash, "now": now},
+        )
+        self.session.commit()
+
+    def revoke_and_replace_refresh(
+        self,
+        old_token_hash: str,
+        user_id: int,
+        new_token_hash: str,
+        expires_at: datetime,
+    ) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        self.session.execute(
+            text(
+                """
+                UPDATE refresh_tokens
+                SET revoked_at = :now
+                WHERE token_hash = :token_hash
+                  AND revoked_at IS NULL
+                """,
+            ),
+            {"now": now, "token_hash": old_token_hash},
+        )
+        self.session.execute(
+            text(
+                """
+                INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
+                VALUES (:user_id, :token_hash, :expires_at)
+                """,
+            ),
+            {
+                "user_id": user_id,
+                "token_hash": new_token_hash,
+                "expires_at": expires_at,
+            },
+        )
+        self.session.commit()
+
+    def invalidate_open_resume_codes(self, email: str) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        self.session.execute(
+            text(
+                """
+                UPDATE affiliation_resume_codes
+                SET consumed_at = :now
+                WHERE lower(email) = lower(:email)
+                  AND consumed_at IS NULL
+                """,
+            ),
+            {"email": email, "now": now},
+        )
+        self.session.commit()
+
+    def create_resume_code(
+        self,
+        user_id: int,
+        email: str,
+        code_hash: str,
+        expires_at: datetime,
+    ) -> None:
+        self.session.execute(
+            text(
+                """
+                INSERT INTO affiliation_resume_codes (user_id, email, code_hash, expires_at)
+                VALUES (:user_id, :email, :code_hash, :expires_at)
+                """,
+            ),
+            {
+                "user_id": user_id,
+                "email": email,
+                "code_hash": code_hash,
+                "expires_at": expires_at,
+            },
+        )
+        self.session.commit()
+
+    def get_latest_resume_code(self, email: str) -> AffiliationResumeCode | None:
+        row = self.session.execute(
+            text(
+                """
+                SELECT id, user_id, email, code_hash, attempts, expires_at, consumed_at, created_at
+                FROM affiliation_resume_codes
+                WHERE lower(email) = lower(:email)
+                  AND consumed_at IS NULL
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+            ),
+            {"email": email},
+        ).mappings().first()
+
+        if row is None:
+            return None
+
+        return AffiliationResumeCode(**dict(row))
+
+    def increment_resume_attempts(self, resume_id: int) -> int:
+        row = self.session.execute(
+            text(
+                """
+                UPDATE affiliation_resume_codes
+                SET attempts = attempts + 1
+                WHERE id = :id
+                RETURNING attempts
+                """,
+            ),
+            {"id": resume_id},
+        ).mappings().first()
+        self.session.commit()
+        return int(row["attempts"]) if row is not None else 0
+
+    def consume_resume_code(self, resume_id: int) -> None:
+        now = datetime.now(UTC).replace(tzinfo=None)
+        self.session.execute(
+            text(
+                """
+                UPDATE affiliation_resume_codes
+                SET consumed_at = :now
+                WHERE id = :id
+                  AND consumed_at IS NULL
+                """,
+            ),
+            {"id": resume_id, "now": now},
+        )
+        self.session.commit()
+
+    def count_recent_resume_codes(self, email: str, since: datetime) -> int:
+        count = self.session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM affiliation_resume_codes
+                WHERE lower(email) = lower(:email)
+                  AND created_at >= :since
+                """,
+            ),
+            {"email": email, "since": since},
+        ).scalar_one()
+        return int(count)
 
     def update_own_password(self, user_id: int, password_hash: str) -> None:
         now = datetime.now(UTC).replace(tzinfo=None)

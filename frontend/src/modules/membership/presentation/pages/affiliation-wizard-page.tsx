@@ -16,7 +16,7 @@ import {
 import { MembershipApiError, registerAffiliation } from "@/modules/membership/infrastructure/membership-api";
 import { mapAffiliationError, type AffiliationFieldError } from "@/modules/membership/presentation/lib/affiliation-errors";
 import { CEDULA_INVALID_MESSAGE, isValidEcuadorianCedula } from "@/modules/membership/presentation/lib/cedula";
-import { storeToken } from "@/modules/auth/infrastructure/auth-storage";
+import { storeSession } from "@/modules/auth/infrastructure/auth-storage";
 import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
 import { trackEvent } from "@/shared/lib/analytics";
@@ -194,7 +194,10 @@ export function AffiliationWizardPage() {
       const result = await registerAffiliation(form, photo);
       trackEvent("generate_lead", { form_name: "afiliacion", method: "signup" });
       trackEvent("form_submit", { form_name: "afiliacion", success: true });
-      storeToken(result.access_token);
+      storeSession({
+        accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+      });
       router.replace("/afiliacion/pago");
     } catch (err) {
       const message = err instanceof Error ? err.message : "No se pudo completar el registro.";

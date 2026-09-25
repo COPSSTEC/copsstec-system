@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type {
   AdminPaymentStats,
   AdminPaymentsQuery,
@@ -83,7 +84,7 @@ export async function listAdminPayments(
   token: string,
   query: AdminPaymentsQuery,
 ): Promise<PaginatedPayments> {
-  const response = await fetch(`${API_URL}/api/payments/admin?${toAdminQuery(query)}`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin?${toAdminQuery(query)}`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -113,7 +114,7 @@ export async function listMembershipPaymentsAdmin(
     params.set("period", query.period);
   }
 
-  const response = await fetch(`${API_URL}/api/payments/admin/membership?${params.toString()}`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/membership?${params.toString()}`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -121,7 +122,7 @@ export async function listMembershipPaymentsAdmin(
 }
 
 export async function getAdminPaymentStats(token: string): Promise<AdminPaymentStats> {
-  const response = await fetch(`${API_URL}/api/payments/admin/stats`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/stats`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -132,7 +133,7 @@ export async function listMemberPaymentsAdmin(
   token: string,
   memberId: number,
 ): Promise<MemberPaymentsAdminResponse> {
-  const response = await fetch(`${API_URL}/api/payments/admin/members/${memberId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/members/${memberId}`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -144,7 +145,7 @@ export async function createMemberPayment(
   memberId: number,
   input: PaymentWriteInput,
 ): Promise<PaymentWriteResponse> {
-  const response = await fetch(`${API_URL}/api/payments/admin/members/${memberId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/members/${memberId}`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -157,7 +158,7 @@ export async function updatePayment(
   paymentId: number,
   input: PaymentWriteInput,
 ): Promise<PaymentWriteResponse> {
-  const response = await fetch(`${API_URL}/api/payments/admin/${paymentId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/${paymentId}`, {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -166,7 +167,7 @@ export async function updatePayment(
 }
 
 export async function deletePayment(token: string, paymentId: number): Promise<void> {
-  const response = await fetch(`${API_URL}/api/payments/admin/${paymentId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/${paymentId}`, {
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -177,7 +178,7 @@ export async function approvePayment(
   token: string,
   paymentId: number,
 ): Promise<PaymentWriteResponse> {
-  const response = await fetch(`${API_URL}/api/payments/admin/${paymentId}/approve`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/${paymentId}/approve`, {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -189,7 +190,7 @@ export async function rejectPayment(
   paymentId: number,
   observation: string,
 ): Promise<PaymentWriteResponse> {
-  const response = await fetch(`${API_URL}/api/payments/admin/${paymentId}/reject`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/${paymentId}/reject`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ observation }),
@@ -198,7 +199,7 @@ export async function rejectPayment(
 }
 
 export async function listMyPayments(token: string): Promise<MyPaymentsResponse> {
-  const response = await fetch(`${API_URL}/api/payments/me`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/me`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -206,7 +207,7 @@ export async function listMyPayments(token: string): Promise<MyPaymentsResponse>
 }
 
 export async function createMyRenewal(token: string, plan: RenewalPlan): Promise<OpenPayment> {
-  const response = await fetch(`${API_URL}/api/payments/me/renewals`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/me/renewals`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ plan }),
@@ -222,7 +223,7 @@ export async function uploadMyVoucher(
 ): Promise<PaymentWriteResponse> {
   const body = new FormData();
   body.append("voucher", file);
-  const response = await fetch(`${API_URL}/api/payments/me/${paymentId}/voucher`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/me/${paymentId}/voucher`, {
     method: "POST",
     headers: authHeaders(token),
     body,
@@ -264,7 +265,7 @@ export async function downloadAdminAgreementDocument(
       ? `autorizacion-adv-${memberId}.pdf`
       : `cedula-acuerdo-${memberId}.pdf`;
   const headers = authHeaders(token);
-  const onboarding = await fetch(
+  const onboarding = await authorizedFetch(
     `${API_URL}/api/members/${memberId}/onboarding-documents/${kind}`,
     { headers },
   );
@@ -272,7 +273,7 @@ export async function downloadAdminAgreementDocument(
     await downloadBlob(onboarding, filename);
     return;
   }
-  const agreement = await fetch(`${API_URL}/api/members/${memberId}/debit-agreement/${kind}`, {
+  const agreement = await authorizedFetch(`${API_URL}/api/members/${memberId}/debit-agreement/${kind}`, {
     headers,
   });
   if (agreement.ok) {
@@ -289,7 +290,7 @@ export async function sendDebitAgreement(
   token: string,
   memberId: number,
 ): Promise<SendDebitAgreementResponse> {
-  const response = await fetch(`${API_URL}/api/payments/admin/members/${memberId}/send-agreement`, {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/members/${memberId}/send-agreement`, {
     method: "POST",
     headers: authHeaders(token),
   });

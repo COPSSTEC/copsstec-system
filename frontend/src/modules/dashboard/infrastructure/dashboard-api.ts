@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type {
   AdminDashboardSnapshot,
   DashboardExportKey,
@@ -61,7 +62,7 @@ function filenameFromDisposition(
 }
 
 export async function getMemberDashboard(token: string): Promise<MemberDashboardSnapshot> {
-  const response = await fetch(`${API_URL}/api/dashboard/member`, {
+  const response = await authorizedFetch(`${API_URL}/api/dashboard/member`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -75,7 +76,7 @@ export async function getAdminDashboard(
   const params = new URLSearchParams();
   params.set("year", String(year));
 
-  const response = await fetch(`${API_URL}/api/dashboard/admin?${params.toString()}`, {
+  const response = await authorizedFetch(`${API_URL}/api/dashboard/admin?${params.toString()}`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -94,7 +95,7 @@ export async function downloadDashboardExport(
   }
 
   const query = params.toString();
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/dashboard/admin/exports/${key}${query ? `?${query}` : ""}`,
     {
       headers: authHeaders(token),

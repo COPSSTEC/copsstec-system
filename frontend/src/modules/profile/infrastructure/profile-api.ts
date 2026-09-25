@@ -1,4 +1,5 @@
 import type { User } from "@/modules/auth/domain/types";
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -65,7 +66,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
 }
 
 async function downloadPdf(token: string, path: string, filename: string): Promise<void> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await authorizedFetch(`${API_URL}${path}`, {
     headers: authHeaders(token),
   });
 
@@ -84,7 +85,7 @@ async function downloadPdf(token: string, path: string, filename: string): Promi
 }
 
 export async function updateMyProfile(token: string, data: ProfileSelfUpdate): Promise<User> {
-  const response = await fetch(`${API_URL}/api/profile/me`, {
+  const response = await authorizedFetch(`${API_URL}/api/profile/me`, {
     method: "PATCH",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -95,7 +96,7 @@ export async function updateMyProfile(token: string, data: ProfileSelfUpdate): P
 export async function updateMyPhoto(token: string, file: File): Promise<User> {
   const body = new FormData();
   body.append("photo", file);
-  const response = await fetch(`${API_URL}/api/profile/me/photo`, {
+  const response = await authorizedFetch(`${API_URL}/api/profile/me/photo`, {
     method: "POST",
     headers: authHeaders(token),
     body,

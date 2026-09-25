@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { clearStoredToken, getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { endClientSession } from "@/modules/auth/infrastructure/auth-api";
+import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipRedirect } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 import { formatIsoDate, formatUsd } from "@/modules/payments/domain/types";
@@ -56,8 +57,7 @@ export function SubscriptionDuePage() {
         <button
           className="secondary-button"
           onClick={() => {
-            clearStoredToken();
-            router.replace("/login");
+            void endClientSession().then(() => router.replace("/login"));
           }}
           type="button"
         >

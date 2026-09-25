@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type {
   AdminCourse,
   BulkActionResponse,
@@ -71,7 +72,7 @@ export async function createGuestInscription(
 }
 
 export async function listAdminCourses(token: string): Promise<AdminCourse[]> {
-  const response = await fetch(`${API_URL}/api/courses/admin`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin`, {
     headers: authHeaders(token),
   });
 
@@ -79,7 +80,7 @@ export async function listAdminCourses(token: string): Promise<AdminCourse[]> {
 }
 
 export async function listMyCourses(token: string): Promise<MemberCourse[]> {
-  const response = await fetch(`${API_URL}/api/courses/member/my-courses`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/member/my-courses`, {
     cache: "no-store",
     headers: authHeaders(token),
   });
@@ -88,7 +89,7 @@ export async function listMyCourses(token: string): Promise<MemberCourse[]> {
 }
 
 export async function listMemberAvailableCourses(token: string): Promise<MemberCourse[]> {
-  const response = await fetch(`${API_URL}/api/courses/member/available`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/member/available`, {
     cache: "no-store",
     headers: authHeaders(token),
   });
@@ -100,7 +101,7 @@ export async function enrollCurrentMember(
   token: string,
   courseId: number,
 ): Promise<CourseInscription> {
-  const response = await fetch(`${API_URL}/api/courses/member/${courseId}/inscriptions`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/member/${courseId}/inscriptions`, {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -112,7 +113,7 @@ export async function downloadMyCertificate(
   token: string,
   inscriptionId: number,
 ): Promise<Blob> {
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/courses/member/inscriptions/${inscriptionId}/certificate/download`,
     {
       headers: authHeaders(token),
@@ -130,7 +131,7 @@ export async function createCourse(
   token: string,
   input: CourseFormInput,
 ): Promise<Course> {
-  const response = await fetch(`${API_URL}/api/courses/admin`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -144,7 +145,7 @@ export async function updateCourse(
   courseId: number,
   input: CourseFormInput,
 ): Promise<Course> {
-  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/${courseId}`, {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -154,7 +155,7 @@ export async function updateCourse(
 }
 
 export async function deleteCourse(token: string, courseId: number): Promise<void> {
-  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/${courseId}`, {
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -163,7 +164,7 @@ export async function deleteCourse(token: string, courseId: number): Promise<voi
 }
 
 export async function finishCourse(token: string, courseId: number): Promise<Course> {
-  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}/finish`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/${courseId}/finish`, {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -180,7 +181,7 @@ export async function listMemberOptions(
     params.set("q", query.trim());
   }
 
-  const response = await fetch(`${API_URL}/api/courses/admin/members?${params}`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/members?${params}`, {
     headers: authHeaders(token),
   });
 
@@ -192,7 +193,7 @@ export async function createMemberInscriptions(
   courseId: number,
   userIds: number[],
 ): Promise<BulkActionResponse> {
-  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}/member-inscriptions`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/${courseId}/member-inscriptions`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ user_ids: userIds }),
@@ -205,7 +206,7 @@ export async function listCourseInscriptions(
   token: string,
   courseId: number,
 ): Promise<CourseInscription[]> {
-  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}/inscriptions`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/${courseId}/inscriptions`, {
     headers: authHeaders(token),
   });
 
@@ -216,7 +217,7 @@ export async function approvePayment(
   token: string,
   inscriptionId: number,
 ): Promise<CourseInscription> {
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/courses/admin/inscriptions/${inscriptionId}/approve-payment`,
     {
       method: "POST",
@@ -232,7 +233,7 @@ export async function rejectPayment(
   inscriptionId: number,
   observation: string,
 ): Promise<CourseInscription> {
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/courses/admin/inscriptions/${inscriptionId}/reject-payment`,
     {
       method: "POST",
@@ -249,7 +250,7 @@ export async function updateAttendance(
   inscriptionId: number,
   attended: boolean,
 ): Promise<CourseInscription> {
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/courses/admin/inscriptions/${inscriptionId}/attendance`,
     {
       method: "PATCH",
@@ -265,7 +266,7 @@ export async function generateCertificate(
   token: string,
   inscriptionId: number,
 ): Promise<{ id: number; certificate_code: string; pdf_path: string }> {
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/courses/admin/inscriptions/${inscriptionId}/certificate`,
     {
       method: "POST",
@@ -284,7 +285,7 @@ export async function downloadCertificate(
   token: string,
   certificateId: number,
 ): Promise<Blob> {
-  const response = await fetch(certificateDownloadUrl(certificateId), {
+  const response = await authorizedFetch(certificateDownloadUrl(certificateId), {
     headers: authHeaders(token),
   });
 
@@ -299,7 +300,7 @@ export async function downloadAttendeesReport(
   token: string,
   courseId: number,
 ): Promise<Blob> {
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/courses/admin/${courseId}/attendees-report?format=csv`,
     {
       headers: authHeaders(token),
@@ -318,7 +319,7 @@ export async function sendCertificates(
   courseId: number,
   inscriptionIds: number[],
 ): Promise<BulkActionResponse> {
-  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}/certificates/send`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/${courseId}/certificates/send`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ inscription_ids: inscriptionIds }),
@@ -331,7 +332,7 @@ export async function generateFeedbackLink(
   token: string,
   inscriptionId: number,
 ): Promise<{ token: string; url: string }> {
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/courses/admin/inscriptions/${inscriptionId}/feedback-link`,
     {
       method: "POST",
@@ -346,7 +347,7 @@ export async function getFeedbackStats(
   token: string,
   courseId: number,
 ): Promise<FeedbackStats> {
-  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}/feedback-stats`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/${courseId}/feedback-stats`, {
     headers: authHeaders(token),
   });
 
@@ -358,7 +359,7 @@ export async function downloadFeedbackReport(
   courseId: number,
   format: "csv" | "pdf",
 ): Promise<Blob> {
-  const response = await fetch(
+  const response = await authorizedFetch(
     `${API_URL}/api/courses/admin/${courseId}/feedback-report?format=${format}`,
     {
       headers: authHeaders(token),
@@ -377,7 +378,7 @@ export async function sendFeedbackLinks(
   courseId: number,
   inscriptionIds: number[],
 ): Promise<BulkActionResponse> {
-  const response = await fetch(`${API_URL}/api/courses/admin/${courseId}/feedback-links/send`, {
+  const response = await authorizedFetch(`${API_URL}/api/courses/admin/${courseId}/feedback-links/send`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ inscription_ids: inscriptionIds }),

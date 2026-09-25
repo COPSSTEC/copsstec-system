@@ -128,6 +128,7 @@ class RegisterUserResponse(BaseModel):
 
 class RegisterMembershipResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: RegisterUserResponse
     payment: PaymentResponse
@@ -137,10 +138,12 @@ class RegisterMembershipResponse(BaseModel):
         cls,
         member: RegisteredMember,
         access_token: str,
+        refresh_token: str,
         message: str,
     ) -> "RegisterMembershipResponse":
         return cls(
             access_token=access_token,
+            refresh_token=refresh_token,
             user=RegisterUserResponse(
                 id=member.user_id,
                 name=member.name,

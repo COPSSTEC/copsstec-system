@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type {
   Election,
   ElectionList,
@@ -49,7 +50,7 @@ function withElection(path: string, electionId?: number): string {
 }
 
 async function downloadFile(token: string, path: string, electionId?: number): Promise<void> {
-  const response = await fetch(withElection(path, electionId), { headers: authHeaders(token) });
+  const response = await authorizedFetch(withElection(path, electionId), { headers: authHeaders(token) });
   if (!response.ok) {
     await parseResponse(response);
     return;
@@ -66,7 +67,7 @@ async function downloadFile(token: string, path: string, electionId?: number): P
 }
 
 export async function getAdminElection(token: string, electionId?: number): Promise<Election> {
-  const response = await fetch(withElection("/api/votaciones/admin/election", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/election", electionId), {
     headers: authHeaders(token),
   });
   return parseResponse<Election>(response);
@@ -77,7 +78,7 @@ export async function updateAdminElection(
   payload: Partial<Election>,
   electionId?: number,
 ): Promise<Election> {
-  const response = await fetch(withElection("/api/votaciones/admin/election", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/election", electionId), {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -86,7 +87,7 @@ export async function updateAdminElection(
 }
 
 export async function closeElection(token: string, electionId?: number): Promise<Election> {
-  const response = await fetch(withElection("/api/votaciones/admin/election/close", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/election/close", electionId), {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -94,7 +95,7 @@ export async function closeElection(token: string, electionId?: number): Promise
 }
 
 export async function startElection(token: string): Promise<Election> {
-  const response = await fetch(`${API_URL}/api/votaciones/admin/election/start`, {
+  const response = await authorizedFetch(`${API_URL}/api/votaciones/admin/election/start`, {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -109,7 +110,7 @@ export async function uploadElectionMedia(
 ): Promise<string> {
   const body = new FormData();
   body.append("file", file);
-  const response = await fetch(withElection(`/api/votaciones/admin/election/media?kind=${kind}`, electionId), {
+  const response = await authorizedFetch(withElection(`/api/votaciones/admin/election/media?kind=${kind}`, electionId), {
     method: "POST",
     headers: authHeaders(token),
     body,
@@ -119,7 +120,7 @@ export async function uploadElectionMedia(
 }
 
 export async function createPosition(token: string, name: string, electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/positions", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/positions", electionId), {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -133,7 +134,7 @@ export async function updatePosition(
   payload: Record<string, unknown>,
   electionId?: number,
 ) {
-  const response = await fetch(withElection(`/api/votaciones/admin/positions/${positionId}`, electionId), {
+  const response = await authorizedFetch(withElection(`/api/votaciones/admin/positions/${positionId}`, electionId), {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -142,7 +143,7 @@ export async function updatePosition(
 }
 
 export async function deletePosition(token: string, positionId: number, electionId?: number) {
-  const response = await fetch(withElection(`/api/votaciones/admin/positions/${positionId}`, electionId), {
+  const response = await authorizedFetch(withElection(`/api/votaciones/admin/positions/${positionId}`, electionId), {
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -150,7 +151,7 @@ export async function deletePosition(token: string, positionId: number, election
 }
 
 export async function reorderPositions(token: string, ids: number[], electionId?: number): Promise<Election> {
-  const response = await fetch(withElection("/api/votaciones/admin/positions/reorder", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/positions/reorder", electionId), {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ ids }),
@@ -163,7 +164,7 @@ export async function saveCalendar(
   events: Array<{ event_key: string; title: string; starts_on: string | null; ends_on: string | null }>,
   electionId?: number,
 ): Promise<Election> {
-  const response = await fetch(withElection("/api/votaciones/admin/calendar", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/calendar", electionId), {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ events }),
@@ -172,7 +173,7 @@ export async function saveCalendar(
 }
 
 export async function publishCalendar(token: string, isPublic: boolean, electionId?: number): Promise<Election> {
-  const response = await fetch(withElection("/api/votaciones/admin/calendar/publish", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/calendar/publish", electionId), {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ public: isPublic }),
@@ -185,14 +186,14 @@ export async function downloadCalendar(token: string, electionId?: number): Prom
 }
 
 export async function listAdminLists(token: string, electionId?: number): Promise<ElectionList[]> {
-  const response = await fetch(withElection("/api/votaciones/admin/lists", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/lists", electionId), {
     headers: authHeaders(token),
   });
   return parseResponse<ElectionList[]>(response);
 }
 
 export async function createList(token: string, payload: Partial<ElectionList>, electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/lists", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/lists", electionId), {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -201,7 +202,7 @@ export async function createList(token: string, payload: Partial<ElectionList>, 
 }
 
 export async function getAdminList(token: string, listId: number): Promise<ElectionList> {
-  const response = await fetch(`${API_URL}/api/votaciones/admin/lists/${listId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/votaciones/admin/lists/${listId}`, {
     headers: authHeaders(token),
   });
   return parseResponse<ElectionList>(response);
@@ -213,7 +214,7 @@ export async function updateList(
   payload: Partial<ElectionList>,
   electionId?: number,
 ): Promise<ElectionList> {
-  const response = await fetch(withElection(`/api/votaciones/admin/lists/${listId}`, electionId), {
+  const response = await authorizedFetch(withElection(`/api/votaciones/admin/lists/${listId}`, electionId), {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -222,7 +223,7 @@ export async function updateList(
 }
 
 export async function deleteList(token: string, listId: number, electionId?: number) {
-  const response = await fetch(withElection(`/api/votaciones/admin/lists/${listId}`, electionId), {
+  const response = await authorizedFetch(withElection(`/api/votaciones/admin/lists/${listId}`, electionId), {
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -238,7 +239,7 @@ export async function uploadListFile(
 ): Promise<string> {
   const body = new FormData();
   body.append("file", file);
-  const response = await fetch(withElection(`/api/votaciones/admin/lists/${listId}/${kind}`, electionId), {
+  const response = await authorizedFetch(withElection(`/api/votaciones/admin/lists/${listId}/${kind}`, electionId), {
     method: "POST",
     headers: authHeaders(token),
     body,
@@ -263,7 +264,7 @@ export async function saveCandidate(
   const path = candidateId
     ? `/api/votaciones/admin/lists/${listId}/candidates/${candidateId}`
     : `/api/votaciones/admin/lists/${listId}/candidates`;
-  const response = await fetch(withElection(path, electionId), {
+  const response = await authorizedFetch(withElection(path, electionId), {
     method: candidateId ? "PUT" : "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -272,7 +273,7 @@ export async function saveCandidate(
 }
 
 export async function deleteCandidate(token: string, listId: number, candidateId: number, electionId?: number) {
-  const response = await fetch(
+  const response = await authorizedFetch(
     withElection(`/api/votaciones/admin/lists/${listId}/candidates/${candidateId}`, electionId),
     { method: "DELETE", headers: authHeaders(token) },
   );
@@ -288,7 +289,7 @@ export async function uploadCandidatePhoto(
 ): Promise<string> {
   const body = new FormData();
   body.append("file", file);
-  const response = await fetch(
+  const response = await authorizedFetch(
     withElection(`/api/votaciones/admin/lists/${listId}/candidates/${candidateId}/photo`, electionId),
     { method: "POST", headers: authHeaders(token), body },
   );
@@ -317,14 +318,14 @@ export async function listVoters(
   if (query.location) params.set("location", query.location);
   params.set("page", String(query.page ?? 1));
   params.set("page_size", String(query.page_size ?? 8));
-  const response = await fetch(withElection(`/api/votaciones/admin/voters?${params}`, electionId), {
+  const response = await authorizedFetch(withElection(`/api/votaciones/admin/voters?${params}`, electionId), {
     headers: authHeaders(token),
   });
   return parseResponse<VoterListResult>(response);
 }
 
 export async function toggleVoter(token: string, userId: number, enabled: boolean, electionId?: number) {
-  const response = await fetch(withElection(`/api/votaciones/admin/voters/${userId}`, electionId), {
+  const response = await authorizedFetch(withElection(`/api/votaciones/admin/voters/${userId}`, electionId), {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ voting_enabled: enabled }),
@@ -333,7 +334,7 @@ export async function toggleVoter(token: string, userId: number, enabled: boolea
 }
 
 export async function syncVoters(token: string, electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/voters/sync", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/voters/sync", electionId), {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -345,7 +346,7 @@ export async function exportVoters(token: string, electionId?: number) {
 }
 
 export async function saveMessages(token: string, templates: Election["templates"], electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/messages", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/messages", electionId), {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ templates }),
@@ -354,7 +355,7 @@ export async function saveMessages(token: string, templates: Election["templates
 }
 
 export async function testMessage(token: string, templateKey: string, email: string, electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/messages/test", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/messages/test", electionId), {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ template_key: templateKey, email }),
@@ -363,7 +364,7 @@ export async function testMessage(token: string, templateKey: string, email: str
 }
 
 export async function sendMessage(token: string, templateKey: string, electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/messages/send", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/messages/send", electionId), {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ template_key: templateKey }),
@@ -372,14 +373,14 @@ export async function sendMessage(token: string, templateKey: string, electionId
 }
 
 export async function getMessageStatus(token: string, electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/messages/status", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/messages/status", electionId), {
     headers: authHeaders(token),
   });
   return parseResponse<MessageDelivery[]>(response);
 }
 
 export async function scheduleMessage(token: string, templateKey: string, scheduledAt: string | null, electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/messages/schedule", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/messages/schedule", electionId), {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ template_key: templateKey, scheduled_at: scheduledAt }),
@@ -388,7 +389,7 @@ export async function scheduleMessage(token: string, templateKey: string, schedu
 }
 
 export async function resendMessage(token: string, templateKey: string, electionId?: number) {
-  const response = await fetch(withElection("/api/votaciones/admin/messages/resend", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/messages/resend", electionId), {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ template_key: templateKey }),
@@ -397,7 +398,7 @@ export async function resendMessage(token: string, templateKey: string, election
 }
 
 export async function getReports(token: string, electionId?: number): Promise<ElectionReport> {
-  const response = await fetch(withElection("/api/votaciones/admin/reports", electionId), {
+  const response = await authorizedFetch(withElection("/api/votaciones/admin/reports", electionId), {
     headers: authHeaders(token),
   });
   return parseResponse<ElectionReport>(response);
@@ -412,12 +413,12 @@ export async function downloadActa(token: string, electionId?: number) {
 }
 
 export async function getMemberPortal(token: string): Promise<MemberPortal> {
-  const response = await fetch(`${API_URL}/api/votaciones/me`, { headers: authHeaders(token) });
+  const response = await authorizedFetch(`${API_URL}/api/votaciones/me`, { headers: authHeaders(token) });
   return parseResponse<MemberPortal>(response);
 }
 
 export async function getMemberList(token: string, listId: number): Promise<MemberPortal> {
-  const response = await fetch(`${API_URL}/api/votaciones/me/lists/${listId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/votaciones/me/lists/${listId}`, {
     headers: authHeaders(token),
   });
   return parseResponse<MemberPortal>(response);
@@ -427,7 +428,7 @@ export async function castVote(
   token: string,
   payload: { list_id?: number | null; is_blank?: boolean; choices?: Array<{ position_id: number; list_id?: number; is_blank?: boolean }> },
 ) {
-  const response = await fetch(`${API_URL}/api/votaciones/me/vote`, {
+  const response = await authorizedFetch(`${API_URL}/api/votaciones/me/vote`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(payload),

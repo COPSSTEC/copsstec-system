@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type { MemberDocument, MemberDocumentKey } from "@/modules/documents/domain/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -26,7 +27,7 @@ function authHeaders(token: string): HeadersInit {
 }
 
 export async function listMemberDocuments(token: string): Promise<MemberDocument[]> {
-  const response = await fetch(`${API_URL}/api/member-documents`, {
+  const response = await authorizedFetch(`${API_URL}/api/member-documents`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -41,7 +42,7 @@ export async function uploadMemberDocument(
   const payload = new FormData();
   payload.append("file", file);
 
-  const response = await fetch(`${API_URL}/api/member-documents/${key}`, {
+  const response = await authorizedFetch(`${API_URL}/api/member-documents/${key}`, {
     method: "PUT",
     headers: authHeaders(token),
     body: payload,
@@ -57,7 +58,7 @@ export async function uploadMemberDocumentCover(
   const payload = new FormData();
   payload.append("file", file);
 
-  const response = await fetch(`${API_URL}/api/member-documents/${key}/cover`, {
+  const response = await authorizedFetch(`${API_URL}/api/member-documents/${key}/cover`, {
     method: "PUT",
     headers: authHeaders(token),
     body: payload,
@@ -71,7 +72,7 @@ export async function updateMemberDocumentStyle(
   overlay_color: string,
   overlay_opacity: number,
 ): Promise<MemberDocument> {
-  const response = await fetch(`${API_URL}/api/member-documents/${key}/style`, {
+  const response = await authorizedFetch(`${API_URL}/api/member-documents/${key}/style`, {
     method: "PATCH",
     headers: {
       ...authHeaders(token),

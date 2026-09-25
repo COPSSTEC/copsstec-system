@@ -3100,11 +3100,102 @@ button.form-error-link {
   display: block;
   font-size: 1rem;
   font-weight: 800;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
   text-align: center;
 }
 
 .login-affiliate-link:hover {
+  color: #0b63d4;
+}
+
+.login-entry-links {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 1.5rem;
+}
+
+.login-resume-link {
+  color: #0f172a;
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.login-resume-link:hover {
+  color: #1d7ef5;
+}
+
+.login-step-copy {
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
+
+.login-code-field {
+  justify-items: center;
+}
+
+.login-code-field label {
+  text-align: center;
+  width: 100%;
+}
+
+.login-code-input,
+.login-field input.login-code-input,
+.login-glass-card .field input.login-code-input {
+  border-radius: 18px;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: 0.42em;
+  padding: 0.95rem 0.6rem 0.95rem 1rem;
+  text-align: center;
+}
+
+.login-step-actions {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.login-secondary,
+.login-glass-card .login-secondary {
+  background: transparent;
+  border: 1px solid #1d7ef5;
+  border-radius: 999px;
+  color: #1d7ef5;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.85rem 1rem;
+  text-transform: uppercase;
+}
+
+.login-secondary:hover,
+.login-glass-card .login-secondary:hover {
+  background: rgba(29, 126, 245, 0.08);
+}
+
+.login-secondary:disabled,
+.login-glass-card .login-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.login-text-button {
+  background: none;
+  border: 0;
+  color: #1d7ef5;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 0;
+}
+
+.login-text-button:hover {
   color: #0b63d4;
 }
 

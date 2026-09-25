@@ -115,7 +115,7 @@ async def register_membership(
         accept_data_policy=_as_bool(accept_data_policy),
     )
     try:
-        member, access_token = use_case.execute(
+        member, access_token, refresh_token = use_case.execute(
             data=data,
             photo_filename=photo.filename or "foto.jpg",
             photo_content=await photo.read(),
@@ -127,6 +127,7 @@ async def register_membership(
     return RegisterMembershipResponse.from_domain(
         member,
         access_token,
+        refresh_token,
         "Registro creado. Continúa con el pago de afiliación.",
     )
 

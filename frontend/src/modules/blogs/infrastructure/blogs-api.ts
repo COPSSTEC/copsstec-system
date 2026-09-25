@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type { AdminBlog, PublicBlog, PublicBlogListItem } from "@/modules/blogs/domain/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -51,7 +52,7 @@ export async function getPublicBlog(blogId: number): Promise<PublicBlog> {
 }
 
 export async function listAdminBlogs(token: string): Promise<AdminBlog[]> {
-  const response = await fetch(`${API_URL}/api/blogs/admin`, {
+  const response = await authorizedFetch(`${API_URL}/api/blogs/admin`, {
     headers: authHeaders(token),
   });
 
@@ -59,7 +60,7 @@ export async function listAdminBlogs(token: string): Promise<AdminBlog[]> {
 }
 
 export async function getAdminBlog(token: string, blogId: number): Promise<AdminBlog> {
-  const response = await fetch(`${API_URL}/api/blogs/admin/${blogId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/blogs/admin/${blogId}`, {
     headers: authHeaders(token),
   });
 
@@ -67,7 +68,7 @@ export async function getAdminBlog(token: string, blogId: number): Promise<Admin
 }
 
 export async function createBlog(token: string, input: FormData): Promise<AdminBlog> {
-  const response = await fetch(`${API_URL}/api/blogs/admin`, {
+  const response = await authorizedFetch(`${API_URL}/api/blogs/admin`, {
     method: "POST",
     headers: authHeaders(token),
     body: input,
@@ -81,7 +82,7 @@ export async function updateBlog(
   blogId: number,
   input: FormData,
 ): Promise<AdminBlog> {
-  const response = await fetch(`${API_URL}/api/blogs/admin/${blogId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/blogs/admin/${blogId}`, {
     method: "PUT",
     headers: authHeaders(token),
     body: input,
@@ -95,7 +96,7 @@ export async function setBlogVisibility(
   blogId: number,
   stateId: number,
 ): Promise<AdminBlog> {
-  const response = await fetch(`${API_URL}/api/blogs/admin/${blogId}/visibility`, {
+  const response = await authorizedFetch(`${API_URL}/api/blogs/admin/${blogId}/visibility`, {
     method: "PATCH",
     headers: authHeaders(token, true),
     body: JSON.stringify({ state_id: stateId }),
@@ -105,7 +106,7 @@ export async function setBlogVisibility(
 }
 
 export async function deleteBlog(token: string, blogId: number): Promise<void> {
-  const response = await fetch(`${API_URL}/api/blogs/admin/${blogId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/blogs/admin/${blogId}`, {
     method: "DELETE",
     headers: authHeaders(token),
   });

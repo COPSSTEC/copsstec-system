@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import { passwordChangeRedirect } from "@/modules/auth/domain/types";
 import { login } from "@/modules/auth/infrastructure/auth-api";
-import { storeToken } from "@/modules/auth/infrastructure/auth-storage";
+import { storeSession } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 
@@ -37,7 +37,10 @@ export function LoginForm() {
 
     try {
       const response = await login(email, password);
-      storeToken(response.access_token);
+      storeSession({
+        accessToken: response.access_token,
+        refreshToken: response.refresh_token,
+      });
 
       if (rememberMe) {
         window.localStorage.setItem(REMEMBER_EMAIL_KEY, email);

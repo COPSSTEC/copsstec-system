@@ -10,9 +10,14 @@ export function LoginPage() {
         <section className="login-glass-card">
           <h1>Iniciar sesión</h1>
           <p className="login-subtitle">Ingresa a tu cuenta COPSSTEC</p>
-          <Link className="login-affiliate-link" href="/afiliacion">
-            ¡Deseo afiliarme!
-          </Link>
+          <div className="login-entry-links">
+            <Link className="login-affiliate-link" href="/afiliacion">
+              ¡Deseo afiliarme!
+            </Link>
+            <Link className="login-resume-link" href="/continuar-afiliacion">
+              Ya me inscribí, continuar con la afiliación
+            </Link>
+          </div>
           <LoginForm />
         </section>
 

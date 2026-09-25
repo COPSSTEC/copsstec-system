@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type {
   AffiliationForm,
   ApprovalPreview,
@@ -60,7 +61,7 @@ function toIsoDate(value: string): string {
 export async function registerAffiliation(
   form: AffiliationForm,
   photo: File,
-): Promise<{ access_token: string; payment: { status: string } }> {
+): Promise<{ access_token: string; refresh_token?: string; payment: { status: string } }> {
   const body = new FormData();
   body.append("names", form.names.trim());
   body.append("lastname", form.lastname.trim());
@@ -91,7 +92,7 @@ export async function registerAffiliation(
 }
 
 export async function getMembershipStatus(token: string): Promise<MembershipStatus> {
-  const response = await fetch(`${API_URL}/api/membership/status`, {
+  const response = await authorizedFetch(`${API_URL}/api/membership/status`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -99,7 +100,7 @@ export async function getMembershipStatus(token: string): Promise<MembershipStat
 }
 
 export async function getPaymentInfo(token: string): Promise<PaymentInfo> {
-  const response = await fetch(`${API_URL}/api/membership/payment-info`, {
+  const response = await authorizedFetch(`${API_URL}/api/membership/payment-info`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -112,7 +113,7 @@ export async function uploadPaymentVoucher(
 ): Promise<{ status: string; message: string; gate?: string }> {
   const body = new FormData();
   body.append("voucher", file);
-  const response = await fetch(`${API_URL}/api/membership/payment-voucher`, {
+  const response = await authorizedFetch(`${API_URL}/api/membership/payment-voucher`, {
     method: "POST",
     headers: authHeaders(token),
     body,
@@ -121,7 +122,7 @@ export async function uploadPaymentVoucher(
 }
 
 export async function downloadMembershipInvoice(token: string): Promise<void> {
-  const response = await fetch(`${API_URL}/api/membership/invoice`, {
+  const response = await authorizedFetch(`${API_URL}/api/membership/invoice`, {
     headers: authHeaders(token),
   });
   if (!response.ok) {
@@ -141,7 +142,7 @@ export async function saveBankDetails(
   token: string,
   details: { account_type: string; account_number: string; bank_name: string; debit_plan: string },
 ): Promise<MembershipStatus> {
-  const response = await fetch(`${API_URL}/api/membership/bank-details`, {
+  const response = await authorizedFetch(`${API_URL}/api/membership/bank-details`, {
     method: "PUT",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify(details),
@@ -150,7 +151,7 @@ export async function saveBankDetails(
 }
 
 async function downloadPdfFile(token: string, path: string, filename: string): Promise<void> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await authorizedFetch(`${API_URL}${path}`, {
     headers: authHeaders(token),
   });
   if (!response.ok) {
@@ -202,7 +203,7 @@ export async function uploadOnboardingDocuments(
     body.append("signed_solicitud", files.signedSolicitud);
   }
   body.append("accepted_affiliation_year", String(Boolean(files.acceptedAffiliationYear)));
-  const response = await fetch(`${API_URL}/api/membership/onboarding-documents`, {
+  const response = await authorizedFetch(`${API_URL}/api/membership/onboarding-documents`, {
     method: "POST",
     headers: authHeaders(token),
     body,
@@ -211,7 +212,7 @@ export async function uploadOnboardingDocuments(
 }
 
 export async function getApprovalPreview(token: string, memberId: number): Promise<ApprovalPreview> {
-  const response = await fetch(`${API_URL}/api/members/${memberId}/approval-preview`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}/approval-preview`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -223,7 +224,7 @@ export async function approveMember(
   memberId: number,
   emailCorp: string,
 ): Promise<{ message: string; login_email: string }> {
-  const response = await fetch(`${API_URL}/api/members/${memberId}/approve`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}/approve`, {
     method: "POST",
     headers: { ...authHeaders(token), "Content-Type": "application/json" },
     body: JSON.stringify({ email_corp: emailCorp }),
@@ -242,7 +243,7 @@ export async function downloadOnboardingDocument(
     voucher: "comprobante",
     solicitud: "solicitud-firmada.pdf",
   };
-  const response = await fetch(`${API_URL}/api/members/${memberId}/onboarding-documents/${kind}`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}/onboarding-documents/${kind}`, {
     headers: authHeaders(token),
   });
   if (!response.ok) {

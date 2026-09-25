@@ -4,6 +4,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db_session
+from app.modules.auth.infrastructure.repository import AuthRepository
 from app.modules.members.infrastructure.pdfs import MemberDocumentGenerator
 from app.modules.members.infrastructure.repository import SqlAlchemyMemberRepository
 from app.modules.membership.application.use_cases import (
@@ -42,8 +43,14 @@ def get_membership_storage() -> LocalMembershipFileStorage:
 def get_register_membership_use_case(
     repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
     storage: Annotated[LocalMembershipFileStorage, Depends(get_membership_storage)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> RegisterMembershipUseCase:
-    return RegisterMembershipUseCase(repository, storage, SmtpOrLogEmailSender())
+    return RegisterMembershipUseCase(
+        repository,
+        storage,
+        SmtpOrLogEmailSender(),
+        token_store=AuthRepository(session),
+    )
 
 
 def get_membership_status_use_case(

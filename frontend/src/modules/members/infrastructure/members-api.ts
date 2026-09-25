@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type {
   Member,
   MemberListQuery,
@@ -88,7 +89,7 @@ export async function listMembers(
   token: string,
   query: MemberListQuery,
 ): Promise<MemberListResponse> {
-  const response = await fetch(`${API_URL}/api/members?${toQuery(query)}`, {
+  const response = await authorizedFetch(`${API_URL}/api/members?${toQuery(query)}`, {
     headers: authHeaders(token),
     cache: "no-store",
   });
@@ -132,7 +133,7 @@ export async function createMember(
   token: string,
   input: MemberWriteInput,
 ): Promise<{ member: Member; temporary_password: string; message: string }> {
-  const response = await fetch(`${API_URL}/api/members`, {
+  const response = await authorizedFetch(`${API_URL}/api/members`, {
     method: "POST",
     headers: authHeaders(token, true),
     body: JSON.stringify(toWritePayload(input)),
@@ -146,7 +147,7 @@ export async function updateMember(
   memberId: number,
   input: MemberWriteInput,
 ): Promise<Member> {
-  const response = await fetch(`${API_URL}/api/members/${memberId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}`, {
     method: "PUT",
     headers: authHeaders(token, true),
     body: JSON.stringify(toWritePayload(input)),
@@ -156,7 +157,7 @@ export async function updateMember(
 }
 
 export async function deleteMember(token: string, memberId: number): Promise<void> {
-  const response = await fetch(`${API_URL}/api/members/${memberId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}`, {
     method: "DELETE",
     headers: authHeaders(token),
   });
@@ -168,7 +169,7 @@ export async function disableMember(
   token: string,
   memberId: number,
 ): Promise<{ message: string; member: Member }> {
-  const response = await fetch(`${API_URL}/api/members/${memberId}/disable`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}/disable`, {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -180,7 +181,7 @@ export async function enableMember(
   token: string,
   memberId: number,
 ): Promise<{ message: string; member: Member }> {
-  const response = await fetch(`${API_URL}/api/members/${memberId}/enable`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}/enable`, {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -192,7 +193,7 @@ export async function resendMemberCredentials(
   token: string,
   memberId: number,
 ): Promise<{ message: string; temporary_password: string; member: Member }> {
-  const response = await fetch(`${API_URL}/api/members/${memberId}/resend-credentials`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}/resend-credentials`, {
     method: "POST",
     headers: authHeaders(token),
   });
@@ -203,7 +204,7 @@ export async function resendMemberCredentials(
 }
 
 async function downloadPdf(token: string, path: string, filename: string): Promise<void> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await authorizedFetch(`${API_URL}${path}`, {
     headers: authHeaders(token),
   });
 
@@ -229,7 +230,7 @@ export async function uploadMemberPhoto(
   const body = new FormData();
   body.append("photo", file);
 
-  const response = await fetch(`${API_URL}/api/members/${memberId}/photo`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}/photo`, {
     method: "POST",
     headers: authHeaders(token),
     body,
@@ -265,7 +266,7 @@ export async function downloadMemberDebitDocument(
     kind === "authorization"
       ? `autorizacion-adv-${memberId}.pdf`
       : `cedula-acuerdo-${memberId}.pdf`;
-  const response = await fetch(`${API_URL}/api/members/${memberId}/debit-agreement/${kind}`, {
+  const response = await authorizedFetch(`${API_URL}/api/members/${memberId}/debit-agreement/${kind}`, {
     headers: authHeaders(token),
   });
 

@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
-from secrets import token_urlsafe
+from secrets import randbelow, token_urlsafe
 from typing import Any
 
 import bcrypt
@@ -83,3 +83,7 @@ def generate_reset_token() -> str:
 
 def hash_reset_token(token: str) -> str:
     return sha256(token.encode("utf-8")).hexdigest()
+
+
+def generate_otp_code() -> str:
+    return f"{randbelow(1_000_000):06d}"

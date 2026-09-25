@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { clearStoredToken, getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { endClientSession } from "@/modules/auth/infrastructure/auth-api";
+import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import {
   getMembershipStatus,
@@ -82,8 +83,7 @@ export function MembershipPaymentPage() {
         <button
           className="secondary-button"
           onClick={() => {
-            clearStoredToken();
-            router.replace("/login");
+            void endClientSession().then(() => router.replace("/login"));
           }}
           type="button"
         >

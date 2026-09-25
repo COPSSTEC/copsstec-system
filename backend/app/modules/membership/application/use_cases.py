@@ -5,8 +5,9 @@ from decimal import Decimal
 from pathlib import Path
 
 from app.core.config import get_settings
-from app.core.security import create_access_token, hash_password
+from app.core.security import hash_password
 from app.modules.auth.application.rbac import resolve_access_policy
+from app.modules.auth.application.session import RefreshTokenWriter, issue_session_tokens
 from app.modules.membership.application.ports import (
     AuthorizationPdfGenerator,
     EmailPort,
@@ -98,10 +99,13 @@ class RegisterMembershipUseCase:
         repository: MembershipRepository,
         storage: MembershipFileStorage,
         email_sender: EmailPort | None = None,
+        *,
+        token_store: RefreshTokenWriter,
     ) -> None:
         self.repository = repository
         self.storage = storage
         self.email_sender = email_sender
+        self.token_store = token_store
 
     def execute(
         self,
@@ -109,7 +113,7 @@ class RegisterMembershipUseCase:
         photo_filename: str,
         photo_content: bytes,
         photo_content_type: str,
-    ) -> tuple[RegisteredMember, str]:
+    ) -> tuple[RegisteredMember, str, str]:
         _validate_registration(data)
         if not photo_content:
             raise MembershipValidationError("La foto de perfil es obligatoria.")
@@ -142,8 +146,9 @@ class RegisterMembershipUseCase:
         )
         self.repository.update_photo(member.user_id, foto_id)
 
-        access_token = create_access_token(
-            subject=member.user_id,
+        access_token, refresh_token = issue_session_tokens(
+            self.token_store,
+            user_id=member.user_id,
             roles=["miembro"],
             access_level="member",
         )
@@ -158,7 +163,7 @@ class RegisterMembershipUseCase:
                         "email": data.email,
                     },
                 )
-        return member, access_token
+        return member, access_token, refresh_token
 
 
 class GetMembershipStatusUseCase:

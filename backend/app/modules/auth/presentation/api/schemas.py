@@ -112,8 +112,37 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class AffiliationResumeRequest(BaseModel):
+    email: EmailStr
+
+
+class AffiliationResumeResponse(BaseModel):
+    message: str
+    debug_code: str | None = None
+
+
+class AffiliationVerifyRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=1, max_length=16)
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
+
+class RefreshResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
 
 
 class ForgotPasswordRequest(BaseModel):

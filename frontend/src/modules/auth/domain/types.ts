@@ -62,8 +62,20 @@ export interface AccessPolicy {
 
 export interface LoginResponse {
   access_token: string;
+  refresh_token?: string;
   token_type: "bearer";
   user: User;
+}
+
+export interface AffiliationResumeResponse {
+  message: string;
+  debug_code?: string;
+}
+
+export interface RefreshSessionResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
 }
 
 export function passwordChangeRedirect(): string {

@@ -5,6 +5,7 @@ import { SITE } from "@/config/site";
 import { AnalyticsNoscript, AnalyticsScripts } from "@/shared/components/analytics";
 import { AppProviders } from "@/shared/components/app-providers";
 import { JsonLd } from "@/shared/components/json-ld";
+import { SessionGuard } from "@/shared/components/session-guard";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -69,7 +70,9 @@ export default function RootLayout({
       <body>
         <AnalyticsNoscript />
         <JsonLd />
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <SessionGuard>{children}</SessionGuard>
+        </AppProviders>
         <AnalyticsScripts />
       </body>
     </html>

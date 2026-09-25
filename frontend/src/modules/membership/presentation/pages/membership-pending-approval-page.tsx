@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { clearStoredToken, getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { endClientSession } from "@/modules/auth/infrastructure/auth-api";
+import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
 import { AppLogo } from "@/shared/components/app-logo";
@@ -49,8 +50,7 @@ export function MembershipPendingApprovalPage() {
         <button
           className="secondary-button"
           onClick={() => {
-            clearStoredToken();
-            router.replace("/login");
+            void endClientSession().then(() => router.replace("/login"));
           }}
           type="button"
         >

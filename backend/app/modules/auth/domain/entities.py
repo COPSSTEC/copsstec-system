@@ -56,3 +56,25 @@ class AccessPolicy:
     roles: list[str]
     allowed_routes: list[str]
     navigation: list[dict]
+
+
+@dataclass(frozen=True)
+class AffiliationResumeCode:
+    id: int
+    user_id: int
+    email: str
+    code_hash: str
+    attempts: int
+    expires_at: datetime
+    consumed_at: datetime | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class StoredRefreshToken:
+    id: int
+    user_id: int
+    token_hash: str
+    expires_at: datetime
+    revoked_at: datetime | None
+    created_at: datetime

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { clearStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { endClientSession } from "@/modules/auth/infrastructure/auth-api";
 import type { User } from "@/modules/auth/domain/types";
 import { UserAvatar } from "@/shared/components/user-avatar";
 
@@ -74,8 +74,8 @@ export function AppHeader({ user, onMenuToggle, onNavigate, variant = "default" 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  function handleLogout() {
-    clearStoredToken();
+  async function handleLogout() {
+    await endClientSession();
     router.replace("/login");
   }
 

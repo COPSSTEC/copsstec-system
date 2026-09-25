@@ -1,3 +1,4 @@
+import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch";
 import type { AdminNotice } from "@/modules/notices/domain/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -32,14 +33,14 @@ function authHeaders(token: string, json = false): HeadersInit {
 }
 
 export async function listAdminNotices(token: string): Promise<AdminNotice[]> {
-  const response = await fetch(`${API_URL}/api/notices/admin`, {
+  const response = await authorizedFetch(`${API_URL}/api/notices/admin`, {
     headers: authHeaders(token),
   });
   return parseResponse<AdminNotice[]>(response);
 }
 
 export async function createNotice(token: string, input: FormData): Promise<AdminNotice> {
-  const response = await fetch(`${API_URL}/api/notices/admin`, {
+  const response = await authorizedFetch(`${API_URL}/api/notices/admin`, {
     method: "POST",
     headers: authHeaders(token),
     body: input,
@@ -52,7 +53,7 @@ export async function updateNotice(
   noticeId: number,
   input: FormData,
 ): Promise<AdminNotice> {
-  const response = await fetch(`${API_URL}/api/notices/admin/${noticeId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/notices/admin/${noticeId}`, {
     method: "PUT",
     headers: authHeaders(token),
     body: input,
@@ -65,7 +66,7 @@ export async function setNoticeVisibility(
   noticeId: number,
   stateId: number,
 ): Promise<AdminNotice> {
-  const response = await fetch(`${API_URL}/api/notices/admin/${noticeId}/visibility`, {
+  const response = await authorizedFetch(`${API_URL}/api/notices/admin/${noticeId}/visibility`, {
     method: "PATCH",
     headers: authHeaders(token, true),
     body: JSON.stringify({ state_id: stateId }),
@@ -74,7 +75,7 @@ export async function setNoticeVisibility(
 }
 
 export async function deleteNotice(token: string, noticeId: number): Promise<void> {
-  const response = await fetch(`${API_URL}/api/notices/admin/${noticeId}`, {
+  const response = await authorizedFetch(`${API_URL}/api/notices/admin/${noticeId}`, {
     method: "DELETE",
     headers: authHeaders(token),
   });

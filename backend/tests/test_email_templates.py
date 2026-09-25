@@ -19,6 +19,12 @@ def test_email_templates_include_logo_and_copy() -> None:
             "token": "abc123",
             "reset_url": "http://localhost:3000/reset-password?email=ana@copsstec.com&token=abc123",
         },
+        "affiliation_resume": {
+            "nombres": "Ana Pérez",
+            "code": "482193",
+            "expire_minutes": 15,
+            "resume_url": "http://localhost:3000/continuar-afiliacion",
+        },
         "new_member_admin": {"nombres": "Ana Pérez", "email": "ana@example.com"},
         "course_inscription_received": {
             "nombres": "Ana Pérez",

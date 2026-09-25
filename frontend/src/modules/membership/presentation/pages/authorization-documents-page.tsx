@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { clearStoredToken, getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
+import { endClientSession } from "@/modules/auth/infrastructure/auth-api";
+import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipPathForStatus, type MembershipStatus } from "@/modules/membership/domain/types";
 import {
   downloadAuthorizationPdf,
@@ -453,8 +454,7 @@ export function AuthorizationDocumentsPage() {
         <button
           className="affiliation-docs-logout"
           onClick={() => {
-            clearStoredToken();
-            router.replace("/login");
+            void endClientSession().then(() => router.replace("/login"));
           }}
           type="button"
         >

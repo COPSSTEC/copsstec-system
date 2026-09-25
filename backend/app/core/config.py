@@ -30,7 +30,16 @@ class Settings:
     secret_key: str = getenv("SECRET_KEY", "dev-secret-key-change-me")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = int(
-        getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"),
+        getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"),
+    )
+    refresh_token_expire_hours: int = int(
+        getenv("REFRESH_TOKEN_EXPIRE_HOURS", "24"),
+    )
+    affiliation_resume_expire_minutes: int = int(
+        getenv("AFFILIATION_RESUME_EXPIRE_MINUTES", "15"),
+    )
+    affiliation_resume_max_attempts: int = int(
+        getenv("AFFILIATION_RESUME_MAX_ATTEMPTS", "5"),
     )
     password_reset_expire_minutes: int = int(
         getenv("PASSWORD_RESET_EXPIRE_MINUTES", "60"),
