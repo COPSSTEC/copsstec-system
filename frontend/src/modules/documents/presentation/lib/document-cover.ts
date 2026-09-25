@@ -16,7 +16,7 @@ export function normalizeOverlayOpacity(value: number | null | undefined): numbe
   return Math.min(90, Math.max(10, Math.round(opacity)));
 }
 
-function hexToRgb(color: string): string {
+function hexToRgb(color: string | null | undefined): string {
   const hex = normalizeOverlayColor(color).slice(1);
   const red = Number.parseInt(hex.slice(0, 2), 16);
   const green = Number.parseInt(hex.slice(2, 4), 16);
