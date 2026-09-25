@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db_session
 from app.modules.documents.application.use_cases import (
     ListMemberDocumentsUseCase,
+    UploadMemberDocumentCoverUseCase,
     UploadMemberDocumentUseCase,
 )
 from app.modules.documents.infrastructure.files import LocalMemberDocumentStorage
@@ -33,3 +34,10 @@ def get_upload_member_document_use_case(
     storage: Annotated[LocalMemberDocumentStorage, Depends(get_document_storage)],
 ) -> UploadMemberDocumentUseCase:
     return UploadMemberDocumentUseCase(repository, storage)
+
+
+def get_upload_member_document_cover_use_case(
+    repository: Annotated[SqlAlchemyMemberDocumentRepository, Depends(get_document_repository)],
+    storage: Annotated[LocalMemberDocumentStorage, Depends(get_document_storage)],
+) -> UploadMemberDocumentCoverUseCase:
+    return UploadMemberDocumentCoverUseCase(repository, storage)

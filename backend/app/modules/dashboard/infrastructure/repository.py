@@ -26,6 +26,7 @@ from app.modules.dashboard.domain.entities import (
     RosterMember,
     feed_excerpt,
 )
+from app.modules.documents.infrastructure.repository import ensure_member_documents_schema
 from app.modules.payments.domain.subscription import STATUS_APPROVED, dollars_from_cents
 
 DATE_SQL = "^[0-9]{2}/[0-9]{2}/[0-9]{4}$"
@@ -328,10 +329,11 @@ class SqlAlchemyDashboardRepository:
         ]
 
     def list_member_documents(self) -> list[FeedDocument]:
+        ensure_member_documents_schema(self.session)
         rows = self.session.execute(
             text(
                 """
-                SELECT document_key, title, file_path
+                SELECT document_key, title, file_path, cover_path
                 FROM member_documents
                 ORDER BY id ASC
                 """,
@@ -343,6 +345,7 @@ class SqlAlchemyDashboardRepository:
                 title=str(row["title"]),
                 file_path=row["file_path"],
                 available=bool(row["file_path"]),
+                cover_path=row.get("cover_path"),
             )
             for row in rows
         ]

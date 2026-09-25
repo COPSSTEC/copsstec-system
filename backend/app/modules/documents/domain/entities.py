@@ -7,6 +7,7 @@ DOCUMENT_CATALOG: dict[str, str] = {
     "statutes": "Estatutos",
     "safety_talks": "Charlas de seguridad",
     "brand_manual": "Manual de marca",
+    "board_resolutions": "Resoluciones del directorio",
 }
 
 DOCUMENT_KEYS = tuple(DOCUMENT_CATALOG.keys())
@@ -19,6 +20,7 @@ class MemberDocument:
     title: str
     file_path: str | None
     original_filename: str | None
+    cover_path: str | None
     updated_by: int | None
     created_at: datetime | None
     updated_at: datetime | None

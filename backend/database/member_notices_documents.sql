@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS member_documents (
     title VARCHAR(255) NOT NULL,
     file_path TEXT,
     original_filename VARCHAR(255),
+    cover_path TEXT,
     updated_by BIGINT REFERENCES users(id),
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
@@ -33,5 +34,6 @@ VALUES
     ('member_guide', 'Manual de miembros', NOW(), NOW()),
     ('statutes', 'Estatutos', NOW(), NOW()),
     ('safety_talks', 'Charlas de seguridad', NOW(), NOW()),
-    ('brand_manual', 'Manual de marca', NOW(), NOW())
+    ('brand_manual', 'Manual de marca', NOW(), NOW()),
+    ('board_resolutions', 'Resoluciones del directorio', NOW(), NOW())
 ON CONFLICT (document_key) DO NOTHING;

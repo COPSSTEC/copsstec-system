@@ -55,3 +55,39 @@ class UploadMemberDocumentUseCase:
         if updated is None:
             raise DocumentNotFoundError()
         return updated
+
+
+class UploadMemberDocumentCoverUseCase:
+    def __init__(
+        self,
+        repository: MemberDocumentRepository,
+        storage: MemberDocumentStorage,
+    ) -> None:
+        self.repository = repository
+        self.storage = storage
+
+    def execute(
+        self,
+        document_key: str,
+        *,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        updated_by: int,
+    ) -> MemberDocument:
+        if document_key not in DOCUMENT_KEYS:
+            raise DocumentValidationError("El tipo de documento no es válido.")
+        if self.repository.get_by_key(document_key) is None:
+            raise DocumentNotFoundError()
+        if not content:
+            raise DocumentValidationError("Debes subir una imagen de portada.")
+
+        try:
+            cover_path = self.storage.save_cover(document_key, filename, content, content_type)
+        except InvalidDocumentFileError as exc:
+            raise DocumentValidationError(exc.message) from exc
+
+        updated = self.repository.upsert_cover(document_key, cover_path, updated_by)
+        if updated is None:
+            raise DocumentNotFoundError()
+        return updated

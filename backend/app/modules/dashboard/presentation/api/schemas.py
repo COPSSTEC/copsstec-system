@@ -245,6 +245,7 @@ class FeedDocumentResponse(BaseModel):
     title: str
     file_path: str | None
     available: bool
+    cover_path: str | None = None
 
     @classmethod
     def from_domain(cls, item: FeedDocument) -> "FeedDocumentResponse":
@@ -253,6 +254,7 @@ class FeedDocumentResponse(BaseModel):
             title=item.title,
             file_path=item.file_path,
             available=item.available,
+            cover_path=item.cover_path,
         )
 
 

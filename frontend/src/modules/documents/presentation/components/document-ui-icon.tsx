@@ -7,7 +7,8 @@ type DocumentIconName =
   | "check"
   | "upload"
   | "refresh"
-  | "pdf";
+  | "pdf"
+  | "image";
 
 const PATHS: Record<DocumentIconName, string[]> = {
   file: ["M7 3h7l5 5v13H7z", "M14 3v5h5"],
@@ -19,6 +20,7 @@ const PATHS: Record<DocumentIconName, string[]> = {
   upload: ["M12 20V8", "M7 13l5-5 5 5", "M5 4h14"],
   refresh: ["M21 12a9 9 0 11-3.2-6.8", "M21 3v6h-6"],
   pdf: ["M7 3h7l5 5v13H7z", "M14 3v5h5", "M9 14h6", "M9 17h4"],
+  image: ["M4 6h16v12H4z", "M8 11a1.5 1.5 0 100-3 1.5 1.5 0 000 3z", "M4 16l5-5 4 4 3-3 4 4"],
 };
 
 interface DocumentUiIconProps {

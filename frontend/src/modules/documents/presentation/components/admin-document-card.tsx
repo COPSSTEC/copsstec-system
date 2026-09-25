@@ -13,23 +13,38 @@ import {
   documentKeyLabel,
   formatDocumentDate,
   formatFileSize,
+  MAX_COVER_LABEL,
   MAX_PDF_LABEL,
 } from "@/modules/documents/presentation/lib/admin-documents";
 
 interface AdminDocumentCardProps {
   document: MemberDocument;
   isUploading: boolean;
+  isUploadingCover: boolean;
   onUpload: (key: MemberDocumentKey, file: File) => void;
+  onUploadCover: (key: MemberDocumentKey, file: File) => void;
 }
 
-export function AdminDocumentCard({ document, isUploading, onUpload }: AdminDocumentCardProps) {
+export function AdminDocumentCard({
+  document,
+  isUploading,
+  isUploadingCover,
+  onUpload,
+  onUploadCover,
+}: AdminDocumentCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const href = documentFileSrc(document.file_path);
+  const coverSrc = documentFileSrc(document.cover_path);
   const published = Boolean(document.available && href);
 
   function pickFile() {
     inputRef.current?.click();
+  }
+
+  function pickCover() {
+    coverInputRef.current?.click();
   }
 
   function submitFile(file: File | null | undefined) {
@@ -67,6 +82,41 @@ export function AdminDocumentCard({ document, isUploading, onUpload }: AdminDocu
         ref={inputRef}
         type="file"
       />
+      <input
+        accept="image/jpeg,image/png,image/webp"
+        hidden
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) {
+            onUploadCover(document.document_key, file);
+          }
+          event.currentTarget.value = "";
+        }}
+        ref={coverInputRef}
+        type="file"
+      />
+
+      <div className="admin-document-cover">
+        {coverSrc ? (
+          <img alt={`Portada de ${document.title}`} src={coverSrc} />
+        ) : (
+          <span className="admin-document-cover-empty">
+            <DocumentUiIcon name="image" />
+          </span>
+        )}
+        <div>
+          <strong>{coverSrc ? "Portada del modal" : "Sin portada"}</strong>
+          <p>JPG, PNG o WEBP • Máx. {MAX_COVER_LABEL}</p>
+          <button
+            className="admin-document-cover-btn"
+            disabled={isUploadingCover}
+            onClick={pickCover}
+            type="button"
+          >
+            {isUploadingCover ? "Subiendo..." : coverSrc ? "Cambiar portada" : "Subir portada"}
+          </button>
+        </div>
+      </div>
 
       {published ? (
         <>

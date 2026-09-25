@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 
-import {
-  documentDownloadName,
-  documentFileSrc,
-  type MemberDocument,
-} from "@/modules/documents/domain/types";
+import { documentFileSrc } from "@/modules/documents/domain/types";
+
+interface InductionDocument {
+  document_key: string;
+  title: string;
+  file_path: string | null;
+  available?: boolean;
+  original_filename?: string | null;
+  cover_path?: string | null;
+}
 
 interface InductionDocumentsModalProps {
-  documents: MemberDocument[];
+  documents: InductionDocument[];
   onClose: () => void;
 }
 
@@ -17,6 +22,7 @@ export function InductionDocumentsModal({ documents, onClose }: InductionDocumen
   const [index, setIndex] = useState(0);
   const current = documents[index];
   const href = current ? documentFileSrc(current.file_path) : null;
+  const coverSrc = current ? documentFileSrc(current.cover_path) : null;
 
   function go(delta: number) {
     if (documents.length === 0) {
@@ -40,13 +46,22 @@ export function InductionDocumentsModal({ documents, onClose }: InductionDocumen
 
         {current ? (
           <article className="induction-slide">
-            <div className={`induction-cover induction-cover-${current.document_key}`}>
+            <div
+              className={`induction-cover induction-cover-${current.document_key} ${coverSrc ? "has-image" : ""}`}
+              style={
+                coverSrc
+                  ? {
+                      backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.12), rgba(15, 23, 42, 0.68)), url("${coverSrc}")`,
+                    }
+                  : undefined
+              }
+            >
               <p className="eyebrow">Documento institucional</p>
               <h3>{current.title}</h3>
               {href ? (
                 <a
                   className="create-button button-link"
-                  download={documentDownloadName(current)}
+                  download={current.original_filename || `${current.title}.pdf`}
                   href={href}
                 >
                   Descargar

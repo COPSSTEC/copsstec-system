@@ -6,6 +6,7 @@ from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import get_current_user, require_access
 from app.modules.documents.application.use_cases import (
     ListMemberDocumentsUseCase,
+    UploadMemberDocumentCoverUseCase,
     UploadMemberDocumentUseCase,
 )
 from app.modules.documents.domain.exceptions import (
@@ -15,6 +16,7 @@ from app.modules.documents.domain.exceptions import (
 )
 from app.modules.documents.presentation.api.dependencies import (
     get_list_member_documents_use_case,
+    get_upload_member_document_cover_use_case,
     get_upload_member_document_use_case,
 )
 from app.modules.documents.presentation.api.schemas import MemberDocumentResponse
@@ -49,6 +51,27 @@ async def upload_member_document(
         document = use_case.execute(
             document_key,
             filename=file.filename or "documento.pdf",
+            content=await file.read(),
+            content_type=file.content_type or "",
+            updated_by=user.id,
+        )
+    except (DocumentValidationError, InvalidDocumentFileError, DocumentNotFoundError) as exc:
+        raise _http_error(exc) from exc
+
+    return MemberDocumentResponse.from_domain(document)
+
+
+@router.put("/{document_key}/cover", response_model=MemberDocumentResponse)
+async def upload_member_document_cover(
+    document_key: str,
+    use_case: Annotated[UploadMemberDocumentCoverUseCase, Depends(get_upload_member_document_cover_use_case)],
+    user: Annotated[User, Depends(require_access("admin"))],
+    file: UploadFile = File(...),
+) -> MemberDocumentResponse:
+    try:
+        document = use_case.execute(
+            document_key,
+            filename=file.filename or "portada.jpg",
             content=await file.read(),
             content_type=file.content_type or "",
             updated_by=user.id,

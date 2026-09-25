@@ -3,11 +3,14 @@ import type { MemberDocument } from "@/modules/documents/domain/types";
 export const MAX_PDF_BYTES = 20 * 1024 * 1024;
 export const MAX_PDF_LABEL = "20 MB";
 
+export const MAX_COVER_BYTES = 5 * 1024 * 1024;
+export const MAX_COVER_LABEL = "5 MB";
+
 const PRACTICE_ITEMS = [
   "Solo formato PDF",
   `Tamaño máximo: ${MAX_PDF_LABEL}`,
+  "Portada JPG, PNG o WEBP",
   "Documentos visibles para todos los socios",
-  "Mantén la información actualizada",
 ] as const;
 
 export const DOCUMENT_PRACTICES = PRACTICE_ITEMS;
@@ -81,6 +84,26 @@ export function validatePdfFile(file: File): string | null {
   }
   if (!file.size) {
     return "El archivo está vacío.";
+  }
+  return null;
+}
+
+export function validateCoverFile(file: File): string | null {
+  const name = file.name.toLowerCase();
+  const isImage =
+    ["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+    name.endsWith(".jpg") ||
+    name.endsWith(".jpeg") ||
+    name.endsWith(".png") ||
+    name.endsWith(".webp");
+  if (!isImage) {
+    return "La portada debe ser JPG, PNG o WEBP.";
+  }
+  if (file.size > MAX_COVER_BYTES) {
+    return `La portada no puede superar ${MAX_COVER_LABEL}.`;
+  }
+  if (!file.size) {
+    return "La imagen está vacía.";
   }
   return null;
 }

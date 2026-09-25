@@ -239,6 +239,7 @@ class FeedDocument:
     title: str
     file_path: str | None
     available: bool
+    cover_path: str | None = None
 
 
 @dataclass(frozen=True)

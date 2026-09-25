@@ -48,3 +48,19 @@ export async function uploadMemberDocument(
   });
   return parseResponse<MemberDocument>(response);
 }
+
+export async function uploadMemberDocumentCover(
+  token: string,
+  key: MemberDocumentKey,
+  file: File,
+): Promise<MemberDocument> {
+  const payload = new FormData();
+  payload.append("file", file);
+
+  const response = await fetch(`${API_URL}/api/member-documents/${key}/cover`, {
+    method: "PUT",
+    headers: authHeaders(token),
+    body: payload,
+  });
+  return parseResponse<MemberDocument>(response);
+}

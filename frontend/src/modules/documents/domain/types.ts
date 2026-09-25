@@ -5,6 +5,7 @@ export const DOCUMENT_KEYS = [
   "statutes",
   "safety_talks",
   "brand_manual",
+  "board_resolutions",
 ] as const;
 
 export type MemberDocumentKey = (typeof DOCUMENT_KEYS)[number];
@@ -14,6 +15,7 @@ export interface MemberDocument {
   title: string;
   file_path: string | null;
   original_filename?: string | null;
+  cover_path?: string | null;
   available: boolean;
   updated_at?: string | null;
   file_size?: number | null;

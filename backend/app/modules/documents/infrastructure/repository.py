@@ -10,12 +10,37 @@ def _now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def ensure_member_documents_schema(session: Session) -> None:
+    if getattr(session, "_member_documents_schema", False):
+        return
+    session.execute(text("ALTER TABLE member_documents ADD COLUMN IF NOT EXISTS cover_path TEXT"))
+    now = _now()
+    for key in DOCUMENT_KEYS:
+        session.execute(
+            text(
+                """
+                INSERT INTO member_documents (document_key, title, created_at, updated_at)
+                VALUES (:document_key, :title, :created_at, :updated_at)
+                ON CONFLICT (document_key) DO NOTHING
+                """,
+            ),
+            {
+                "document_key": key,
+                "title": DOCUMENT_CATALOG[key],
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+    session.commit()
+    setattr(session, "_member_documents_schema", True)
+
+
 class SqlAlchemyMemberDocumentRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
     def list_all(self) -> list[MemberDocument]:
-        self._ensure_seeds()
+        self._ensure_schema()
         rows = self.session.execute(
             text(
                 """
@@ -28,7 +53,7 @@ class SqlAlchemyMemberDocumentRepository:
         return [self._build(row) for row in rows]
 
     def get_by_key(self, document_key: str) -> MemberDocument | None:
-        self._ensure_seeds()
+        self._ensure_schema()
         row = self.session.execute(
             text(
                 """
@@ -72,25 +97,36 @@ class SqlAlchemyMemberDocumentRepository:
         self.session.commit()
         return self._build(row) if row is not None else None
 
-    def _ensure_seeds(self) -> None:
-        now = _now()
-        for key in DOCUMENT_KEYS:
-            self.session.execute(
-                text(
-                    """
-                    INSERT INTO member_documents (document_key, title, created_at, updated_at)
-                    VALUES (:document_key, :title, :created_at, :updated_at)
-                    ON CONFLICT (document_key) DO NOTHING
-                    """,
-                ),
-                {
-                    "document_key": key,
-                    "title": DOCUMENT_CATALOG[key],
-                    "created_at": now,
-                    "updated_at": now,
-                },
-            )
+    def upsert_cover(
+        self,
+        document_key: str,
+        cover_path: str,
+        updated_by: int,
+    ) -> MemberDocument | None:
+        self._ensure_schema()
+        row = self.session.execute(
+            text(
+                """
+                UPDATE member_documents
+                SET cover_path = :cover_path,
+                    updated_by = :updated_by,
+                    updated_at = :updated_at
+                WHERE document_key = :document_key
+                RETURNING *
+                """,
+            ),
+            {
+                "cover_path": cover_path,
+                "updated_by": updated_by,
+                "updated_at": _now(),
+                "document_key": document_key,
+            },
+        ).mappings().first()
         self.session.commit()
+        return self._build(row) if row is not None else None
+
+    def _ensure_schema(self) -> None:
+        ensure_member_documents_schema(self.session)
 
     def _build(self, row: object) -> MemberDocument:
         data = dict(row)  # type: ignore[arg-type]
@@ -100,6 +136,7 @@ class SqlAlchemyMemberDocumentRepository:
             title=str(data["title"]),
             file_path=data["file_path"],
             original_filename=data["original_filename"],
+            cover_path=data.get("cover_path"),
             updated_by=int(data["updated_by"]) if data["updated_by"] is not None else None,
             created_at=data["created_at"],
             updated_at=data["updated_at"],

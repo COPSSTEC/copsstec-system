@@ -132,10 +132,11 @@ export interface MemberFeedJob {
 }
 
 export interface MemberFeedDocument {
-  document_key: "member_guide" | "statutes" | "safety_talks" | "brand_manual";
+  document_key: "member_guide" | "statutes" | "safety_talks" | "brand_manual" | "board_resolutions";
   title: string;
   file_path: string | null;
   available: boolean;
+  cover_path?: string | null;
 }
 
 export interface MemberDashboardSnapshot {

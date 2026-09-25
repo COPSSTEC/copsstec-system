@@ -7,6 +7,7 @@ import type { MemberDocument, MemberDocumentKey } from "@/modules/documents/doma
 import {
   listMemberDocuments,
   uploadMemberDocument,
+  uploadMemberDocumentCover,
 } from "@/modules/documents/infrastructure/documents-api";
 import { AdminDocumentCard } from "@/modules/documents/presentation/components/admin-document-card";
 import { DocumentUiIcon } from "@/modules/documents/presentation/components/document-ui-icon";
@@ -14,6 +15,7 @@ import {
   DOCUMENT_PRACTICES,
   formatShortDocumentDate,
   latestDocumentUpdate,
+  validateCoverFile,
   validatePdfFile,
 } from "@/modules/documents/presentation/lib/admin-documents";
 import { RoleGate } from "@/shared/components/role-gate";
@@ -25,6 +27,7 @@ export function AdminDocumentsPage() {
   const [documents, setDocuments] = useState<MemberDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [uploadingKey, setUploadingKey] = useState<MemberDocumentKey | null>(null);
+  const [uploadingCoverKey, setUploadingCoverKey] = useState<MemberDocumentKey | null>(null);
 
   const publishedCount = documents.filter((item) => item.available).length;
   const pendingCount = documents.length - publishedCount;
@@ -69,6 +72,27 @@ export function AdminDocumentsPage() {
     }
   }
 
+  async function handleUploadCover(key: MemberDocumentKey, file: File) {
+    if (!token) {
+      return;
+    }
+    const invalid = validateCoverFile(file);
+    if (invalid) {
+      toast.error(invalid);
+      return;
+    }
+    setUploadingCoverKey(key);
+    try {
+      const updated = await uploadMemberDocumentCover(token, key, file);
+      setDocuments((current) => current.map((item) => (item.document_key === key ? updated : item)));
+      toast.success(`Portada de ${updated.title} actualizada.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo subir la portada.");
+    } finally {
+      setUploadingCoverKey(null);
+    }
+  }
+
   return (
     <RoleGate requiredAccess="admin">
       <section className="admin-documents">
@@ -76,7 +100,7 @@ export function AdminDocumentsPage() {
           <div className="admin-documents-hero-main">
             <header className="admin-documents-heading">
               <h1>Documentos institucionales</h1>
-              <p>Administra los 4 PDF oficiales de los socios desde el portal.</p>
+              <p>Administra los 5 PDF oficiales de los socios desde el portal.</p>
             </header>
 
             <section className="admin-documents-kpis">
@@ -119,7 +143,7 @@ export function AdminDocumentsPage() {
 
         {isLoading ? (
           <section className="admin-documents-grid">
-            {Array.from({ length: 4 }, (_, index) => (
+            {Array.from({ length: 5 }, (_, index) => (
               <article className="admin-document-card is-skeleton" key={index} />
             ))}
           </section>
@@ -129,8 +153,10 @@ export function AdminDocumentsPage() {
               <AdminDocumentCard
                 document={document}
                 isUploading={uploadingKey === document.document_key}
+                isUploadingCover={uploadingCoverKey === document.document_key}
                 key={document.document_key}
                 onUpload={handleUpload}
+                onUploadCover={handleUploadCover}
               />
             ))}
           </section>

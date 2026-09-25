@@ -19,7 +19,18 @@ class MemberDocumentRepository(Protocol):
     ) -> MemberDocument | None:
         ...
 
+    def upsert_cover(
+        self,
+        document_key: str,
+        cover_path: str,
+        updated_by: int,
+    ) -> MemberDocument | None:
+        ...
+
 
 class MemberDocumentStorage(Protocol):
     def save(self, document_key: str, filename: str, content: bytes, content_type: str) -> str:
+        ...
+
+    def save_cover(self, document_key: str, filename: str, content: bytes, content_type: str) -> str:
         ...
