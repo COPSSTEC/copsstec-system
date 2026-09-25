@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from app.core.config import get_settings
+from app.core.config import get_settings, live_membership_transfer
 from app.core.security import hash_password
 from app.modules.auth.application.rbac import resolve_access_policy
 from app.modules.auth.application.session import RefreshTokenWriter, issue_session_tokens
@@ -127,16 +127,16 @@ class RegisterMembershipUseCase:
             code = "identifier_taken" if "cédula" in conflict.lower() else "email_taken"
             raise MembershipConflictError(conflict, code=code)
 
-        settings = get_settings()
+        transfer = live_membership_transfer()
         member = self.repository.register_member(
             data=data,
             password_hash=hash_password(token_urlsafe(24)),
-            amount=settings.membership_fee,
-            bank_name=settings.membership_bank_name,
-            account_type=settings.membership_account_type,
-            account_number=settings.membership_account_number,
-            account_holder=settings.membership_account_holder,
-            account_ruc=settings.membership_account_ruc,
+            amount=transfer.fee,
+            bank_name=transfer.bank_name,
+            account_type=transfer.account_type,
+            account_number=transfer.account_number,
+            account_holder=transfer.account_holder,
+            account_ruc=transfer.account_ruc,
         )
         foto_id = self.storage.save_photo(
             member.user_id,
@@ -245,23 +245,28 @@ class GetPaymentInfoUseCase:
         if payment.status == PAYMENT_APPROVED:
             raise MembershipForbiddenError("Tu afiliación ya fue aprobada.")
 
+        transfer = live_membership_transfer()
+        try:
+            amount = Decimal(str(transfer.fee).strip())
+        except Exception:
+            amount = payment.amount
         qr_payload = (
             f"COPSSTEC afiliación\n"
-            f"Banco: {payment.bank_name}\n"
-            f"Tipo: {payment.account_type}\n"
-            f"Cuenta: {payment.account_number}\n"
-            f"Titular: {payment.account_holder}\n"
-            f"Valor: {payment.currency} {payment.amount}\n"
+            f"Banco: {transfer.bank_name}\n"
+            f"Tipo: {transfer.account_type}\n"
+            f"Cuenta: {transfer.account_number}\n"
+            f"Titular: {transfer.account_holder}\n"
+            f"Valor: {payment.currency} {amount}\n"
             f"Referencia: {payment.reference}"
         )
         return BankTransferInfo(
-            amount=payment.amount,
+            amount=amount,
             currency=payment.currency,
-            bank_name=payment.bank_name,
-            account_type=payment.account_type,
-            account_number=payment.account_number,
-            account_holder=payment.account_holder,
-            account_ruc=payment.account_ruc or "",
+            bank_name=transfer.bank_name,
+            account_type=transfer.account_type,
+            account_number=transfer.account_number,
+            account_holder=transfer.account_holder,
+            account_ruc=transfer.account_ruc or "",
             reference=payment.reference,
             qr_payload=qr_payload,
         )

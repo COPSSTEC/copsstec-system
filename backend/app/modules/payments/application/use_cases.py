@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from secrets import token_urlsafe
 
-from app.core.config import get_settings
+from app.core.config import get_settings, live_membership_transfer
 from app.modules.payments.application.ports import (
     AdvAuthorizationPdfGenerator,
     AgreementEmailSender,
@@ -119,21 +119,21 @@ def _with_subscription_view(subscription, today: date):
 
 
 def _bank_info() -> BankTransferInfo:
-    settings = get_settings()
+    transfer = live_membership_transfer()
     qr_payload = (
         f"COPSSTEC renovación de membresía\n"
-        f"Banco: {settings.membership_bank_name}\n"
-        f"Tipo: {settings.membership_account_type}\n"
-        f"Cuenta: {settings.membership_account_number}\n"
-        f"Titular: {settings.membership_account_holder}\n"
+        f"Banco: {transfer.bank_name}\n"
+        f"Tipo: {transfer.account_type}\n"
+        f"Cuenta: {transfer.account_number}\n"
+        f"Titular: {transfer.account_holder}\n"
         f"Valor mensual: USD {MONTHLY_FEE:.2f}"
     )
     return BankTransferInfo(
-        bank_name=settings.membership_bank_name,
-        account_type=settings.membership_account_type,
-        account_number=settings.membership_account_number,
-        account_holder=settings.membership_account_holder,
-        account_ruc=settings.membership_account_ruc,
+        bank_name=transfer.bank_name,
+        account_type=transfer.account_type,
+        account_number=transfer.account_number,
+        account_holder=transfer.account_holder,
+        account_ruc=transfer.account_ruc,
         qr_payload=qr_payload,
     )
 

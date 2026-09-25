@@ -13,7 +13,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
-from reportlab.platypus import HRFlowable, PageBreak, Paragraph, SimpleDocTemplate, Spacer
+from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer
 
 from app.modules.members.domain.entities import ENABLED_STATE_ID, Member
 
@@ -195,126 +195,98 @@ def _solicitud_upper(value: str | None) -> str:
     return escape(text.upper()) if text else "—"
 
 
-SOLICITUD_OBLIGATIONS: list[tuple[str, list[str]]] = [
+SOLICITUD_STATIC_PARAGRAPHS = (
     (
-        "AFILIACIÓN Y OBLIGACIÓN DE LOS MIEMBROS",
-        [
-            (
-                "La afiliación al COPSSTEC se realiza de manera voluntaria. Una vez que el "
-                "profesional adquiere la calidad de miembro, debe cumplir las disposiciones "
-                "establecidas en el Estatuto y los reglamentos institucionales."
-            ),
-            (
-                "De conformidad con el artículo 13 literal (a), constituye obligación de los "
-                "miembros cumplir estrictamente las disposiciones contenidas en el Estatuto, "
-                "su Reglamento Interno y las resoluciones de la Asamblea General y del Directorio."
-            ),
-            (
-                "De igual manera, el artículo 13 literal d) impone la obligación de cumplir con "
-                "los valores voluntarios anuales de aporte y demás obligaciones económicas que "
-                "correspondan."
-            ),
-        ],
+        "Para tal efecto, manifiesto mi voluntad y compromiso de cumplir con los aportes "
+        "correspondientes, así como con las obligaciones inherentes a mi calidad de miembro."
     ),
     (
-        "SOCIOS CON VALORES PENDIENTES",
-        [
-            (
-                "Los miembros que actualmente mantengan valores pendientes podrán acogerse a "
-                "las facilidades de pago establecidas por el COPSSTEC, con la finalidad de "
-                "regularizar progresivamente sus obligaciones económicas y evitar la "
-                "acumulación de nuevos valores pendientes."
-            ),
-            (
-                "Esta medida busca brindar una alternativa accesible para que los socios puedan "
-                "ponerse al día de manera ordenada."
-            ),
-            (
-                "El Estatuto contempla expresamente el incumplimiento en el pago de cuotas "
-                "ordinarias o extraordinarias como una infracción, conforme al artículo 66 "
-                "literal g)."
-            ),
-            (
-                "Asimismo, el artículo 70 establece que la Asamblea General, previa investigación "
-                "e informe de la Comisión Especial correspondiente, podrá suspender a dignatarios "
-                "y miembros en el ejercicio de sus derechos por incumplimiento en el pago de "
-                "obligaciones económicas, cuotas, aportes u obligaciones pecuniarias en mora "
-                "con el Colegio."
-            ),
-            (
-                "Por ello, el COPSSTEC invita a los miembros que mantienen valores pendientes a "
-                "aprovechar estas facilidades y regularizar voluntariamente su situación."
-            ),
-        ],
+        "Asimismo, declaro conocer y aceptar las disposiciones establecidas en los Estatutos "
+        "del COPSSTEC, aprobados por la autoridad competente."
     ),
     (
-        "SOCIOS AL DÍA EN SUS OBLIGACIONES",
-        [
-            (
-                "Los miembros que se encuentren al día en el cumplimiento de sus obligaciones "
-                "económicas podrán continuar realizando sus pagos bajo las alternativas "
-                "disponibles o conforme a las facilidades establecidas por el Colegio."
-            ),
-            (
-                "El objetivo es mantener un sistema de pago organizado que facilite la "
-                "continuidad de la membresía y contribuya al sostenimiento de las actividades "
-                "institucionales."
-            ),
-            (
-                "El artículo 59 literal a) del Estatuto establece que las cuotas y aportes de "
-                "los miembros constituyen una de las fuentes de ingresos del COPSSTEC, mientras "
-                "que el artículo 56 dispone que los fondos del Colegio serán utilizados "
-                "únicamente para el cumplimiento de sus fines y objetivos institucionales."
-            ),
-        ],
+        "De igual manera, autorizo al COPSSTEC a registrar y gestionar mis datos profesionales "
+        "ante el Ministerio del Trabajo, para los fines institucionales y legales correspondientes."
     ),
-]
+    "Para constancia, adjunto copia de mi cédula de identidad y demás documentación requerida.",
+)
 
 
-def build_solicitud_body(member: Member) -> str:
+def _solicitud_address(member: Member) -> str:
+    parts = [
+        (member.street_principal or "").strip(),
+        (member.street_secondary or "").strip(),
+    ]
+    return " y ".join(part for part in parts if part)
+
+
+def _solicitud_titles_clause(member: Member) -> str:
+    third_title = (member.title_academic or "").strip()
+    third_code = (member.cod_senescyt or "").strip()
+    fourth_title = (member.fourth_title or "").strip()
+    fourth_code = (member.codigo_senescyt_cuarto or "").strip()
+    has_third = bool(third_title)
+    has_fourth = bool(fourth_title)
+
+    if has_third and has_fourth:
+        return (
+            "con título de tercer nivel en "
+            f"<font name='Times-Bold'>{_solicitud_upper(third_title)}</font> "
+            "y título de cuarto nivel en "
+            f"<font name='Times-Bold'>{_solicitud_upper(fourth_title)}</font>, "
+            "legalmente registrados en la SENESCYT, con los códigos de registro "
+            f"<font name='Times-Bold'>{_solicitud_upper(third_code)}</font> y "
+            f"<font name='Times-Bold'>{_solicitud_upper(fourth_code)}</font>, respectivamente"
+        )
+    if has_third:
+        return (
+            "con título de tercer nivel en "
+            f"<font name='Times-Bold'>{_solicitud_upper(third_title)}</font>, "
+            "legalmente registrado en la SENESCYT, con el código de registro "
+            f"<font name='Times-Bold'>{_solicitud_upper(third_code)}</font>"
+        )
+    if has_fourth:
+        return (
+            "con título de cuarto nivel en "
+            f"<font name='Times-Bold'>{_solicitud_upper(fourth_title)}</font>, "
+            "legalmente registrado en la SENESCYT, con el código de registro "
+            f"<font name='Times-Bold'>{_solicitud_upper(fourth_code)}</font>"
+        )
+    return "legalmente registrado en la SENESCYT"
+
+
+def build_solicitud_paragraphs(member: Member) -> list[str]:
     names = _solicitud_upper(member.names)
     lastname = _solicitud_upper(member.lastname)
     identifier = _solicitud_upper(member.identifier)
-    address_parts = [
-        "domiciliado en la "
-        f"provincia de <font name='Times-Bold'>{_solicitud_upper(member.province)}</font> "
-        f"Ciudad de <font name='Times-Bold'>{_solicitud_upper(member.city)}</font>",
-    ]
-    if (member.street_principal or "").strip():
-        address_parts.append(
-            f"en la calle <font name='Times-Bold'>{_solicitud_upper(member.street_principal)}</font>"
-        )
-    if (member.street_secondary or "").strip():
-        address_parts.append(
-            f"y transversal <font name='Times-Bold'>{_solicitud_upper(member.street_secondary)}</font>"
-        )
-    if (member.fixed_phone or "").strip():
-        address_parts.append(
-            f"Teléfono fijo <font name='Times-Bold'>{_solicitud_upper(member.fixed_phone)}</font>"
-        )
-    if (member.mobile_phone or "").strip():
-        address_parts.append(
-            f"Teléfono Móvil <font name='Times-Bold'>{_solicitud_upper(member.mobile_phone)}</font>"
-        )
-    return (
-        f"Yo, <font name='Times-Bold'>{names} {lastname}</font>, titular de la cédula de "
-        f"identidad Nro. <font name='Times-Bold'>{identifier}</font>, "
-        f"{' '.join(address_parts)}, "
-        "en consideración de ser un profesional de la seguridad y salud en el trabajo con mi "
-        f"título de <font name='Times-Bold'>{_solicitud_upper(member.title_academic)}</font>, "
-        "legalmente registrado en el Sistema Nacional de Información de la Educación Superior "
-        f"del Ecuador, con el código: <font name='Times-Bold'>{_solicitud_upper(member.cod_senescyt)}</font>. "
-        "Solicito a usted Sr. Presidente, se me incluya como miembro activo del "
-        "<font name='Times-Bold'>COLEGIO DE PROFESIONALES DE SEGURIDAD Y SALUD EN EL TRABAJO "
-        "DEL ECUADOR (COPSSTEC)</font>, asumiendo el compromiso de manera voluntaria de "
-        "realizar mi aporte anual por el valor de $120 (ciento veinte dólares americanos); "
-        "en la cuenta corriente No 48403590 del Banco de Guayaquil a nombre del Colegio de "
-        "Profesionales de Seguridad y Salud en el Trabajo del Ecuador Ruc: 1792898633001, "
-        "además declaro que estoy en conocimiento de los estatutos y apruebo mi aporte sea "
-        "destinado a cumplir con los fines y objetivos planteados. Además, autorizo a que se "
-        "registren mis datos ante el Ministerio de Trabajo, para lo cual adjunto la copia de "
-        "mi cédula."
+    address = _solicitud_address(member)
+    address_clause = (
+        f", con dirección domiciliaria en <font name='Times-Bold'>{_solicitud_upper(address)}</font>"
+        if address
+        else ""
     )
+    mobile = (member.mobile_phone or "").strip()
+    mobile_clause = (
+        f", y teléfono móvil <font name='Times-Bold'>{_solicitud_upper(mobile)}</font>"
+        if mobile
+        else ""
+    )
+    intro = (
+        f"Yo, <font name='Times-Bold'>{names} {lastname}</font>, titular de la cédula de "
+        f"identidad Nro. <font name='Times-Bold'>{identifier}</font>, domiciliado en la "
+        f"provincia de <font name='Times-Bold'>{_solicitud_upper(member.province)}</font>, "
+        f"cantón <font name='Times-Bold'>{_solicitud_upper(member.city)}</font>"
+        f"{address_clause}{mobile_clause}, en mi calidad de profesional de Seguridad y Salud "
+        f"en el Trabajo, {_solicitud_titles_clause(member)}, por medio de la presente, solicito "
+        "a usted, señor Presidente, se sirva disponer mi incorporación como miembro activo del "
+        "<font name='Times-Bold'>COLEGIO DE PROFESIONALES DE SEGURIDAD Y SALUD EN EL TRABAJO "
+        "DEL ECUADOR (COPSSTEC)</font>."
+    )
+    return [intro, *SOLICITUD_STATIC_PARAGRAPHS]
+
+
+def build_solicitud_body(member: Member) -> str:
+    return " ".join(build_solicitud_paragraphs(member))
 
 
 def _certificate_name_lines(names: str, lastname: str) -> list[str]:
@@ -572,32 +544,14 @@ class MemberDocumentGenerator:
             alignment=TA_LEFT,
             spaceAfter=2,
         )
-        obligation_title_style = ParagraphStyle(
-            "SolicitudObligationTitle",
-            fontName="Times-Bold",
-            fontSize=12,
-            leading=15,
-            alignment=TA_LEFT,
-            spaceBefore=12,
-            spaceAfter=8,
-        )
-        obligation_body_style = ParagraphStyle(
-            "SolicitudObligationBody",
-            fontName="Times-Roman",
-            fontSize=11,
-            leading=15,
-            alignment=TA_JUSTIFY,
-            spaceBefore=2,
-            spaceAfter=8,
-        )
 
-        body = build_solicitud_body(member)
+        paragraphs = build_solicitud_paragraphs(member)
         footer_name = f"{_solicitud_value(member.lastname)} {_solicitud_value(member.names)}".strip()
         today = date.today().strftime("%d/%m/%Y")
 
         story = [
             Paragraph("SOLICITUD DE AFILIACIÓN", section_style),
-            Paragraph(body, body_style),
+            *[Paragraph(text, body_style) for text in paragraphs],
             Paragraph("Atentamente:", body_style),
             Spacer(1, 28),
             HRFlowable(
@@ -612,18 +566,7 @@ class MemberDocumentGenerator:
             Paragraph(f"<b>Apellidos y nombres:</b> {footer_name}", footer_style),
             Paragraph(f"<b>Cédula:</b> {_solicitud_value(member.identifier)}", footer_style),
             Paragraph(f"<b>Fecha de solicitud:</b> {today}", footer_style),
-            PageBreak(),
         ]
-        for index, (title, paragraphs) in enumerate(SOLICITUD_OBLIGATIONS):
-            title_style = obligation_title_style
-            if index == 0:
-                title_style = ParagraphStyle(
-                    "SolicitudObligationTitleFirst",
-                    parent=obligation_title_style,
-                    spaceBefore=0,
-                )
-            story.append(Paragraph(title, title_style))
-            story.extend(Paragraph(text, obligation_body_style) for text in paragraphs)
         document.build(
             story,
             onFirstPage=_draw_solicitud_letterhead,

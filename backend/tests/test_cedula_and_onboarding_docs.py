@@ -1,17 +1,23 @@
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from app.core.config import live_membership_transfer
 from app.modules.members.domain.entities import ENABLED_STATE_ID, Member
 from app.modules.membership.infrastructure.files import InvalidMembershipFileError, LocalMembershipFileStorage
 from app.modules.members.infrastructure.pdfs import (
     MemberDocumentGenerator,
-    SOLICITUD_OBLIGATIONS,
     build_solicitud_body,
 )
-from app.modules.membership.application.use_cases import _validate_registration
+from app.modules.membership.application.use_cases import GetPaymentInfoUseCase, _validate_registration
 from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula
-from app.modules.membership.domain.entities import MembershipRegistrationData, onboarding_documents_complete
+from app.modules.membership.domain.entities import (
+    MembershipPayment,
+    MembershipRegistrationData,
+    PAYMENT_PENDING,
+    onboarding_documents_complete,
+)
 from app.modules.membership.domain.exceptions import MembershipValidationError
 from app.modules.membership.infrastructure.authorization_pdf import (
     AuthorizationDebitPdfGenerator,
@@ -147,12 +153,91 @@ def test_solicitud_omits_empty_optional_fields() -> None:
     body = build_solicitud_body(member)
     assert "AV. AMAZONAS N12" in body
     assert "0990000000" in body
-    assert "transversal" not in body.lower()
-    assert "Teléfono fijo" not in body
-    titles = [title for title, _ in SOLICITUD_OBLIGATIONS]
-    assert titles == [
-        "AFILIACIÓN Y OBLIGACIÓN DE LOS MIEMBROS",
-        "SOCIOS CON VALORES PENDIENTES",
-        "SOCIOS AL DÍA EN SUS OBLIGACIONES",
-    ]
-    assert any("artículo 13 literal a)" in paragraph for _, paragraphs in SOLICITUD_OBLIGATIONS for paragraph in paragraphs)
+    assert "cantón" in body
+    assert "título de tercer nivel" in body
+    assert "título de cuarto nivel" not in body
+    assert "respectivamente" not in body
+    assert "SENESCYT" in body
+    assert "Banco de Guayaquil" not in body
+    assert "$120" not in body
+    assert "Ministerio del Trabajo" in body
+
+
+def test_solicitud_includes_both_titles_when_present() -> None:
+    member = Member(
+        user_id=8,
+        profile_id=13,
+        name="Luis Mora",
+        login_email="luis@copsstec.com",
+        state_id=ENABLED_STATE_ID,
+        state_label="HABILITADO",
+        last_conexion=None,
+        names="Luis",
+        lastname="Mora",
+        identifier="1710034065",
+        email="luis@example.com",
+        birtday="01/01/1988",
+        blood_type="O+",
+        mobile_phone="0981111111",
+        fixed_phone="",
+        title_academic="Ingeniero en SST",
+        level_academic="Ingeniero",
+        cod_senescyt="11111",
+        date_register="23/09/2026",
+        linkdink="",
+        want_notifications=True,
+        is_work=True,
+        foto_id="",
+        province="Guayas",
+        city="Guayaquil",
+        street_principal="Av. 9 de Octubre",
+        street_secondary="Chimborazo",
+        type_profile="miembro",
+        date_exit=None,
+        fourth_title="Magíster en SST",
+        type_commision=None,
+        codigo_senescyt_cuarto="99999",
+        cod="00008",
+        gender="Masculino",
+    )
+    body = build_solicitud_body(member)
+    assert "título de tercer nivel" in body
+    assert "INGENIERO EN SST" in body
+    assert "título de cuarto nivel" in body
+    assert "MAGÍSTER EN SST" in body
+    assert "11111" in body
+    assert "99999" in body
+    assert "respectivamente" in body
+    assert "CHIMBORAZO" in body
+
+
+def test_payment_info_uses_live_account_not_payment_snapshot() -> None:
+    transfer = live_membership_transfer()
+
+    class _Repo:
+        def get_payment(self, user_id: int) -> MembershipPayment:
+            return MembershipPayment(
+                id=1,
+                user_id=user_id,
+                profile_id=9,
+                amount=Decimal("99.00"),
+                currency="USD",
+                bank_name="Banco Viejo",
+                account_type="Corriente",
+                account_number="SNAPSHOT-OLD-NUMBER",
+                account_holder="TITULAR VIEJO",
+                account_ruc="999",
+                reference="17080081744",
+                voucher_path=None,
+                status=PAYMENT_PENDING,
+                reviewed_by=None,
+                reviewed_at=None,
+            )
+
+    info = GetPaymentInfoUseCase(_Repo()).execute(4)
+    assert info.reference == "17080081744"
+    assert info.account_number == transfer.account_number
+    assert info.account_number != "SNAPSHOT-OLD-NUMBER"
+    assert info.bank_name == transfer.bank_name
+    assert info.account_holder == transfer.account_holder
+    assert str(info.amount) == str(Decimal(transfer.fee))

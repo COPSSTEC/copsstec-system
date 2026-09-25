@@ -1,9 +1,22 @@
+from dataclasses import dataclass
 from functools import lru_cache
 from os import environ, getenv
 from pathlib import Path
 
+_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+_MEMBERSHIP_ENV_KEYS = frozenset(
+    {
+        "MEMBERSHIP_FEE",
+        "MEMBERSHIP_BANK_NAME",
+        "MEMBERSHIP_ACCOUNT_TYPE",
+        "MEMBERSHIP_ACCOUNT_NUMBER",
+        "MEMBERSHIP_ACCOUNT_HOLDER",
+        "MEMBERSHIP_ACCOUNT_RUC",
+    }
+)
 
-def _apply_env_file(path: Path) -> None:
+
+def _apply_env_file(path: Path, *, overwrite: frozenset[str] | None = None) -> None:
     if not path.is_file():
         return
     for raw in path.read_text(encoding="utf-8").splitlines():
@@ -15,11 +28,34 @@ def _apply_env_file(path: Path) -> None:
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
             value = value[1:-1]
-        if key and key not in environ:
+        if key and (key not in environ or (overwrite and key in overwrite)):
             environ[key] = value
 
 
-_apply_env_file(Path(__file__).resolve().parents[2] / ".env")
+_apply_env_file(_ENV_PATH)
+
+
+@dataclass(frozen=True)
+class MembershipTransferSettings:
+    fee: str
+    bank_name: str
+    account_type: str
+    account_number: str
+    account_holder: str
+    account_ruc: str
+
+
+def live_membership_transfer() -> MembershipTransferSettings:
+    if getenv("APP_ENV", "local") in {"local", "development", "dev"}:
+        _apply_env_file(_ENV_PATH, overwrite=_MEMBERSHIP_ENV_KEYS)
+    return MembershipTransferSettings(
+        fee=getenv("MEMBERSHIP_FEE", "10.00"),
+        bank_name=getenv("MEMBERSHIP_BANK_NAME", "Banco Pichincha"),
+        account_type=getenv("MEMBERSHIP_ACCOUNT_TYPE", "Cuenta de ahorros"),
+        account_number=getenv("MEMBERSHIP_ACCOUNT_NUMBER", "XXXXXXXXXX"),
+        account_holder=getenv("MEMBERSHIP_ACCOUNT_HOLDER", "COPSSTEC"),
+        account_ruc=getenv("MEMBERSHIP_ACCOUNT_RUC", ""),
+    )
 
 
 class Settings:
