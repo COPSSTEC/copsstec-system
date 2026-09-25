@@ -3,6 +3,7 @@ from uuid import uuid4
 
 
 ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_PDF_FOLDERS = {"authorization", "identity", "solicitud"}
 MAX_FILE_BYTES = 8 * 1024 * 1024
 
 
@@ -31,7 +32,7 @@ class LocalMembershipFileStorage:
         return f"/media/membership/{user_id}/invoices/{target.name}"
 
     def save_pdf(self, user_id: int, folder: str, filename: str, content: bytes, content_type: str) -> str:
-        if folder not in {"authorization", "identity"}:
+        if folder not in ALLOWED_PDF_FOLDERS:
             raise InvalidMembershipFileError("El documento no corresponde a un tipo permitido.")
         normalized_type = (content_type or "").split(";")[0].strip().lower()
         if normalized_type not in {"application/pdf", "application/octet-stream", ""}:

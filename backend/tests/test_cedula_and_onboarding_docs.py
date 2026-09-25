@@ -1,6 +1,9 @@
 from datetime import date
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from app.modules.members.domain.entities import ENABLED_STATE_ID, Member
+from app.modules.membership.infrastructure.files import InvalidMembershipFileError, LocalMembershipFileStorage
 from app.modules.members.infrastructure.pdfs import (
     MemberDocumentGenerator,
     SOLICITUD_OBLIGATIONS,
@@ -54,6 +57,26 @@ def test_register_rejects_invalid_cedula() -> None:
         assert exc.message == CEDULA_INVALID_MESSAGE
     else:
         raise AssertionError("Expected invalid cedula to fail")
+
+
+def test_save_pdf_accepts_solicitud_folder() -> None:
+    with TemporaryDirectory() as tmp:
+        storage = LocalMembershipFileStorage(tmp)
+        stored = storage.save_pdf(7, "solicitud", "solicitud-firmada.pdf", b"%PDF-1.4 test", "application/pdf")
+        assert stored.endswith(".pdf")
+        assert "/solicitud/" in stored
+        assert (Path(tmp) / "7" / "solicitud").is_dir()
+
+
+def test_save_pdf_rejects_unknown_folder() -> None:
+    with TemporaryDirectory() as tmp:
+        storage = LocalMembershipFileStorage(tmp)
+        try:
+            storage.save_pdf(7, "unknown", "archivo.pdf", b"%PDF-1.4 test", "application/pdf")
+        except InvalidMembershipFileError as exc:
+            assert "tipo permitido" in exc.message
+        else:
+            raise AssertionError("Expected unknown folder to fail")
 
 
 def test_onboarding_requires_solicitud_and_year() -> None:

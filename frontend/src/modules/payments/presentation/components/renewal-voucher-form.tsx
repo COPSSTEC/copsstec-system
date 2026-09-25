@@ -10,6 +10,7 @@ import {
   type RenewalPaymentInfo,
   type RenewalPlan,
 } from "@/modules/payments/domain/types";
+import { PAYMENT_QR_URL, paymentQrImageSrc } from "@/shared/lib/payment-qr";
 
 interface RenewalVoucherFormProps {
   openPayment: OpenPayment | null;
@@ -49,9 +50,7 @@ export function RenewalVoucherForm({
     : plan === "yearly"
       ? YEARLY_FEE
       : MONTHLY_FEE;
-  const qrSrc = paymentInfo?.qr_payload
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(paymentInfo.qr_payload)}`
-    : null;
+  const qrSrc = paymentInfo ? paymentQrImageSrc() : null;
 
   function handlePlanSelect(next: RenewalPlan) {
     if (!canChangePlan) {
@@ -127,8 +126,12 @@ export function RenewalVoucherForm({
       {paymentInfo ? (
         <div className="payment-grid">
           <div className="payment-qr">
-            {qrSrc ? <img alt="QR de transferencia COPSSTEC" src={qrSrc} /> : null}
-            <small>Al escanear verás los datos de la transferencia.</small>
+            {qrSrc ? (
+              <a href={PAYMENT_QR_URL} rel="noopener noreferrer" target="_blank">
+                <img alt="QR de pago COPSSTEC" src={qrSrc} />
+              </a>
+            ) : null}
+            <small>Al escanear se abrirá el enlace de pago.</small>
           </div>
           <dl className="payment-details">
             <div>

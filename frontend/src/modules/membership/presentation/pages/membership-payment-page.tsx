@@ -15,6 +15,7 @@ import {
 import { AffiliationAmountBanner } from "@/modules/membership/presentation/components/affiliation-amount-banner";
 import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
+import { PAYMENT_QR_URL, paymentQrImageSrc } from "@/shared/lib/payment-qr";
 import type { PaymentInfo } from "@/modules/membership/domain/types";
 
 export function MembershipPaymentPage() {
@@ -72,9 +73,7 @@ export function MembershipPaymentPage() {
     }
   }
 
-  const qrSrc = info
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(info.qr_payload)}`
-    : null;
+  const qrSrc = info ? paymentQrImageSrc() : null;
 
   return (
     <main className="affiliation-page">
@@ -101,8 +100,12 @@ export function MembershipPaymentPage() {
         {info ? (
           <div className="payment-grid">
             <div className="payment-qr">
-              {qrSrc ? <img alt="QR de transferencia COPSSTEC" src={qrSrc} /> : null}
-              <small>Al escanear verás los datos de la transferencia.</small>
+              {qrSrc ? (
+                <a href={PAYMENT_QR_URL} rel="noopener noreferrer" target="_blank">
+                  <img alt="QR de pago COPSSTEC" src={qrSrc} />
+                </a>
+              ) : null}
+              <small>Al escanear se abrirá el enlace de pago.</small>
             </div>
             <dl className="payment-details">
               <div>
