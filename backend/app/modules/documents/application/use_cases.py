@@ -1,3 +1,5 @@
+from re import fullmatch
+
 from app.modules.documents.application.ports import MemberDocumentRepository, MemberDocumentStorage
 from app.modules.documents.domain.entities import DOCUMENT_KEYS, MemberDocument
 from app.modules.documents.domain.exceptions import (
@@ -88,6 +90,34 @@ class UploadMemberDocumentCoverUseCase:
             raise DocumentValidationError(exc.message) from exc
 
         updated = self.repository.upsert_cover(document_key, cover_path, updated_by)
+        if updated is None:
+            raise DocumentNotFoundError()
+        return updated
+
+
+class UpdateMemberDocumentStyleUseCase:
+    def __init__(self, repository: MemberDocumentRepository) -> None:
+        self.repository = repository
+
+    def execute(
+        self,
+        document_key: str,
+        *,
+        overlay_color: str,
+        overlay_opacity: int,
+        updated_by: int,
+    ) -> MemberDocument:
+        if document_key not in DOCUMENT_KEYS:
+            raise DocumentValidationError("El tipo de documento no es válido.")
+        if self.repository.get_by_key(document_key) is None:
+            raise DocumentNotFoundError()
+        color = overlay_color.strip().lower()
+        if not fullmatch(r"#[0-9a-f]{6}", color):
+            raise DocumentValidationError("El color de superposición debe ser un HEX de 6 dígitos.")
+        if overlay_opacity < 10 or overlay_opacity > 90:
+            raise DocumentValidationError("La intensidad debe estar entre 10% y 90%.")
+
+        updated = self.repository.update_style(document_key, color, overlay_opacity, updated_by)
         if updated is None:
             raise DocumentNotFoundError()
         return updated

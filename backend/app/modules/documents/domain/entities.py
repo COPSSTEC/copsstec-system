@@ -11,6 +11,8 @@ DOCUMENT_CATALOG: dict[str, str] = {
 }
 
 DOCUMENT_KEYS = tuple(DOCUMENT_CATALOG.keys())
+DEFAULT_OVERLAY_COLOR = "#0f172a"
+DEFAULT_OVERLAY_OPACITY = 68
 
 
 @dataclass(frozen=True)
@@ -21,6 +23,8 @@ class MemberDocument:
     file_path: str | None
     original_filename: str | None
     cover_path: str | None
+    overlay_color: str
+    overlay_opacity: int
     updated_by: int | None
     created_at: datetime | None
     updated_at: datetime | None

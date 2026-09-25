@@ -6,6 +6,7 @@ import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import type { MemberDocument, MemberDocumentKey } from "@/modules/documents/domain/types";
 import {
   listMemberDocuments,
+  updateMemberDocumentStyle,
   uploadMemberDocument,
   uploadMemberDocumentCover,
 } from "@/modules/documents/infrastructure/documents-api";
@@ -28,6 +29,7 @@ export function AdminDocumentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [uploadingKey, setUploadingKey] = useState<MemberDocumentKey | null>(null);
   const [uploadingCoverKey, setUploadingCoverKey] = useState<MemberDocumentKey | null>(null);
+  const [savingStyleKey, setSavingStyleKey] = useState<MemberDocumentKey | null>(null);
 
   const publishedCount = documents.filter((item) => item.available).length;
   const pendingCount = documents.length - publishedCount;
@@ -93,6 +95,25 @@ export function AdminDocumentsPage() {
     }
   }
 
+  const handleStyleChange = useCallback(async function handleStyleChange(
+    key: MemberDocumentKey,
+    overlayColor: string,
+    overlayOpacity: number,
+  ) {
+    if (!token) {
+      return;
+    }
+    setSavingStyleKey(key);
+    try {
+      const updated = await updateMemberDocumentStyle(token, key, overlayColor, overlayOpacity);
+      setDocuments((current) => current.map((item) => (item.document_key === key ? updated : item)));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo guardar el diseño.");
+    } finally {
+      setSavingStyleKey(null);
+    }
+  }, [toast, token]);
+
   return (
     <RoleGate requiredAccess="admin">
       <section className="admin-documents">
@@ -152,9 +173,11 @@ export function AdminDocumentsPage() {
             {documents.map((document) => (
               <AdminDocumentCard
                 document={document}
+                isSavingStyle={savingStyleKey === document.document_key}
                 isUploading={uploadingKey === document.document_key}
                 isUploadingCover={uploadingCoverKey === document.document_key}
                 key={document.document_key}
+                onStyleChange={handleStyleChange}
                 onUpload={handleUpload}
                 onUploadCover={handleUploadCover}
               />

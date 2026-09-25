@@ -27,6 +27,15 @@ class MemberDocumentRepository(Protocol):
     ) -> MemberDocument | None:
         ...
 
+    def update_style(
+        self,
+        document_key: str,
+        overlay_color: str,
+        overlay_opacity: int,
+        updated_by: int,
+    ) -> MemberDocument | None:
+        ...
+
 
 class MemberDocumentStorage(Protocol):
     def save(self, document_key: str, filename: str, content: bytes, content_type: str) -> str:

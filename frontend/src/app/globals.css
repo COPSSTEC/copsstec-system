@@ -11511,9 +11511,65 @@ button.form-error-link {
     #0f172a;
 }
 
-.induction-cover.has-image {
+.induction-cover.has-image,
+.induction-cover.is-preview {
   background-position: center;
   background-size: cover;
+}
+
+.induction-cover.is-preview {
+  min-height: 200px;
+  pointer-events: none;
+}
+
+.induction-cover.is-preview h3 {
+  font-size: 1.35rem;
+}
+
+.admin-document-style {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.admin-document-color,
+.admin-document-opacity {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.admin-document-color {
+  align-items: center;
+  grid-template-columns: auto 48px 1fr;
+}
+
+.admin-document-color span,
+.admin-document-opacity span,
+.admin-document-style > p {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.admin-document-color input[type="color"] {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  height: 36px;
+  padding: 0.15rem;
+  width: 48px;
+}
+
+.admin-document-color strong {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.admin-document-opacity input {
+  width: 100%;
+}
+
+.admin-document-style > p {
+  margin: 0;
 }
 
 .induction-modal-nav {

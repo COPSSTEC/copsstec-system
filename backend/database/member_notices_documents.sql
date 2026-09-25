@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS member_documents (
     file_path TEXT,
     original_filename VARCHAR(255),
     cover_path TEXT,
+    overlay_color VARCHAR(16) NOT NULL DEFAULT '#0f172a',
+    overlay_opacity INTEGER NOT NULL DEFAULT 68,
     updated_by BIGINT REFERENCES users(id),
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL

@@ -246,6 +246,8 @@ class FeedDocumentResponse(BaseModel):
     file_path: str | None
     available: bool
     cover_path: str | None = None
+    overlay_color: str = "#0f172a"
+    overlay_opacity: int = 68
 
     @classmethod
     def from_domain(cls, item: FeedDocument) -> "FeedDocumentResponse":
@@ -255,6 +257,8 @@ class FeedDocumentResponse(BaseModel):
             file_path=item.file_path,
             available=item.available,
             cover_path=item.cover_path,
+            overlay_color=item.overlay_color,
+            overlay_opacity=item.overlay_opacity,
         )
 
 

@@ -64,3 +64,20 @@ export async function uploadMemberDocumentCover(
   });
   return parseResponse<MemberDocument>(response);
 }
+
+export async function updateMemberDocumentStyle(
+  token: string,
+  key: MemberDocumentKey,
+  overlay_color: string,
+  overlay_opacity: number,
+): Promise<MemberDocument> {
+  const response = await fetch(`${API_URL}/api/member-documents/${key}/style`, {
+    method: "PATCH",
+    headers: {
+      ...authHeaders(token),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ overlay_color, overlay_opacity }),
+  });
+  return parseResponse<MemberDocument>(response);
+}

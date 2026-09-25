@@ -137,6 +137,8 @@ export interface MemberFeedDocument {
   file_path: string | null;
   available: boolean;
   cover_path?: string | null;
+  overlay_color?: string | null;
+  overlay_opacity?: number | null;
 }
 
 export interface MemberDashboardSnapshot {

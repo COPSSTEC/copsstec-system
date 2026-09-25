@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { documentFileSrc } from "@/modules/documents/domain/types";
+import { DocumentCoverPreview } from "@/modules/documents/presentation/components/document-cover-preview";
 
 interface InductionDocument {
   document_key: string;
@@ -11,6 +12,8 @@ interface InductionDocument {
   available?: boolean;
   original_filename?: string | null;
   cover_path?: string | null;
+  overlay_color?: string | null;
+  overlay_opacity?: number | null;
 }
 
 interface InductionDocumentsModalProps {
@@ -46,32 +49,14 @@ export function InductionDocumentsModal({ documents, onClose }: InductionDocumen
 
         {current ? (
           <article className="induction-slide">
-            <div
-              className={`induction-cover induction-cover-${current.document_key} ${coverSrc ? "has-image" : ""}`}
-              style={
-                coverSrc
-                  ? {
-                      backgroundImage: `linear-gradient(180deg, rgba(15, 23, 42, 0.12), rgba(15, 23, 42, 0.68)), url("${coverSrc}")`,
-                    }
-                  : undefined
-              }
-            >
-              <p className="eyebrow">Documento institucional</p>
-              <h3>{current.title}</h3>
-              {href ? (
-                <a
-                  className="create-button button-link"
-                  download={current.original_filename || `${current.title}.pdf`}
-                  href={href}
-                >
-                  Descargar
-                </a>
-              ) : (
-                <button className="create-button" disabled type="button">
-                  Pendiente de publicación
-                </button>
-              )}
-            </div>
+            <DocumentCoverPreview
+              coverSrc={coverSrc}
+              documentKey={current.document_key}
+              href={href}
+              overlayColor={current.overlay_color}
+              overlayOpacity={current.overlay_opacity}
+              title={current.title}
+            />
           </article>
         ) : (
           <p className="muted">Los documentos institucionales se publicarán pronto.</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 
 import {
   documentDownloadName,
@@ -8,6 +8,7 @@ import {
   type MemberDocument,
   type MemberDocumentKey,
 } from "@/modules/documents/domain/types";
+import { DocumentCoverPreview } from "@/modules/documents/presentation/components/document-cover-preview";
 import { DocumentUiIcon } from "@/modules/documents/presentation/components/document-ui-icon";
 import {
   documentKeyLabel,
@@ -16,28 +17,55 @@ import {
   MAX_COVER_LABEL,
   MAX_PDF_LABEL,
 } from "@/modules/documents/presentation/lib/admin-documents";
+import {
+  normalizeOverlayColor,
+  normalizeOverlayOpacity,
+} from "@/modules/documents/presentation/lib/document-cover";
 
 interface AdminDocumentCardProps {
   document: MemberDocument;
   isUploading: boolean;
   isUploadingCover: boolean;
+  isSavingStyle: boolean;
   onUpload: (key: MemberDocumentKey, file: File) => void;
   onUploadCover: (key: MemberDocumentKey, file: File) => void;
+  onStyleChange: (key: MemberDocumentKey, overlayColor: string, overlayOpacity: number) => void;
 }
 
 export function AdminDocumentCard({
   document,
   isUploading,
   isUploadingCover,
+  isSavingStyle,
   onUpload,
   onUploadCover,
+  onStyleChange,
 }: AdminDocumentCardProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [overlayColor, setOverlayColor] = useState(normalizeOverlayColor(document.overlay_color));
+  const [overlayOpacity, setOverlayOpacity] = useState(normalizeOverlayOpacity(document.overlay_opacity));
   const href = documentFileSrc(document.file_path);
   const coverSrc = documentFileSrc(document.cover_path);
   const published = Boolean(document.available && href);
+
+  useEffect(() => {
+    setOverlayColor(normalizeOverlayColor(document.overlay_color));
+    setOverlayOpacity(normalizeOverlayOpacity(document.overlay_opacity));
+  }, [document.overlay_color, document.overlay_opacity]);
+
+  useEffect(() => {
+    const savedColor = normalizeOverlayColor(document.overlay_color);
+    const savedOpacity = normalizeOverlayOpacity(document.overlay_opacity);
+    if (overlayColor === savedColor && overlayOpacity === savedOpacity) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      onStyleChange(document.document_key, overlayColor, overlayOpacity);
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [document.document_key, document.overlay_color, document.overlay_opacity, onStyleChange, overlayColor, overlayOpacity]);
 
   function pickFile() {
     inputRef.current?.click();
@@ -71,6 +99,39 @@ export function AdminDocumentCard({
       </header>
 
       <h2>{document.title}</h2>
+
+      <DocumentCoverPreview
+        compact
+        coverSrc={coverSrc}
+        documentKey={document.document_key}
+        href={href}
+        overlayColor={overlayColor}
+        overlayOpacity={overlayOpacity}
+        title={document.title}
+      />
+
+      <div className="admin-document-style">
+        <label className="admin-document-color">
+          <span>Color de superposición</span>
+          <input
+            onChange={(event) => setOverlayColor(event.target.value)}
+            type="color"
+            value={overlayColor}
+          />
+          <strong>{overlayColor}</strong>
+        </label>
+        <label className="admin-document-opacity">
+          <span>Intensidad {overlayOpacity}%</span>
+          <input
+            max={90}
+            min={10}
+            onChange={(event) => setOverlayOpacity(Number(event.target.value))}
+            type="range"
+            value={overlayOpacity}
+          />
+        </label>
+        <p>{isSavingStyle ? "Guardando diseño..." : "Así se verá en el modal de bienvenida."}</p>
+      </div>
 
       <input
         accept="application/pdf"

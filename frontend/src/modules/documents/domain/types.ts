@@ -16,6 +16,8 @@ export interface MemberDocument {
   file_path: string | null;
   original_filename?: string | null;
   cover_path?: string | null;
+  overlay_color?: string | null;
+  overlay_opacity?: number | null;
   available: boolean;
   updated_at?: string | null;
   file_size?: number | null;

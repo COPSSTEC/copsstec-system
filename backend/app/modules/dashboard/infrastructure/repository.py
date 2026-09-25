@@ -333,7 +333,7 @@ class SqlAlchemyDashboardRepository:
         rows = self.session.execute(
             text(
                 """
-                SELECT document_key, title, file_path, cover_path
+                SELECT document_key, title, file_path, cover_path, overlay_color, overlay_opacity
                 FROM member_documents
                 ORDER BY id ASC
                 """,
@@ -346,6 +346,8 @@ class SqlAlchemyDashboardRepository:
                 file_path=row["file_path"],
                 available=bool(row["file_path"]),
                 cover_path=row.get("cover_path"),
+                overlay_color=str(row.get("overlay_color") or "#0f172a"),
+                overlay_opacity=int(row.get("overlay_opacity") or 68),
             )
             for row in rows
         ]

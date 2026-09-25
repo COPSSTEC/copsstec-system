@@ -240,6 +240,8 @@ class FeedDocument:
     file_path: str | None
     available: bool
     cover_path: str | None = None
+    overlay_color: str = "#0f172a"
+    overlay_opacity: int = 68
 
 
 @dataclass(frozen=True)
