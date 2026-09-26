@@ -175,6 +175,10 @@ export async function downloadSolicitudPdf(token: string): Promise<void> {
   await downloadPdfFile(token, "/api/membership/solicitud-pdf", "solicitud-afiliacion-copsstec.pdf");
 }
 
+export async function downloadAffiliationCommitmentPdf(token: string): Promise<void> {
+  await downloadPdfFile(token, "/api/membership/compromiso-pdf", "compromiso-afiliacion-copsstec.pdf");
+}
+
 export async function uploadOnboardingDocuments(
   token: string,
   files: {

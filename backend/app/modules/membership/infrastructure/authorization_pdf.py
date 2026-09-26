@@ -217,8 +217,7 @@ class AuthorizationDebitPdfGenerator:
 
         full_name = _esc(f"{names.strip()} {lastname.strip()}".strip())
         identifier_label = _esc(identifier.strip())
-        city_label = _esc(city.strip())
-        issued = issued_on.strftime("%d/%m/%Y")
+        _ = (city, issued_on)
         monthly = _checkbox(debit_plan == "monthly")
         quarterly = _checkbox(debit_plan == "quarterly")
         semiannual = _checkbox(debit_plan == "semiannual")
@@ -227,8 +226,8 @@ class AuthorizationDebitPdfGenerator:
         header_table = Table(
             [
                 [
-                    Paragraph(f"Ciudad: {city_label}", header),
-                    Paragraph(f"Fecha: {issued}", header),
+                    Paragraph("Ciudad:", header),
+                    Paragraph("Fecha:", header),
                 ]
             ],
             colWidths=[4449 * _TWIP, 4449 * _TWIP],

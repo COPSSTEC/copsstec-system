@@ -1,6 +1,6 @@
 from secrets import token_urlsafe
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -536,6 +536,35 @@ class DownloadSolicitudPdfUseCase:
         if member is None:
             raise MembershipNotFoundError()
         return self.pdf_generator.generate_solicitud(member)
+
+
+class DownloadAffiliationCommitmentPdfUseCase:
+    def __init__(self, member_lookup, pdf_generator, membership_repository: MembershipRepository) -> None:
+        self.member_lookup = member_lookup
+        self.pdf_generator = pdf_generator
+        self.membership_repository = membership_repository
+
+    def execute(self, user_id: int, issued_at: datetime | None = None) -> bytes:
+        payment = self.membership_repository.get_payment(user_id)
+        if payment is None:
+            raise MembershipNotFoundError()
+        if payment.status != PAYMENT_REVIEW:
+            raise MembershipForbiddenError("El compromiso solo está disponible después de enviar los documentos.")
+        if not onboarding_documents_complete(
+            payment.signed_authorization_path,
+            payment.identity_document_path,
+            payment.signed_solicitud_path,
+            payment.accepted_affiliation_year,
+        ):
+            raise MembershipForbiddenError("Debes enviar los documentos de afiliación antes de descargar el compromiso.")
+        member = self.member_lookup.get_member(user_id)
+        if member is None:
+            raise MembershipNotFoundError()
+        return self.pdf_generator.generate(
+            member,
+            debit_plan=payment.member_debit_plan or "",
+            issued_at=issued_at,
+        )
 
 
 class UploadOnboardingDocumentsUseCase:

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -19,6 +19,11 @@ from app.modules.membership.domain.entities import (
     onboarding_documents_complete,
 )
 from app.modules.membership.domain.exceptions import MembershipValidationError
+from app.modules.membership.infrastructure.affiliation_commitment_pdf import (
+    AffiliationCommitmentPdfGenerator,
+    add_months,
+    build_document_code,
+)
 from app.modules.membership.infrastructure.authorization_pdf import (
     AuthorizationDebitPdfGenerator,
     build_account_phrase,
@@ -109,6 +114,8 @@ def test_authorization_pdf_contains_bank_data() -> None:
     assert "2211447788" in phrase
     assert "Banco Pichincha" in phrase
     assert "Ahorros" in phrase
+    assert b"23/09/2026" not in pdf
+    assert b"Quito" not in pdf
 
 
 def test_solicitud_omits_empty_optional_fields() -> None:
@@ -241,3 +248,47 @@ def test_payment_info_uses_live_account_not_payment_snapshot() -> None:
     assert info.bank_name == transfer.bank_name
     assert info.account_holder == transfer.account_holder
     assert str(info.amount) == str(Decimal(transfer.fee))
+
+
+def test_affiliation_commitment_pdf_clones_word_document() -> None:
+    member = Member(
+        user_id=7,
+        profile_id=12,
+        name="Ana Pérez",
+        login_email="ana@copsstec.com",
+        state_id=ENABLED_STATE_ID,
+        state_label="HABILITADO",
+        last_conexion=None,
+        names="Ana",
+        lastname="Pérez",
+        identifier="1710034065",
+        email="ana@example.com",
+        birtday="01/01/1990",
+        blood_type="O+",
+        mobile_phone="0990000000",
+        fixed_phone="",
+        title_academic="Ingeniera",
+        level_academic="Ingeniera",
+        cod_senescyt="12345",
+        date_register="23/09/2026",
+        linkdink="",
+        want_notifications=True,
+        is_work=True,
+        foto_id="",
+        province="Pichincha",
+        city="Quito",
+        street_principal="Av. Amazonas N12",
+        street_secondary="",
+        type_profile="miembro",
+        date_exit=None,
+        fourth_title=None,
+        type_commision=None,
+        codigo_senescyt_cuarto=None,
+        cod="00007",
+        gender="Femenino",
+    )
+    issued = datetime(2026, 9, 26, 10, 15, 0)
+    pdf = AffiliationCommitmentPdfGenerator().generate(member, debit_plan="quarterly", issued_at=issued)
+    assert pdf.startswith(b"%PDF")
+    assert add_months(date(2026, 9, 23), 12) == date(2027, 9, 23)
+    assert build_document_code(member, issued) == "COPS-AFI-2026-00007"

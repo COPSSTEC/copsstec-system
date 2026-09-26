@@ -6,13 +6,20 @@ import { useRouter } from "next/navigation";
 import { endClientSession } from "@/modules/auth/infrastructure/auth-api";
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipPathForStatus } from "@/modules/membership/domain/types";
-import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
+import {
+  downloadAffiliationCommitmentPdf,
+  getMembershipStatus,
+} from "@/modules/membership/infrastructure/membership-api";
 import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
+
+const AUTO_DOWNLOAD_KEY = "copsstec-compromiso-auto-download";
 
 export function MembershipPendingApprovalPage() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const token = getStoredToken();
 
   useEffect(() => {
@@ -38,6 +45,37 @@ export function MembershipPendingApprovalPage() {
 
     void load();
   }, [router, token]);
+
+  useEffect(() => {
+    if (!ready || !token) {
+      return;
+    }
+    if (sessionStorage.getItem(AUTO_DOWNLOAD_KEY) === token) {
+      return;
+    }
+
+    sessionStorage.setItem(AUTO_DOWNLOAD_KEY, token);
+    void downloadAffiliationCommitmentPdf(token).catch((err) => {
+      sessionStorage.removeItem(AUTO_DOWNLOAD_KEY);
+      setError(err instanceof Error ? err.message : "No se pudo descargar el compromiso de afiliación.");
+    });
+  }, [ready, token]);
+
+  async function handleDownload() {
+    if (!token) {
+      return;
+    }
+    setIsDownloading(true);
+    setError(null);
+    try {
+      await downloadAffiliationCommitmentPdf(token);
+      sessionStorage.setItem(AUTO_DOWNLOAD_KEY, token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo descargar el compromiso de afiliación.");
+    } finally {
+      setIsDownloading(false);
+    }
+  }
 
   if (!ready) {
     return <main className="affiliation-page">Cargando...</main>;
@@ -65,6 +103,16 @@ export function MembershipPendingApprovalPage() {
           administrador revisará tu solicitud. No puedes ingresar al dashboard hasta que se apruebe
           tu afiliación.
         </p>
+        <p className="muted">
+          Descarga tu compromiso de afiliación. El archivo se genera con tus datos y debe quedar en
+          tu correo o carpeta de descargas.
+        </p>
+        <div className="pending-download">
+          <button className="create-button" disabled={isDownloading} onClick={() => void handleDownload()} type="button">
+            {isDownloading ? "Descargando..." : "Descargar compromiso de afiliación"}
+          </button>
+        </div>
+        {error ? <p className="form-error">{error}</p> : null}
         <p className="muted">
           Cuando te aprueben, te llegará por correo electrónico tu usuario corporativo, la
           contraseña y el resto de la información de acceso. Cada vez que inicies sesión volverás a

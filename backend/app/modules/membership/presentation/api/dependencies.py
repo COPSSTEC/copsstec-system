@@ -9,6 +9,7 @@ from app.modules.members.infrastructure.pdfs import MemberDocumentGenerator
 from app.modules.members.infrastructure.repository import SqlAlchemyMemberRepository
 from app.modules.membership.application.use_cases import (
     ApproveMembershipUseCase,
+    DownloadAffiliationCommitmentPdfUseCase,
     DownloadAuthorizationPdfUseCase,
     DownloadOnboardingDocumentUseCase,
     DownloadSolicitudPdfUseCase,
@@ -21,6 +22,7 @@ from app.modules.membership.application.use_cases import (
     UploadOnboardingDocumentsUseCase,
     UploadPaymentVoucherUseCase,
 )
+from app.modules.membership.infrastructure.affiliation_commitment_pdf import AffiliationCommitmentPdfGenerator
 from app.modules.membership.infrastructure.authorization_pdf import AuthorizationDebitPdfGenerator
 from app.modules.membership.infrastructure.email import SmtpOrLogEmailSender
 from app.modules.membership.infrastructure.files import LocalMembershipFileStorage
@@ -97,6 +99,17 @@ def get_solicitud_pdf_use_case(
     return DownloadSolicitudPdfUseCase(
         member_lookup=SqlAlchemyMemberRepository(session),
         pdf_generator=MemberDocumentGenerator(),
+        membership_repository=repository,
+    )
+
+
+def get_affiliation_commitment_pdf_use_case(
+    repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
+    session: Annotated[Session, Depends(get_db_session)],
+) -> DownloadAffiliationCommitmentPdfUseCase:
+    return DownloadAffiliationCommitmentPdfUseCase(
+        member_lookup=SqlAlchemyMemberRepository(session),
+        pdf_generator=AffiliationCommitmentPdfGenerator(),
         membership_repository=repository,
     )
 

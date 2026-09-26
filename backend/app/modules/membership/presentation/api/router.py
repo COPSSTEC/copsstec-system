@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse, Response
 from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import get_current_user
 from app.modules.membership.application.use_cases import (
+    DownloadAffiliationCommitmentPdfUseCase,
     DownloadAuthorizationPdfUseCase,
     DownloadSolicitudPdfUseCase,
     GetMembershipInvoiceUseCase,
@@ -26,6 +27,7 @@ from app.modules.membership.domain.exceptions import (
 )
 from app.modules.membership.infrastructure.files import InvalidMembershipFileError
 from app.modules.membership.presentation.api.dependencies import (
+    get_affiliation_commitment_pdf_use_case,
     get_authorization_pdf_use_case,
     get_invoice_use_case,
     get_membership_status_use_case,
@@ -251,6 +253,23 @@ def download_solicitud_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="solicitud-afiliacion-copsstec.pdf"'},
+    )
+
+
+@router.get("/compromiso-pdf")
+def download_affiliation_commitment_pdf(
+    user: Annotated[User, Depends(get_current_user)],
+    use_case: Annotated[DownloadAffiliationCommitmentPdfUseCase, Depends(get_affiliation_commitment_pdf_use_case)],
+) -> Response:
+    try:
+        pdf_bytes = use_case.execute(user.id)
+    except (MembershipNotFoundError, MembershipForbiddenError) as exc:
+        raise _http_error(exc) from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="compromiso-afiliacion-copsstec.pdf"'},
     )
 
 
