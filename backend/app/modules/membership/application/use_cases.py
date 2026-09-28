@@ -311,11 +311,32 @@ class GetApprovalPreviewUseCase:
 
     def execute(self, user_id: int) -> dict[str, object]:
         status = self.repository.get_status(user_id)
-        payment = self.repository.get_payment(user_id)
-        if status is None or payment is None:
+        if status is None:
             raise MembershipNotFoundError()
         if status.state_id != PENDING_ENABLE_STATE_ID:
             raise MembershipValidationError("Este miembro no está pendiente de habilitar.")
+
+        payment = self.repository.get_payment(user_id)
+        if payment is None:
+            try:
+                suggested = suggest_corporate_email(status.names, status.lastname)
+            except ValueError as exc:
+                raise MembershipValidationError(str(exc)) from exc
+            transfer = live_membership_transfer()
+            return {
+                "user_id": status.user_id,
+                "names": status.names,
+                "lastname": status.lastname,
+                "identifier": status.identifier,
+                "personal_email": status.personal_email,
+                "suggested_corporate_email": suggested,
+                "payment_status": None,
+                "voucher_url": None,
+                "signed_authorization_url": None,
+                "identity_document_url": None,
+                "signed_solicitud_url": None,
+                "amount": transfer.fee,
+            }
         if payment.status != PAYMENT_REVIEW:
             raise MembershipValidationError("El miembro aún no ha subido el comprobante de pago.")
 
@@ -369,17 +390,21 @@ class ApproveMembershipUseCase:
 
         preview = GetApprovalPreviewUseCase(self.repository).execute(user_id)
         payment = self.repository.get_payment(user_id)
-        if payment is None:
-            raise MembershipNotFoundError()
-        if not onboarding_documents_complete(
-            payment.signed_authorization_path,
-            payment.identity_document_path,
-            payment.signed_solicitud_path,
-            payment.accepted_affiliation_year,
-        ):
-            raise MembershipValidationError(
-                "Faltan la autorización firmada, la cédula, la solicitud firmada o la aceptación de afiliación por 1 año.",
-            )
+        if payment is not None:
+            if payment.status != PAYMENT_REVIEW:
+                raise MembershipValidationError("El miembro aún no ha subido el comprobante de pago.")
+            if not onboarding_documents_complete(
+                payment.signed_authorization_path,
+                payment.identity_document_path,
+                payment.signed_solicitud_path,
+                payment.accepted_affiliation_year,
+            ):
+                raise MembershipValidationError(
+                    "Faltan la autorización firmada, la cédula, la solicitud firmada o la aceptación de afiliación por 1 año.",
+                )
+            invoice_amount = str(payment.amount)
+        else:
+            invoice_amount = live_membership_transfer().fee
 
         from datetime import UTC, datetime
 
@@ -391,7 +416,7 @@ class ApproveMembershipUseCase:
             number=invoice_number,
             member_name=full_name,
             identifier=str(preview["identifier"]),
-            amount=str(payment.amount),
+            amount=invoice_amount,
         )
         pdf_path = self.storage.save_invoice_pdf(user_id, invoice_number, pdf)
 
@@ -410,9 +435,10 @@ class ApproveMembershipUseCase:
         )
 
         if self.affiliation_payment is not None:
+            amount = payment.amount if payment is not None else Decimal(live_membership_transfer().fee)
             self.affiliation_payment.record_affiliation_payment(
                 user_id=user_id,
-                amount=payment.amount,
+                amount=amount,
                 payment_date=date.today(),
             )
 

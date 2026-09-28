@@ -74,8 +74,10 @@ export function ApproveMemberModal({
   const hasSignedAuthorization = Boolean(preview?.signed_authorization_url);
   const hasIdentityDocument = Boolean(preview?.identity_document_url);
   const hasSignedSolicitud = Boolean(preview?.signed_solicitud_url);
-  const missingDocuments = Boolean(preview)
-    && (!hasVoucher || !hasSignedAuthorization || !hasIdentityDocument || !hasSignedSolicitud);
+  const requiresOnboardingDocuments = Boolean(preview?.payment_status);
+  const missingDocuments =
+    requiresOnboardingDocuments &&
+    (!hasVoucher || !hasSignedAuthorization || !hasIdentityDocument || !hasSignedSolicitud);
 
   async function handleDownload(kind: "authorization" | "identity" | "voucher" | "solicitud") {
     if (!token) {
@@ -113,36 +115,43 @@ export function ApproveMemberModal({
                 value={emailCorp}
               />
             </label>
-            <div className="approve-documents">
-              {hasVoucher ? (
-                <button className="secondary-button" onClick={() => void handleDownload("voucher")} type="button">
-                  Descargar comprobante
-                </button>
-              ) : (
-                <p className="muted">No hay comprobante de pago.</p>
-              )}
-              {hasSignedAuthorization ? (
-                <button className="secondary-button" onClick={() => void handleDownload("authorization")} type="button">
-                  Descargar autorización firmada
-                </button>
-              ) : (
-                <p className="muted">No hay autorización firmada.</p>
-              )}
-              {hasIdentityDocument ? (
-                <button className="secondary-button" onClick={() => void handleDownload("identity")} type="button">
-                  Descargar cédula
-                </button>
-              ) : (
-                <p className="muted">No hay copia de cédula.</p>
-              )}
-              {hasSignedSolicitud ? (
-                <button className="secondary-button" onClick={() => void handleDownload("solicitud")} type="button">
-                  Descargar solicitud firmada
-                </button>
-              ) : (
-                <p className="muted">No hay solicitud firmada.</p>
-              )}
-            </div>
+            {requiresOnboardingDocuments ? (
+              <div className="approve-documents">
+                {hasVoucher ? (
+                  <button className="secondary-button" onClick={() => void handleDownload("voucher")} type="button">
+                    Descargar comprobante
+                  </button>
+                ) : (
+                  <p className="muted">No hay comprobante de pago.</p>
+                )}
+                {hasSignedAuthorization ? (
+                  <button className="secondary-button" onClick={() => void handleDownload("authorization")} type="button">
+                    Descargar autorización firmada
+                  </button>
+                ) : (
+                  <p className="muted">No hay autorización firmada.</p>
+                )}
+                {hasIdentityDocument ? (
+                  <button className="secondary-button" onClick={() => void handleDownload("identity")} type="button">
+                    Descargar cédula
+                  </button>
+                ) : (
+                  <p className="muted">No hay copia de cédula.</p>
+                )}
+                {hasSignedSolicitud ? (
+                  <button className="secondary-button" onClick={() => void handleDownload("solicitud")} type="button">
+                    Descargar solicitud firmada
+                  </button>
+                ) : (
+                  <p className="muted">No hay solicitud firmada.</p>
+                )}
+              </div>
+            ) : (
+              <p className="muted">
+                Este miembro no tiene pago de afiliación en el sistema nuevo. Puedes aprobarlo y crear su
+                correo corporativo.
+              </p>
+            )}
             {missingDocuments ? (
               <p className="form-error">
                 Faltan documentos. No se puede aprobar sin comprobante, autorización firmada, cédula y solicitud.

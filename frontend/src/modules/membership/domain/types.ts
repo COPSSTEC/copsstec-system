@@ -60,7 +60,7 @@ export interface ApprovalPreview {
   identifier: string;
   personal_email: string;
   suggested_corporate_email: string;
-  payment_status: string;
+  payment_status: string | null;
   voucher_url: string | null;
   signed_authorization_url: string | null;
   identity_document_url: string | null;

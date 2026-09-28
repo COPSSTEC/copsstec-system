@@ -10,7 +10,7 @@ from app.modules.members.infrastructure.pdfs import (
     MemberDocumentGenerator,
     build_solicitud_body,
 )
-from app.modules.membership.application.use_cases import GetPaymentInfoUseCase, _validate_registration
+from app.modules.membership.application.use_cases import GetApprovalPreviewUseCase, GetPaymentInfoUseCase, _validate_registration
 from app.modules.membership.domain.cedula import (
     ACTIVE_PROFILE_CEDULA_SQL,
     CEDULA_INVALID_MESSAGE,
@@ -21,7 +21,9 @@ from app.modules.membership.domain.cedula import (
 from app.modules.membership.domain.entities import (
     MembershipPayment,
     MembershipRegistrationData,
+    MembershipStatus,
     PAYMENT_PENDING,
+    PENDING_ENABLE_STATE_ID,
     onboarding_documents_complete,
 )
 from app.modules.membership.domain.exceptions import MembershipValidationError
@@ -310,3 +312,31 @@ def test_affiliation_commitment_pdf_clones_word_document() -> None:
     assert pdf.startswith(b"%PDF")
     assert add_months(date(2026, 9, 23), 12) == date(2027, 9, 23)
     assert build_document_code(member, issued) == "COPS-AFI-2026-00007"
+
+
+def test_approval_preview_allows_pending_member_without_payment() -> None:
+    class _Repo:
+        def get_status(self, user_id: int) -> MembershipStatus:
+            return MembershipStatus(
+                user_id=user_id,
+                state_id=PENDING_ENABLE_STATE_ID,
+                personal_email="hqcs060599@gmail.com",
+                login_email="hqcs060599@gmail.com",
+                payment_status=None,
+                gate="pending_approval",
+                must_complete_payment=False,
+                must_wait_approval=True,
+                has_invoice=False,
+                names="Hitler Sadan",
+                lastname="Quinzo Castellano",
+                identifier="1718678194",
+            )
+
+        def get_payment(self, user_id: int) -> None:
+            return None
+
+    preview = GetApprovalPreviewUseCase(_Repo()).execute(778)
+    assert preview["user_id"] == 778
+    assert preview["payment_status"] is None
+    assert preview["identifier"] == "1718678194"
+    assert "@copsstec.com" in str(preview["suggested_corporate_email"])

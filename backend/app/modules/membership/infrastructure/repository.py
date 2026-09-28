@@ -285,7 +285,7 @@ class SqlAlchemyMembershipRepository:
                         LIMIT 1
                     ) AS open_payment_status
                 FROM users u
-                LEFT JOIN profiles p ON p.user_id = u.id
+                LEFT JOIN profiles p ON p.user_id = u.id AND p.deleted_at IS NULL
                 LEFT JOIN membership_payments mp ON mp.user_id = u.id
                 LEFT JOIN member_subscriptions ms ON ms.user_id = u.id
                 WHERE u.id = :user_id
@@ -537,7 +537,18 @@ class SqlAlchemyMembershipRepository:
     ) -> RegisteredMember:
         now = datetime.now(UTC).replace(tzinfo=None)
         payment = self.get_payment(user_id)
-        if payment is None:
+        profile_id = self.session.execute(
+            text(
+                """
+                SELECT id FROM profiles
+                WHERE user_id = :user_id AND deleted_at IS NULL
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+            ),
+            {"user_id": user_id},
+        ).scalar()
+        if profile_id is None:
             raise MembershipNotFoundError()
         sync_serial_sequence(self.session, "membership_invoices")
 
@@ -568,52 +579,53 @@ class SqlAlchemyMembershipRepository:
             ),
             {"state_id": ENABLED_STATE_ID, "now": now, "user_id": user_id},
         )
-        self.session.execute(
-            text(
-                """
-                UPDATE membership_payments
-                SET status = :status, reviewed_by = :reviewed_by, reviewed_at = :now, updated_at = :now
-                WHERE user_id = :user_id
-                """,
-            ),
-            {
-                "status": PAYMENT_APPROVED,
-                "reviewed_by": reviewed_by,
-                "now": now,
-                "user_id": user_id,
-            },
-        )
-        self.session.execute(
-            text(
-                """
-                INSERT INTO membership_invoices (
-                    payment_id, user_id, number, amount, pdf_path, issued_at
-                )
-                VALUES (:payment_id, :user_id, :number, :amount, :pdf_path, :now)
-                """,
-            ),
-            {
-                "payment_id": payment.id,
-                "user_id": user_id,
-                "number": invoice_number,
-                "amount": str(payment.amount),
-                "pdf_path": invoice_pdf_path,
-                "now": now,
-            },
-        )
+        if payment is not None:
+            self.session.execute(
+                text(
+                    """
+                    UPDATE membership_payments
+                    SET status = :status, reviewed_by = :reviewed_by, reviewed_at = :now, updated_at = :now
+                    WHERE user_id = :user_id
+                    """,
+                ),
+                {
+                    "status": PAYMENT_APPROVED,
+                    "reviewed_by": reviewed_by,
+                    "now": now,
+                    "user_id": user_id,
+                },
+            )
+            self.session.execute(
+                text(
+                    """
+                    INSERT INTO membership_invoices (
+                        payment_id, user_id, number, amount, pdf_path, issued_at
+                    )
+                    VALUES (:payment_id, :user_id, :number, :amount, :pdf_path, :now)
+                    """,
+                ),
+                {
+                    "payment_id": payment.id,
+                    "user_id": user_id,
+                    "number": invoice_number,
+                    "amount": str(payment.amount),
+                    "pdf_path": invoice_pdf_path,
+                    "now": now,
+                },
+            )
         self.session.commit()
 
         status = self.get_status(user_id)
-        approved_payment = self.get_payment(user_id)
-        if status is None or approved_payment is None:
+        if status is None:
             raise MembershipNotFoundError()
+        approved_payment = self.get_payment(user_id)
         return RegisteredMember(
             user_id=user_id,
-            profile_id=approved_payment.profile_id,
+            profile_id=int(profile_id),
             name=f"{status.names} {status.lastname}".strip(),
             email=corporate_email,
             state_id=ENABLED_STATE_ID,
-            payment=approved_payment,
+            payment=approved_payment or payment,
         )
 
     def _to_payment(self, row: Any) -> MembershipPayment:

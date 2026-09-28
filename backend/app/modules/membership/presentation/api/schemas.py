@@ -141,6 +141,8 @@ class RegisterMembershipResponse(BaseModel):
         refresh_token: str,
         message: str,
     ) -> "RegisterMembershipResponse":
+        if member.payment is None:
+            raise ValueError("El registro debe incluir el pago de afiliación.")
         return cls(
             access_token=access_token,
             refresh_token=refresh_token,
@@ -161,7 +163,7 @@ class ApprovalPreviewResponse(BaseModel):
     identifier: str
     personal_email: str
     suggested_corporate_email: str
-    payment_status: str
+    payment_status: str | None = None
     voucher_url: str | None
     signed_authorization_url: str | None = None
     identity_document_url: str | None = None

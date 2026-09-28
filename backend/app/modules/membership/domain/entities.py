@@ -190,4 +190,4 @@ class RegisteredMember:
     name: str
     email: str
     state_id: int
-    payment: MembershipPayment
+    payment: MembershipPayment | None = None
