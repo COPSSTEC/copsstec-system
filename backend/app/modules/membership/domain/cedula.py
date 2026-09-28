@@ -55,11 +55,6 @@ RELEASE_DELETED_LOGIN_EMAIL_SQL = f"""
     SET email = left('deleted-' || CAST(u.id AS text) || '@invalid.local', 255),
         updated_at = :now
     WHERE lower(u.email) = lower(:email)
-      AND EXISTS (
-          SELECT 1 FROM profiles p
-          WHERE p.user_id = u.id
-            AND {profile_is_deleted_sql("p")}
-      )
       AND NOT EXISTS (
           SELECT 1 FROM profiles p2
           WHERE p2.user_id = u.id

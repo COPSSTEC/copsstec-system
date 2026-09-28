@@ -27,7 +27,6 @@ from app.modules.membership.domain.cedula import (
     normalize_cedula,
     profile_holds_live_cedula,
     profile_is_active_sql,
-    profile_is_deleted_sql,
 )
 from app.modules.membership.infrastructure.soft_delete_uniques import ensure_profile_soft_delete_uniques
 from app.shared.infrastructure.sequences import sync_serial_sequence
@@ -598,17 +597,10 @@ class SqlAlchemyMemberRepository:
                         SELECT 1 FROM users u
                         WHERE lower(u.email) = lower(:login_email)
                           AND (:exclude_user_id IS NULL OR u.id <> :exclude_user_id)
-                          AND NOT (
-                              EXISTS (
-                                  SELECT 1 FROM profiles p
-                                  WHERE p.user_id = u.id
-                                    AND {profile_is_deleted_sql("p")}
-                              )
-                              AND NOT EXISTS (
-                                  SELECT 1 FROM profiles p2
-                                  WHERE p2.user_id = u.id
-                                    AND {profile_is_active_sql("p2")}
-                              )
+                          AND EXISTS (
+                              SELECT 1 FROM profiles p2
+                              WHERE p2.user_id = u.id
+                                AND {profile_is_active_sql("p2")}
                           )
                     ) AS login_email_taken
                 """,

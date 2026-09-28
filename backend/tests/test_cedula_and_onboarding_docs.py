@@ -132,6 +132,39 @@ def test_integrity_conflict_does_not_map_other_uniques_to_cedula() -> None:
     error = _conflict_from_integrity(IntegrityError("INSERT", {}, Orig()))
     assert error.code == "conflict"
     assert "cédula" not in error.message
+    assert "users_pkey" in error.message
+
+
+def test_integrity_conflict_maps_spanish_email_unique() -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    from app.modules.membership.infrastructure.repository import _conflict_from_integrity
+
+    class Orig(Exception):
+        def __str__(self) -> str:
+            return (
+                "llave duplicada viola restricción de unicidad «users_email_unique» "
+                "detalle: ya existe la llave (email)=(ana@example.com)."
+            )
+
+    error = _conflict_from_integrity(IntegrityError("INSERT", {}, Orig()))
+    assert error.code == "email_taken"
+
+
+def test_integrity_conflict_maps_spanish_identifier_unique() -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    from app.modules.membership.infrastructure.repository import _conflict_from_integrity
+
+    class Orig(Exception):
+        def __str__(self) -> str:
+            return (
+                "llave duplicada viola restricción de unicidad «profiles_identifier_unique» "
+                "detalle: ya existe la llave (identifier)=(1761048378)."
+            )
+
+    error = _conflict_from_integrity(IntegrityError("INSERT", {}, Orig()))
+    assert error.code == "identifier_taken"
 
 
 def test_register_rejects_invalid_cedula() -> None:

@@ -7,7 +7,10 @@ def sync_serial_sequence(session: Session, table: str, column: str = "id") -> No
         text(
             f"""
             SELECT setval(
-                pg_get_serial_sequence('{table}', '{column}'),
+                COALESCE(
+                    pg_get_serial_sequence('{table}', '{column}'),
+                    '{table}_{column}_seq'
+                ),
                 COALESCE((SELECT MAX({column}) FROM {table}), 1),
                 true
             )

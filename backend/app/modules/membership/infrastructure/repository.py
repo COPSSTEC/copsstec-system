@@ -15,7 +15,6 @@ from app.modules.membership.domain.cedula import (
     normalize_cedula,
     profile_holds_live_cedula,
     profile_is_active_sql,
-    profile_is_deleted_sql,
 )
 from app.modules.membership.domain.entities import (
     ENABLED_STATE_ID,
@@ -98,17 +97,10 @@ class SqlAlchemyMembershipRepository:
                     EXISTS(
                         SELECT 1 FROM users u
                         WHERE lower(u.email) = lower(:email)
-                          AND NOT (
-                              EXISTS (
-                                  SELECT 1 FROM profiles p
-                                  WHERE p.user_id = u.id
-                                    AND {profile_is_deleted_sql("p")}
-                              )
-                              AND NOT EXISTS (
-                                  SELECT 1 FROM profiles p2
-                                  WHERE p2.user_id = u.id
-                                    AND {profile_is_active_sql("p2")}
-                              )
+                          AND EXISTS (
+                              SELECT 1 FROM profiles p2
+                              WHERE p2.user_id = u.id
+                                AND {profile_is_active_sql("p2")}
                           )
                     ) AS login_email_taken
                 """,
@@ -716,18 +708,43 @@ class SqlAlchemyMembershipRepository:
         )
 
 
+def _integrity_detail(exc: IntegrityError) -> str:
+    return str(getattr(exc, "orig", exc)).lower()
+
+
 def _constraint_name(exc: IntegrityError) -> str:
-    detail = str(getattr(exc, "orig", exc)).lower()
-    match = search(r'constraint "?([a-z0-9_]+)"?', detail)
+    detail = _integrity_detail(exc)
+    for pattern in (
+        r'constraint "?([a-z0-9_]+)"?',
+        r'unicidad ["«]([a-z0-9_]+)["»]',
+        r'restricción(?: de unicidad)? ["«]([a-z0-9_]+)["»]',
+        r'«([a-z0-9_]+)»',
+    ):
+        match = search(pattern, detail)
+        if match:
+            return match.group(1)
+    return ""
+
+
+def _conflict_column(exc: IntegrityError) -> str:
+    match = search(r'(?:key|llave) \(([a-z0-9_]+)\)=', _integrity_detail(exc))
     return match.group(1) if match else ""
 
 
 def _conflict_from_integrity(exc: IntegrityError) -> MembershipConflictError:
     constraint = _constraint_name(exc)
-    if "identifier" in constraint:
+    column = _conflict_column(exc)
+    token = f"{constraint} {column}"
+    if "identifier" in token:
         return MembershipConflictError("Ya existe un miembro con esa cédula.", code="identifier_taken")
-    if "email" in constraint:
+    if "email" in token:
         return MembershipConflictError("Ya existe un miembro con ese correo.", code="email_taken")
+    hint = constraint or column
+    if hint:
+        return MembershipConflictError(
+            f"No se pudo completar el registro porque esos datos ya existen ({hint}).",
+            code="conflict",
+        )
     return MembershipConflictError(
         "No se pudo completar el registro porque esos datos ya existen.",
         code="conflict",
