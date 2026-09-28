@@ -18,6 +18,7 @@ from app.modules.members.domain.entities import (
     MemberWriteData,
 )
 from app.modules.members.domain.exceptions import MemberNotFoundError
+from app.modules.membership.domain.cedula import ACTIVE_PROFILE_CEDULA_SQL, normalize_cedula
 from app.shared.infrastructure.sequences import sync_serial_sequence
 
 
@@ -507,16 +508,17 @@ class SqlAlchemyMemberRepository:
     ) -> str | None:
         row = self.session.execute(
             text(
-                """
+                f"""
                 SELECT
                     EXISTS(
                         SELECT 1 FROM profiles
-                        WHERE lower(identifier) = lower(:identifier)
+                        WHERE {ACTIVE_PROFILE_CEDULA_SQL}
                           AND (:exclude_user_id IS NULL OR user_id <> :exclude_user_id)
                     ) AS identifier_taken,
                     EXISTS(
                         SELECT 1 FROM profiles
                         WHERE lower(email) = lower(:email)
+                          AND deleted_at IS NULL
                           AND (:exclude_user_id IS NULL OR user_id <> :exclude_user_id)
                     ) AS profile_email_taken,
                     EXISTS(
@@ -527,7 +529,7 @@ class SqlAlchemyMemberRepository:
                 """,
             ),
             {
-                "identifier": identifier,
+                "identifier": normalize_cedula(identifier),
                 "email": email,
                 "login_email": login_email,
                 "exclude_user_id": exclude_user_id,
@@ -658,7 +660,7 @@ class SqlAlchemyMemberRepository:
             "user_id": user_id,
             "names": data.names.strip(),
             "lastname": data.lastname.strip(),
-            "identifier": data.identifier.strip(),
+            "identifier": normalize_cedula(data.identifier),
             "email": data.email.strip(),
             "birtday": data.birtday.strip(),
             "blood_type": data.blood_type or "",

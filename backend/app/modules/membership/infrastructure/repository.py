@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.modules.membership.domain.cedula import ACTIVE_PROFILE_CEDULA_SQL, normalize_cedula
 from app.modules.membership.domain.entities import (
     ENABLED_STATE_ID,
     GATE_DOCUMENTS,
@@ -35,20 +36,23 @@ class SqlAlchemyMembershipRepository:
     def find_conflict(self, identifier: str, email: str) -> str | None:
         row = self.session.execute(
             text(
-                """
+                f"""
                 SELECT
                     EXISTS(
-                        SELECT 1 FROM profiles WHERE lower(identifier) = lower(:identifier)
+                        SELECT 1 FROM profiles
+                        WHERE {ACTIVE_PROFILE_CEDULA_SQL}
                     ) AS identifier_taken,
                     EXISTS(
-                        SELECT 1 FROM profiles WHERE lower(email) = lower(:email)
+                        SELECT 1 FROM profiles
+                        WHERE lower(email) = lower(:email)
+                          AND deleted_at IS NULL
                     ) AS profile_email_taken,
                     EXISTS(
                         SELECT 1 FROM users WHERE lower(email) = lower(:email)
                     ) AS login_email_taken
                 """,
             ),
-            {"identifier": identifier, "email": email},
+            {"identifier": normalize_cedula(identifier), "email": email},
         ).mappings().first()
         if row is None:
             return None
@@ -151,7 +155,7 @@ class SqlAlchemyMembershipRepository:
                 "user_id": user_id,
                 "names": data.names.strip(),
                 "lastname": data.lastname.strip(),
-                "identifier": data.identifier.strip(),
+                "identifier": normalize_cedula(data.identifier),
                 "email": data.email.strip().lower(),
                 "birtday": data.birtday.strip(),
                 "blood_type": data.blood_type,

@@ -11,7 +11,12 @@ from app.modules.members.infrastructure.pdfs import (
     build_solicitud_body,
 )
 from app.modules.membership.application.use_cases import GetPaymentInfoUseCase, _validate_registration
-from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula
+from app.modules.membership.domain.cedula import (
+    ACTIVE_PROFILE_CEDULA_SQL,
+    CEDULA_INVALID_MESSAGE,
+    is_valid_ecuadorian_cedula,
+    normalize_cedula,
+)
 from app.modules.membership.domain.entities import (
     MembershipPayment,
     MembershipRegistrationData,
@@ -38,6 +43,15 @@ def test_ecuadorian_cedula_valid_and_invalid() -> None:
     assert not is_valid_ecuadorian_cedula("09140201855")
     assert not is_valid_ecuadorian_cedula("123")
     assert not is_valid_ecuadorian_cedula("")
+
+
+def test_cedula_conflict_uses_normalized_active_profiles() -> None:
+    sql = " ".join(ACTIVE_PROFILE_CEDULA_SQL.split()).lower()
+    assert "deleted_at is null" in sql
+    assert "regexp_replace" in sql
+    assert "identifier" in sql
+    assert normalize_cedula(" 171-003-4065 ") == "1710034065"
+    assert normalize_cedula("1710034065") == "1710034065"
 
 
 def test_register_rejects_invalid_cedula() -> None:

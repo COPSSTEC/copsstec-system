@@ -17,7 +17,7 @@ from app.modules.membership.application.ports import (
     MembershipRepository,
     RecordAffiliationPaymentPort,
 )
-from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula
+from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula, normalize_cedula
 from app.modules.membership.domain.corporate_email import is_corporate_email, suggest_corporate_email
 from app.modules.membership.domain.entities import (
     ACCOUNT_TYPES,
@@ -122,7 +122,7 @@ class RegisterMembershipUseCase:
         if len(photo_content) > 5 * 1024 * 1024:
             raise MembershipValidationError("La foto no puede superar 5 MB.")
 
-        conflict = self.repository.find_conflict(data.identifier.strip(), data.email.strip())
+        conflict = self.repository.find_conflict(normalize_cedula(data.identifier), data.email.strip())
         if conflict:
             code = "identifier_taken" if "cédula" in conflict.lower() else "email_taken"
             raise MembershipConflictError(conflict, code=code)
