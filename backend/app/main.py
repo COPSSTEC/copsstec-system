@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -5,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
+from app.core.database import engine
+from app.modules.membership.infrastructure.soft_delete_uniques import ensure_profile_soft_delete_uniques
 from app.modules.auth.presentation.api.router import router as auth_router
 from app.modules.blogs.presentation.api.router import router as blogs_router
 from app.modules.courses.presentation.api.router import router as courses_router
@@ -23,9 +26,17 @@ from app.modules.votaciones.presentation.api.router import router as votaciones_
 
 settings = get_settings()
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    ensure_profile_soft_delete_uniques(engine)
+    yield
+
+
 app = FastAPI(
     title="COPSSTEC System API",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

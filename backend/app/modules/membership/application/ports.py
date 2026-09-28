@@ -17,6 +17,9 @@ class RecordAffiliationPaymentPort(Protocol):
 
 
 class MembershipRepository(Protocol):
+    def release_deleted_identity(self, identifier: str, email: str) -> None:
+        ...
+
     def find_conflict(self, identifier: str, email: str) -> str | None:
         ...
 

@@ -55,6 +55,11 @@ class CreateMemberUseCase:
         _validate(data)
         if not is_valid_ecuadorian_cedula(data.identifier):
             raise MemberValidationError(CEDULA_INVALID_MESSAGE)
+        self.repository.release_deleted_identity(
+            identifier=data.identifier,
+            email=data.email,
+            login_email=data.login_email,
+        )
         conflict = self.repository.find_conflict(
             identifier=data.identifier,
             email=data.email,
@@ -78,6 +83,11 @@ class UpdateMemberUseCase:
             raise MemberNotFoundError()
 
         _validate(data)
+        self.repository.release_deleted_identity(
+            identifier=data.identifier,
+            email=data.email,
+            login_email=data.login_email,
+        )
         conflict = self.repository.find_conflict(
             identifier=data.identifier,
             email=data.email,
@@ -237,6 +247,11 @@ class UpdateMyProfileUseCase:
             state_id=member.state_id,
         )
         _validate(data)
+        self.repository.release_deleted_identity(
+            identifier=data.identifier,
+            email=data.email,
+            login_email=data.login_email,
+        )
         conflict = self.repository.find_conflict(
             identifier=data.identifier,
             email=data.email,

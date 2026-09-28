@@ -71,13 +71,23 @@ def test_cedula_conflict_uses_normalized_active_profiles() -> None:
     assert normalize_cedula("1710034065") == "1710034065"
     release = " ".join(RELEASE_DELETED_PROFILE_CEDULA_SQL.split()).lower()
     compact = release.replace(" ", "")
-    assert "d'||id" in compact
-    assert "left(" in release
+    assert "'d'||cast(id" in compact
     assert "-del-" not in release
-    assert "255" not in release
     email_release = " ".join(RELEASE_DELETED_PROFILE_EMAIL_SQL.split()).lower()
     assert "deleted_at is not null" in email_release
     assert "@invalid.local" in email_release
+
+
+def test_soft_delete_uniques_are_partial_and_release_deleted_rows() -> None:
+    from app.modules.membership.infrastructure.soft_delete_uniques import (
+        ENSURE_PROFILE_SOFT_DELETE_UNIQUES_STATEMENTS,
+    )
+
+    sql = " ".join(ENSURE_PROFILE_SOFT_DELETE_UNIQUES_STATEMENTS).lower()
+    assert "drop constraint if exists profiles_identifier_unique" in sql
+    assert "where deleted_at is null" in sql
+    assert "'d' || cast(id as text)" in sql
+    assert "@invalid.local" in sql
 
 
 def test_integrity_conflict_maps_overflow_to_cedula() -> None:

@@ -39,12 +39,29 @@ from app.modules.membership.domain.exceptions import (
     MembershipNotFoundError,
     MembershipValidationError,
 )
+from app.modules.membership.infrastructure.soft_delete_uniques import ensure_profile_soft_delete_uniques
 from app.shared.infrastructure.sequences import sync_serial_sequence
 
 
 class SqlAlchemyMembershipRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def release_deleted_identity(self, identifier: str, email: str) -> None:
+        ensure_profile_soft_delete_uniques(self.session)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        self.session.execute(
+            text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
+            {"identifier": normalize_cedula(identifier), "now": now},
+        )
+        self.session.execute(
+            text(RELEASE_DELETED_PROFILE_EMAIL_SQL),
+            {"email": email.strip().lower(), "now": now},
+        )
+        self.session.execute(
+            text(RELEASE_DELETED_LOGIN_EMAIL_SQL),
+            {"email": email.strip().lower(), "now": now},
+        )
 
     def find_conflict(self, identifier: str, email: str) -> str | None:
         row = self.session.execute(
@@ -123,18 +140,7 @@ class SqlAlchemyMembershipRepository:
         fourth_title = (data.fourth_title or "").strip() or None
         senescyt_cuarto = (data.codigo_senescyt_cuarto or "").strip() or None
 
-        self.session.execute(
-            text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
-            {"identifier": normalize_cedula(data.identifier), "now": now},
-        )
-        self.session.execute(
-            text(RELEASE_DELETED_PROFILE_EMAIL_SQL),
-            {"email": data.email.strip().lower(), "now": now},
-        )
-        self.session.execute(
-            text(RELEASE_DELETED_LOGIN_EMAIL_SQL),
-            {"email": data.email.strip().lower(), "now": now},
-        )
+        self.release_deleted_identity(data.identifier, data.email)
 
         try:
             user_id = self.session.execute(

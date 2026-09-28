@@ -106,6 +106,9 @@ class FakeMemberRepository:
         self.passwords[user_id] = password_hash
         return self.members[user_id]
 
+    def release_deleted_identity(self, *, identifier: str, email: str, login_email: str) -> None:
+        return None
+
     def find_conflict(
         self,
         *,

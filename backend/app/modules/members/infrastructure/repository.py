@@ -28,6 +28,7 @@ from app.modules.membership.domain.cedula import (
     profile_is_active_sql,
     profile_is_deleted_sql,
 )
+from app.modules.membership.infrastructure.soft_delete_uniques import ensure_profile_soft_delete_uniques
 from app.shared.infrastructure.sequences import sync_serial_sequence
 
 
@@ -239,21 +240,11 @@ class SqlAlchemyMemberRepository:
         sync_serial_sequence(self.session, "profiles")
         full_name = f"{data.names} {data.lastname}".strip()
 
-        self.session.execute(
-            text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
-            {"identifier": normalize_cedula(data.identifier), "now": now},
+        self.release_deleted_identity(
+            identifier=data.identifier,
+            email=data.email,
+            login_email=data.login_email,
         )
-        for raw_email in {data.email.strip().lower(), data.login_email.strip().lower()}:
-            if not raw_email:
-                continue
-            self.session.execute(
-                text(RELEASE_DELETED_PROFILE_EMAIL_SQL),
-                {"email": raw_email, "now": now},
-            )
-            self.session.execute(
-                text(RELEASE_DELETED_LOGIN_EMAIL_SQL),
-                {"email": raw_email, "now": now},
-            )
 
         try:
             user_id = self.session.execute(
@@ -438,7 +429,7 @@ class SqlAlchemyMemberRepository:
                 """
                 UPDATE users
                 SET state_id = :state_id,
-                    email = left('deleted-' || id::text || '@invalid.local', 255),
+                    email = left('deleted-' || CAST(id AS text) || '@invalid.local', 255),
                     updated_at = :now
                 WHERE id = :user_id
                 """,
@@ -450,8 +441,8 @@ class SqlAlchemyMemberRepository:
                 """
                 UPDATE profiles
                 SET state_id = :state_id,
-                    identifier = left('d' || id::text, 10),
-                    email = left('deleted-' || id::text || '@invalid.local', 255),
+                    identifier = 'd' || CAST(id AS text),
+                    email = left('deleted-' || CAST(id AS text) || '@invalid.local', 255),
                     deleted_at = :deleted_at,
                     deleted_by = :deleted_by,
                     updated_at = :now
@@ -544,6 +535,24 @@ class SqlAlchemyMemberRepository:
         if member is None:
             raise MemberNotFoundError()
         return member
+
+    def release_deleted_identity(self, *, identifier: str, email: str, login_email: str) -> None:
+        ensure_profile_soft_delete_uniques(self.session)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        self.session.execute(
+            text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
+            {"identifier": normalize_cedula(identifier), "now": now},
+        )
+        emails = {value.strip().lower() for value in (email, login_email) if value and value.strip()}
+        for raw_email in emails:
+            self.session.execute(
+                text(RELEASE_DELETED_PROFILE_EMAIL_SQL),
+                {"email": raw_email, "now": now},
+            )
+            self.session.execute(
+                text(RELEASE_DELETED_LOGIN_EMAIL_SQL),
+                {"email": raw_email, "now": now},
+            )
 
     def find_conflict(
         self,

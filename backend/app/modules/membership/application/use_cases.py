@@ -124,7 +124,10 @@ class RegisterMembershipUseCase:
         if len(photo_content) > 5 * 1024 * 1024:
             raise MembershipValidationError("La foto no puede superar 5 MB.")
 
-        conflict = self.repository.find_conflict(normalize_cedula(data.identifier), data.email.strip())
+        identifier = normalize_cedula(data.identifier)
+        email = data.email.strip()
+        self.repository.release_deleted_identity(identifier, email)
+        conflict = self.repository.find_conflict(identifier, email)
         if conflict:
             code = "identifier_taken" if "cédula" in conflict.lower() else "email_taken"
             raise MembershipConflictError(conflict, code=code)

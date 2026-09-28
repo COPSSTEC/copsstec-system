@@ -28,6 +28,9 @@ class MemberRepository(Protocol):
     def update_photo(self, user_id: int, foto_id: str) -> Member:
         ...
 
+    def release_deleted_identity(self, *, identifier: str, email: str, login_email: str) -> None:
+        ...
+
     def find_conflict(
         self,
         *,

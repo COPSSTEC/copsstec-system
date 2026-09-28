@@ -1,13 +1,14 @@
 CEDULA_INVALID_MESSAGE = "La cédula debe tener exactamente 10 dígitos."
 
+
 def profile_is_active_sql(alias: str = "") -> str:
     column = f"{alias}.deleted_at" if alias else "deleted_at"
-    return f"({column} IS NULL OR btrim(COALESCE({column}::text, '')) = '')"
+    return f"({column} IS NULL OR btrim(COALESCE(CAST({column} AS text), '')) = '')"
 
 
 def profile_is_deleted_sql(alias: str = "") -> str:
     column = f"{alias}.deleted_at" if alias else "deleted_at"
-    return f"({column} IS NOT NULL AND btrim(COALESCE({column}::text, '')) <> '')"
+    return f"({column} IS NOT NULL AND btrim(COALESCE(CAST({column} AS text), '')) <> '')"
 
 
 PROFILE_IS_ACTIVE_SQL = profile_is_active_sql()
@@ -15,26 +16,26 @@ PROFILE_IS_DELETED_SQL = profile_is_deleted_sql()
 
 # Solo profiles vigentes: cédula en dígitos.
 ACTIVE_PROFILE_CEDULA_SQL = f"""
-    regexp_replace(COALESCE(identifier::text, ''), '[^0-9]', '', 'g') = :identifier
+    regexp_replace(COALESCE(CAST(identifier AS text), ''), '[^0-9]', '', 'g') = :identifier
     AND :identifier <> ''
     AND {PROFILE_IS_ACTIVE_SQL}
 """
 
-# Libera la cédula de un profile eliminado. Cabe en varchar(10).
+# identifier es varchar(255). Prefijo d{{id}} libera la cédula del unique legado.
 RELEASE_DELETED_PROFILE_CEDULA_SQL = f"""
     UPDATE profiles
-    SET identifier = left('d' || id::text, 10),
+    SET identifier = 'd' || CAST(id AS text),
         updated_at = :now
     WHERE {PROFILE_IS_DELETED_SQL}
       AND (
-          regexp_replace(COALESCE(identifier::text, ''), '[^0-9]', '', 'g') = :identifier
-          OR btrim(COALESCE(identifier::text, '')) = :identifier
+          regexp_replace(COALESCE(CAST(identifier AS text), ''), '[^0-9]', '', 'g') = :identifier
+          OR btrim(COALESCE(CAST(identifier AS text), '')) = :identifier
       )
 """
 
 RELEASE_DELETED_PROFILE_EMAIL_SQL = f"""
     UPDATE profiles
-    SET email = left('d' || id::text || '@invalid.local', 255),
+    SET email = left('d' || CAST(id AS text) || '@invalid.local', 255),
         updated_at = :now
     WHERE {PROFILE_IS_DELETED_SQL}
       AND lower(email) = lower(:email)
@@ -42,7 +43,7 @@ RELEASE_DELETED_PROFILE_EMAIL_SQL = f"""
 
 RELEASE_DELETED_LOGIN_EMAIL_SQL = f"""
     UPDATE users u
-    SET email = left('deleted-' || u.id::text || '@invalid.local', 255),
+    SET email = left('deleted-' || CAST(u.id AS text) || '@invalid.local', 255),
         updated_at = :now
     WHERE lower(u.email) = lower(:email)
       AND EXISTS (
