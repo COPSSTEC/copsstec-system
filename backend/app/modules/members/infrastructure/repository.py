@@ -20,11 +20,12 @@ from app.modules.members.domain.entities import (
 )
 from app.modules.members.domain.exceptions import MemberConflictError, MemberNotFoundError
 from app.modules.membership.domain.cedula import (
-    ACTIVE_PROFILE_CEDULA_SQL,
+    CEDULA_CANDIDATE_SQL,
     RELEASE_DELETED_LOGIN_EMAIL_SQL,
     RELEASE_DELETED_PROFILE_CEDULA_SQL,
     RELEASE_DELETED_PROFILE_EMAIL_SQL,
     normalize_cedula,
+    profile_holds_live_cedula,
     profile_is_active_sql,
     profile_is_deleted_sql,
 )
@@ -562,15 +563,31 @@ class SqlAlchemyMemberRepository:
         login_email: str,
         exclude_user_id: int | None = None,
     ) -> str | None:
+        cedula = normalize_cedula(identifier)
+        rows = self.session.execute(
+            text(
+                f"""
+                SELECT id, user_id, identifier, deleted_at
+                FROM profiles
+                WHERE {CEDULA_CANDIDATE_SQL}
+                  AND (:exclude_user_id IS NULL OR user_id <> :exclude_user_id)
+                """,
+            ),
+            {"identifier": cedula, "exclude_user_id": exclude_user_id},
+        ).mappings().all()
+        for row in rows:
+            if profile_holds_live_cedula(
+                identifier=row["identifier"],
+                deleted_at=row["deleted_at"],
+                profile_id=int(row["id"]),
+                cedula=cedula,
+            ):
+                return "Ya existe un miembro con esa cédula."
+
         row = self.session.execute(
             text(
                 f"""
                 SELECT
-                    EXISTS(
-                        SELECT 1 FROM profiles
-                        WHERE {ACTIVE_PROFILE_CEDULA_SQL}
-                          AND (:exclude_user_id IS NULL OR user_id <> :exclude_user_id)
-                    ) AS identifier_taken,
                     EXISTS(
                         SELECT 1 FROM profiles
                         WHERE lower(email) = lower(:email)
@@ -597,7 +614,6 @@ class SqlAlchemyMemberRepository:
                 """,
             ),
             {
-                "identifier": normalize_cedula(identifier),
                 "email": email,
                 "login_email": login_email,
                 "exclude_user_id": exclude_user_id,
@@ -606,8 +622,6 @@ class SqlAlchemyMemberRepository:
 
         if row is None:
             return None
-        if row["identifier_taken"]:
-            return "Ya existe un miembro con esa cédula."
         if row["profile_email_taken"]:
             return "Ya existe un miembro con ese correo de contacto."
         if row["login_email_taken"]:

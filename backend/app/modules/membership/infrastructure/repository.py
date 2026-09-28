@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from re import search
 from typing import Any
 
 from sqlalchemy import text
@@ -7,11 +8,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.membership.domain.cedula import (
-    ACTIVE_PROFILE_CEDULA_SQL,
+    CEDULA_CANDIDATE_SQL,
     RELEASE_DELETED_LOGIN_EMAIL_SQL,
     RELEASE_DELETED_PROFILE_CEDULA_SQL,
     RELEASE_DELETED_PROFILE_EMAIL_SQL,
     normalize_cedula,
+    profile_holds_live_cedula,
     profile_is_active_sql,
     profile_is_deleted_sql,
 )
@@ -64,14 +66,30 @@ class SqlAlchemyMembershipRepository:
         )
 
     def find_conflict(self, identifier: str, email: str) -> str | None:
-        row = self.session.execute(
+        cedula = normalize_cedula(identifier)
+        rows = self.session.execute(
+            text(
+                f"""
+                SELECT id, identifier, deleted_at, names, lastname
+                FROM profiles
+                WHERE {CEDULA_CANDIDATE_SQL}
+                """,
+            ),
+            {"identifier": cedula},
+        ).mappings().all()
+        for row in rows:
+            if profile_holds_live_cedula(
+                identifier=row["identifier"],
+                deleted_at=row["deleted_at"],
+                profile_id=int(row["id"]),
+                cedula=cedula,
+            ):
+                return "Ya existe un miembro con esa cédula."
+
+        email_row = self.session.execute(
             text(
                 f"""
                 SELECT
-                    EXISTS(
-                        SELECT 1 FROM profiles
-                        WHERE {ACTIVE_PROFILE_CEDULA_SQL}
-                    ) AS identifier_taken,
                     EXISTS(
                         SELECT 1 FROM profiles
                         WHERE lower(email) = lower(:email)
@@ -95,13 +113,9 @@ class SqlAlchemyMembershipRepository:
                     ) AS login_email_taken
                 """,
             ),
-            {"identifier": normalize_cedula(identifier), "email": email},
+            {"email": email},
         ).mappings().first()
-        if row is None:
-            return None
-        if row["identifier_taken"]:
-            return "Ya existe un miembro con esa cédula."
-        if row["profile_email_taken"] or row["login_email_taken"]:
+        if email_row and (email_row["profile_email_taken"] or email_row["login_email_taken"]):
             return "Ya existe un miembro con ese correo."
         return None
 
@@ -130,6 +144,8 @@ class SqlAlchemyMembershipRepository:
         account_number: str,
         account_holder: str,
         account_ruc: str,
+        *,
+        _retried: bool = False,
     ) -> RegisteredMember:
         now = datetime.now(UTC).replace(tzinfo=None)
         sync_serial_sequence(self.session, "users")
@@ -257,6 +273,18 @@ class SqlAlchemyMembershipRepository:
             self.session.commit()
         except IntegrityError as exc:
             self.session.rollback()
+            if not _retried:
+                return self.register_member(
+                    data,
+                    password_hash,
+                    amount,
+                    bank_name,
+                    account_type,
+                    account_number,
+                    account_holder,
+                    account_ruc,
+                    _retried=True,
+                )
             raise _conflict_from_integrity(exc) from exc
 
         payment = self.get_payment(user_id)
@@ -688,13 +716,20 @@ class SqlAlchemyMembershipRepository:
         )
 
 
-def _conflict_from_integrity(exc: IntegrityError) -> MembershipConflictError:
+def _constraint_name(exc: IntegrityError) -> str:
     detail = str(getattr(exc, "orig", exc)).lower()
-    if "identifier" in detail or "identif" in detail:
+    match = search(r'constraint "?([a-z0-9_]+)"?', detail)
+    return match.group(1) if match else ""
+
+
+def _conflict_from_integrity(exc: IntegrityError) -> MembershipConflictError:
+    constraint = _constraint_name(exc)
+    if "identifier" in constraint:
         return MembershipConflictError("Ya existe un miembro con esa cédula.", code="identifier_taken")
-    if "email" in detail:
+    if "email" in constraint:
         return MembershipConflictError("Ya existe un miembro con ese correo.", code="email_taken")
-    if "duplicate" in detail or "unique" in detail or "unicidad" in detail:
-        return MembershipConflictError("Ya existe un miembro con esa cédula.", code="identifier_taken")
-    return MembershipConflictError("Ya existe un miembro con esa cédula.", code="identifier_taken")
+    return MembershipConflictError(
+        "No se pudo completar el registro porque esos datos ya existen.",
+        code="conflict",
+    )
 

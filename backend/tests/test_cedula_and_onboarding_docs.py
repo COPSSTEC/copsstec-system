@@ -36,8 +36,10 @@ from app.modules.membership.domain.cedula import (
     PROFILE_IS_DELETED_SQL,
     RELEASE_DELETED_PROFILE_CEDULA_SQL,
     RELEASE_DELETED_PROFILE_EMAIL_SQL,
+    is_released_identifier,
     is_valid_ecuadorian_cedula,
     normalize_cedula,
+    profile_holds_live_cedula,
 )
 from app.modules.membership.infrastructure.affiliation_commitment_pdf import (
     AffiliationCommitmentPdfGenerator,
@@ -65,10 +67,24 @@ def test_cedula_conflict_uses_normalized_active_profiles() -> None:
     assert "deleted_at is null" in sql
     assert "regexp_replace" in sql
     assert "identifier" in sql
+    assert "^d[0-9]+" in sql
     assert "btrim" in PROFILE_IS_ACTIVE_SQL.lower()
     assert "is not null" in PROFILE_IS_DELETED_SQL.lower()
     assert normalize_cedula(" 171-003-4065 ") == "1710034065"
     assert normalize_cedula("1710034065") == "1710034065"
+    assert is_released_identifier("d480", 480)
+    assert not profile_holds_live_cedula(
+        identifier="d480",
+        deleted_at="2026-09-24T21:52:13.645632",
+        profile_id=480,
+        cedula="1710034065",
+    )
+    assert profile_holds_live_cedula(
+        identifier="1710034065",
+        deleted_at=None,
+        profile_id=12,
+        cedula="1710034065",
+    )
     release = " ".join(RELEASE_DELETED_PROFILE_CEDULA_SQL.split()).lower()
     compact = release.replace(" ", "")
     assert "'d'||cast(id" in compact
@@ -90,19 +106,32 @@ def test_soft_delete_uniques_are_partial_and_release_deleted_rows() -> None:
     assert "@invalid.local" in sql
 
 
-def test_integrity_conflict_maps_overflow_to_cedula() -> None:
+def test_integrity_conflict_maps_identifier_constraint() -> None:
     from sqlalchemy.exc import IntegrityError
 
     from app.modules.membership.infrastructure.repository import _conflict_from_integrity
 
     class Orig(Exception):
         def __str__(self) -> str:
-            return "value too long for type character varying(10)"
+            return 'duplicate key value violates unique constraint "profiles_identifier_unique"'
 
     error = _conflict_from_integrity(IntegrityError("INSERT", {}, Orig()))
     assert error.code == "identifier_taken"
     assert "cédula" in error.message
-    assert "esos datos" not in error.message
+
+
+def test_integrity_conflict_does_not_map_other_uniques_to_cedula() -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    from app.modules.membership.infrastructure.repository import _conflict_from_integrity
+
+    class Orig(Exception):
+        def __str__(self) -> str:
+            return 'duplicate key value violates unique constraint "users_pkey"'
+
+    error = _conflict_from_integrity(IntegrityError("INSERT", {}, Orig()))
+    assert error.code == "conflict"
+    assert "cédula" not in error.message
 
 
 def test_register_rejects_invalid_cedula() -> None:

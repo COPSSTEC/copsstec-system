@@ -14,11 +14,20 @@ def profile_is_deleted_sql(alias: str = "") -> str:
 PROFILE_IS_ACTIVE_SQL = profile_is_active_sql()
 PROFILE_IS_DELETED_SQL = profile_is_deleted_sql()
 
-# Solo profiles vigentes: cédula en dígitos.
+# Candidatos por dígitos. El filtro vigente/liberado se aplica en Python.
+CEDULA_CANDIDATE_SQL = """
+    :identifier <> ''
+    AND (
+        btrim(CAST(identifier AS text)) = :identifier
+        OR regexp_replace(btrim(CAST(identifier AS text)), '[^0-9]', '', 'g') = :identifier
+    )
+"""
+
+# Solo profiles vigentes: cédula en dígitos, nunca el marcador d{id} del soft-delete.
 ACTIVE_PROFILE_CEDULA_SQL = f"""
-    regexp_replace(COALESCE(CAST(identifier AS text), ''), '[^0-9]', '', 'g') = :identifier
-    AND :identifier <> ''
-    AND {PROFILE_IS_ACTIVE_SQL}
+    {CEDULA_CANDIDATE_SQL}
+    AND CAST(identifier AS text) !~ '^d[0-9]+$'
+    AND deleted_at IS NULL
 """
 
 # identifier es varchar(255). Prefijo d{{id}} libera la cédula del unique legado.
@@ -66,3 +75,34 @@ def normalize_cedula(value: str) -> str:
 def is_valid_ecuadorian_cedula(value: str) -> bool:
     raw = (value or "").strip()
     return raw.isdigit() and len(raw) == 10
+
+
+def is_profile_deleted(deleted_at: object) -> bool:
+    if deleted_at is None:
+        return False
+    return str(deleted_at).strip() != ""
+
+
+def is_released_identifier(identifier: str | None, profile_id: int | None = None) -> bool:
+    raw = (identifier or "").strip()
+    if not raw.startswith("d"):
+        return False
+    suffix = raw[1:]
+    if not suffix.isdigit():
+        return False
+    if profile_id is None:
+        return True
+    return suffix == str(profile_id)
+
+
+def profile_holds_live_cedula(
+    *,
+    identifier: str | None,
+    deleted_at: object,
+    profile_id: int | None,
+    cedula: str,
+) -> bool:
+    if not cedula or is_profile_deleted(deleted_at) or is_released_identifier(identifier, profile_id):
+        return False
+    raw = (identifier or "").strip()
+    return raw == cedula or normalize_cedula(raw) == cedula
