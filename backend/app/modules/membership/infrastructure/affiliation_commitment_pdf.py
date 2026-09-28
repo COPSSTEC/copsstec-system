@@ -3,6 +3,7 @@ from __future__ import annotations
 import calendar
 import hashlib
 import io
+from dataclasses import dataclass
 from datetime import date, datetime
 from xml.sax.saxutils import escape
 
@@ -87,6 +88,100 @@ def build_integrity_hash(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+ISSUED_STATUS = "DOCUMENTO EMITIDO POR EL SISTEMA DE AFILIACIÓN COPSSTEC"
+
+
+@dataclass(frozen=True)
+class CommitmentIssuance:
+    document_code: str
+    document_version: str
+    digest: str
+    issued_at: datetime
+    start: date
+    end: date
+    names: str
+    identifier: str
+    email: str
+    phone: str
+    member_number: str
+    debit_plan: str
+    debit_plan_label: str
+    user_id: int
+    status: str = ISSUED_STATUS
+
+    def to_public_dict(self) -> dict[str, str | int]:
+        return {
+            "document_code": self.document_code,
+            "document_version": self.document_version,
+            "hash": self.digest,
+            "issued_at": self.issued_at.isoformat(timespec="seconds"),
+            "issued_at_label": self.issued_at.strftime("%d/%m/%Y - %H:%M:%S"),
+            "period_start": format_date(self.start),
+            "period_end": format_date(self.end),
+            "names": self.names,
+            "identifier": self.identifier,
+            "email": self.email,
+            "phone": self.phone,
+            "member_number": self.member_number,
+            "debit_plan": self.debit_plan,
+            "debit_plan_label": self.debit_plan_label,
+            "user_id": self.user_id,
+            "status": self.status,
+        }
+
+
+def build_commitment_issuance(
+    member: Member,
+    *,
+    debit_plan: str = "",
+    issued_at: datetime | None = None,
+) -> CommitmentIssuance:
+    now = issued_at or datetime.now()
+    start = parse_register_date(member.date_register, now.date())
+    end = add_months(start, 12)
+    document_code = build_document_code(member, now)
+    return CommitmentIssuance(
+        document_code=document_code,
+        document_version=DOCUMENT_VERSION,
+        digest=build_integrity_hash(
+            member=member,
+            document_code=document_code,
+            start=start,
+            end=end,
+            debit_plan=debit_plan,
+            issued_at=now,
+        ),
+        issued_at=now,
+        start=start,
+        end=end,
+        names=f"{(member.names or '').strip()} {(member.lastname or '').strip()}".strip(),
+        identifier=(member.identifier or "").strip(),
+        email=(member.email or member.login_email or "").strip(),
+        phone=(member.mobile_phone or member.fixed_phone or "").strip(),
+        member_number=member_code(member),
+        debit_plan=(debit_plan or "").strip(),
+        debit_plan_label=debit_plan_label(debit_plan),
+        user_id=member.user_id,
+    )
+
+
+def commitment_verify_url(digest: str) -> str:
+    from app.core.config import get_settings
+
+    origin = get_settings().frontend_origin.rstrip("/")
+    return f"{origin}/verificar-compromiso/{digest}"
+
+
+def parse_stored_issued_at(value: str | None) -> datetime | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
 class AffiliationCommitmentPdfGenerator:
     def generate(
         self,
@@ -94,22 +189,18 @@ class AffiliationCommitmentPdfGenerator:
         *,
         debit_plan: str = "",
         issued_at: datetime | None = None,
+        verify_url: str | None = None,
     ) -> bytes:
-        now = issued_at or datetime.now()
-        start = parse_register_date(member.date_register, now.date())
-        end = add_months(start, 12)
-        full_name = f"{(member.names or '').strip()} {(member.lastname or '').strip()}".strip()
-        document_code = build_document_code(member, now)
-        digest = build_integrity_hash(
-            member=member,
-            document_code=document_code,
-            start=start,
-            end=end,
-            debit_plan=debit_plan,
-            issued_at=now,
-        )
-        plan_label = debit_plan_label(debit_plan)
-        member_number = member_code(member)
+        issuance = build_commitment_issuance(member, debit_plan=debit_plan, issued_at=issued_at)
+        now = issuance.issued_at
+        start = issuance.start
+        end = issuance.end
+        full_name = issuance.names
+        document_code = issuance.document_code
+        digest = issuance.digest
+        plan_label = issuance.debit_plan_label
+        member_number = issuance.member_number
+        qr_url = (verify_url or commitment_verify_url(digest)).strip()
 
         title = ParagraphStyle(
             "CommitmentTitle",
@@ -207,7 +298,7 @@ class AffiliationCommitmentPdfGenerator:
         )
 
         qr_box = qrcode.QRCode(border=1, box_size=4)
-        qr_box.add_data(f"{document_code}|{digest}")
+        qr_box.add_data(qr_url)
         qr_box.make(fit=True)
         qr_buffer = io.BytesIO()
         qr_box.make_image(fill_color="black", back_color="white").convert("RGB").save(qr_buffer, format="PNG")
@@ -373,7 +464,7 @@ class AffiliationCommitmentPdfGenerator:
         story.extend(
             [
                 qr_table,
-                Paragraph("Código QR de verificación", meta),
+                Paragraph("Escanea para verificar la autenticidad de este documento", meta),
                 Paragraph("10. BASE INSTITUCIONAL", section),
                 Paragraph(
                     "Estatuto del COPSSTEC y Resolución de Directorio N.° "

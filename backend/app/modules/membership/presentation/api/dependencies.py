@@ -21,6 +21,7 @@ from app.modules.membership.application.use_cases import (
     SaveBankDetailsUseCase,
     UploadOnboardingDocumentsUseCase,
     UploadPaymentVoucherUseCase,
+    VerifyAffiliationCommitmentUseCase,
 )
 from app.modules.membership.infrastructure.affiliation_commitment_pdf import AffiliationCommitmentPdfGenerator
 from app.modules.membership.infrastructure.authorization_pdf import AuthorizationDebitPdfGenerator
@@ -141,6 +142,12 @@ def get_download_onboarding_document_use_case(
     repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
 ) -> DownloadOnboardingDocumentUseCase:
     return DownloadOnboardingDocumentUseCase(repository)
+
+
+def get_verify_affiliation_commitment_use_case(
+    storage: Annotated[LocalMembershipFileStorage, Depends(get_membership_storage)],
+) -> VerifyAffiliationCommitmentUseCase:
+    return VerifyAffiliationCommitmentUseCase(storage)
 
 
 def get_approve_membership_use_case(

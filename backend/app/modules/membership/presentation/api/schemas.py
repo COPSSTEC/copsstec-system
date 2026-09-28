@@ -203,3 +203,21 @@ class ApproveMemberResponse(BaseModel):
     login_email: str
     state_id: int
     approved_at: datetime | None = None
+
+
+class CommitmentVerificationResponse(BaseModel):
+    valid: bool = True
+    document_code: str
+    document_version: str
+    hash: str
+    issued_at: str
+    issued_at_label: str
+    period_start: str
+    period_end: str
+    names: str
+    identifier: str
+    email: str
+    phone: str
+    member_number: str
+    debit_plan_label: str
+    status: str

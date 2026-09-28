@@ -185,6 +185,34 @@ export async function downloadAffiliationCommitmentPdf(token: string): Promise<v
   await downloadPdfFile(token, "/api/membership/compromiso-pdf", "compromiso-afiliacion-copsstec.pdf");
 }
 
+export interface CommitmentVerification {
+  valid: boolean;
+  document_code: string;
+  document_version: string;
+  hash: string;
+  issued_at: string;
+  issued_at_label: string;
+  period_start: string;
+  period_end: string;
+  names: string;
+  identifier: string;
+  email: string;
+  phone: string;
+  member_number: string;
+  debit_plan_label: string;
+  status: string;
+}
+
+export async function getCommitmentVerification(digest: string): Promise<CommitmentVerification> {
+  const response = await fetch(`${API_URL}/api/membership/commitment-verify/${encodeURIComponent(digest)}`, {
+    cache: "no-store",
+  });
+  if (response.status === 404) {
+    throw new MembershipApiError("Este compromiso no consta en el registro de COPSSTEC.");
+  }
+  return parseResponse<CommitmentVerification>(response);
+}
+
 async function snapshotPdf(file: File): Promise<File> {
   const bytes = await file.arrayBuffer();
   return new File([bytes], file.name, {

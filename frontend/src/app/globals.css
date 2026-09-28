@@ -14246,6 +14246,57 @@ button.form-error-link {
   margin-top: 4rem;
 }
 
+.commitment-verify-page {
+  max-width: 720px;
+}
+
+.commitment-verify-badge {
+  background: #dcfce7;
+  border-radius: 999px;
+  color: #166534;
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  text-transform: uppercase;
+}
+
+.commitment-verify-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.5rem 0 0;
+}
+
+.commitment-verify-list div {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+}
+
+.commitment-verify-list dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.commitment-verify-list dd {
+  font-size: 0.98rem;
+  font-weight: 600;
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.commitment-verify-hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
 @media (max-width: 1080px) {
   .member-profile-hero,
   .member-profile-sections,

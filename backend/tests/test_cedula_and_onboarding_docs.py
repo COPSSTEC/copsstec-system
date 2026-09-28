@@ -16,6 +16,7 @@ from app.modules.membership.application.use_cases import (
     GetApprovalPreviewUseCase,
     GetPaymentInfoUseCase,
     UploadOnboardingDocumentsUseCase,
+    VerifyAffiliationCommitmentUseCase,
     _validate_registration,
 )
 from app.modules.membership.domain.entities import (
@@ -46,6 +47,7 @@ from app.modules.membership.infrastructure.affiliation_commitment_pdf import (
     AffiliationCommitmentPdfGenerator,
     add_months,
     build_document_code,
+    commitment_verify_url,
 )
 from app.modules.membership.infrastructure.authorization_pdf import (
     AuthorizationDebitPdfGenerator,
@@ -674,7 +676,7 @@ def test_download_commitment_emails_pdf_once() -> None:
             return member
 
     class _Pdf:
-        def generate(self, member: Member, *, debit_plan: str = "", issued_at: datetime | None = None) -> bytes:
+        def generate(self, member: Member, *, debit_plan: str = "", issued_at: datetime | None = None, **kwargs) -> bytes:
             return b"%PDF-commitment"
 
     class _Mail:
@@ -703,4 +705,41 @@ def test_download_commitment_emails_pdf_once() -> None:
     assert sent == [("ana@example.com", "affiliation_commitment", "compromiso-afiliacion-copsstec.pdf")]
     assert use_case.execute(7) == b"%PDF-commitment"
     assert len(sent) == 1
+
+
+def test_commitment_verify_url_points_to_public_page() -> None:
+    digest = "ab" * 32
+    assert commitment_verify_url(digest).endswith(f"/verificar-compromiso/{digest}")
+
+
+def test_commitment_issuance_storage_and_verify() -> None:
+    digest = "ab" * 32
+    payload = {
+        "document_code": "COPS-AFI-2026-00007",
+        "document_version": "R-DIR-COPSSTEC-2026-003",
+        "hash": digest,
+        "issued_at": "2026-09-28T19:39:24",
+        "issued_at_label": "28/09/2026 - 19:39:24",
+        "period_start": "28/09/2026",
+        "period_end": "28/09/2027",
+        "names": "Elimar Moronta",
+        "identifier": "1710034065",
+        "email": "elimar@example.com",
+        "phone": "0990000000",
+        "member_number": "2842018-00007",
+        "debit_plan_label": "MENSUAL $10,00",
+        "user_id": 7,
+        "status": "DOCUMENTO EMITIDO POR EL SISTEMA DE AFILIACIÓN COPSSTEC",
+    }
+    with TemporaryDirectory() as folder:
+        storage = LocalMembershipFileStorage(folder)
+        storage.save_commitment_issuance(payload)
+        found = VerifyAffiliationCommitmentUseCase(storage).execute(digest)
+        assert found["names"] == "Elimar Moronta"
+        assert found["document_code"] == "COPS-AFI-2026-00007"
+        try:
+            VerifyAffiliationCommitmentUseCase(storage).execute("cd" * 32)
+            raise AssertionError("expected MembershipNotFoundError")
+        except MembershipNotFoundError as exc:
+            assert "compromiso" in exc.message.lower()
 

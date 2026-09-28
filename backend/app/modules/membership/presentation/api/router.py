@@ -17,6 +17,7 @@ from app.modules.membership.application.use_cases import (
     SaveBankDetailsUseCase,
     UploadOnboardingDocumentsUseCase,
     UploadPaymentVoucherUseCase,
+    VerifyAffiliationCommitmentUseCase,
 )
 from app.modules.membership.domain.entities import MembershipRegistrationData
 from app.modules.membership.domain.exceptions import (
@@ -37,6 +38,7 @@ from app.modules.membership.presentation.api.dependencies import (
     get_solicitud_pdf_use_case,
     get_upload_onboarding_documents_use_case,
     get_upload_voucher_use_case,
+    get_verify_affiliation_commitment_use_case,
 )
 from app.modules.membership.presentation.api.schemas import (
     BankDetailsRequest,
@@ -45,6 +47,7 @@ from app.modules.membership.presentation.api.schemas import (
     PaymentInfoResponse,
     PaymentResponse,
     RegisterMembershipResponse,
+    CommitmentVerificationResponse,
 )
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
@@ -69,6 +72,34 @@ def _http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, InvalidMembershipFileError):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno.")
+
+
+@router.get("/commitment-verify/{digest}", response_model=CommitmentVerificationResponse)
+def verify_affiliation_commitment(
+    digest: str,
+    use_case: Annotated[VerifyAffiliationCommitmentUseCase, Depends(get_verify_affiliation_commitment_use_case)],
+) -> CommitmentVerificationResponse:
+    try:
+        record = use_case.execute(digest)
+    except MembershipNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=exc.message) from exc
+    return CommitmentVerificationResponse(
+        valid=True,
+        document_code=str(record.get("document_code") or ""),
+        document_version=str(record.get("document_version") or ""),
+        hash=str(record.get("hash") or digest),
+        issued_at=str(record.get("issued_at") or ""),
+        issued_at_label=str(record.get("issued_at_label") or ""),
+        period_start=str(record.get("period_start") or ""),
+        period_end=str(record.get("period_end") or ""),
+        names=str(record.get("names") or ""),
+        identifier=str(record.get("identifier") or ""),
+        email=str(record.get("email") or ""),
+        phone=str(record.get("phone") or ""),
+        member_number=str(record.get("member_number") or ""),
+        debit_plan_label=str(record.get("debit_plan_label") or ""),
+        status=str(record.get("status") or "DOCUMENTO EMITIDO POR EL SISTEMA DE AFILIACIÓN COPSSTEC"),
+    )
 
 
 @router.post("/register", response_model=RegisterMembershipResponse, status_code=status.HTTP_201_CREATED)

@@ -52,6 +52,11 @@ from app.modules.membership.domain.exceptions import (
 )
 from app.modules.payments.domain.subscription import apply_subscription_gate, days_overdue
 from app.shared.infrastructure.email.messages import EmailAttachment
+from app.modules.membership.infrastructure.affiliation_commitment_pdf import (
+    build_commitment_issuance,
+    commitment_verify_url,
+    parse_stored_issued_at,
+)
 
 
 def _send_commitment_email(
@@ -84,6 +89,33 @@ def _send_commitment_email(
     if sent is False:
         return
     storage.mark_commitment_emailed(user_id)
+
+
+def _issue_commitment_pdf(
+    *,
+    member,
+    debit_plan: str,
+    pdf_generator,
+    storage: MembershipFileStorage | None,
+    issued_at: datetime | None = None,
+) -> bytes:
+    stored = None
+    if storage is not None:
+        loader = getattr(storage, "load_commitment_issuance", None)
+        if callable(loader):
+            stored = loader(member.user_id)
+    resolved_issued_at = issued_at or parse_stored_issued_at((stored or {}).get("issued_at") if stored else None)
+    snapshot = build_commitment_issuance(member, debit_plan=debit_plan, issued_at=resolved_issued_at)
+    pdf_bytes = pdf_generator.generate(
+        member,
+        debit_plan=debit_plan,
+        issued_at=snapshot.issued_at,
+        verify_url=commitment_verify_url(snapshot.digest),
+    )
+    saver = getattr(storage, "save_commitment_issuance", None) if storage is not None else None
+    if callable(saver):
+        saver(snapshot.to_public_dict())
+    return pdf_bytes
 
 
 def _validate_registration(data: MembershipRegistrationData) -> None:
@@ -620,9 +652,11 @@ class DownloadAffiliationCommitmentPdfUseCase:
         member = self.member_lookup.get_member(user_id)
         if member is None:
             raise MembershipNotFoundError()
-        pdf_bytes = self.pdf_generator.generate(
-            member,
+        pdf_bytes = _issue_commitment_pdf(
+            member=member,
             debit_plan=payment.member_debit_plan or "",
+            pdf_generator=self.pdf_generator,
+            storage=self.storage,
             issued_at=issued_at,
         )
         _send_commitment_email(
@@ -718,9 +752,11 @@ class UploadOnboardingDocumentsUseCase:
         if now_complete and not already_complete and self.pdf_generator is not None and self.member_lookup is not None:
             member = self.member_lookup.get_member(user_id)
             if member is not None:
-                pdf_bytes = self.pdf_generator.generate(
-                    member,
+                pdf_bytes = _issue_commitment_pdf(
+                    member=member,
                     debit_plan=updated.member_debit_plan or "",
+                    pdf_generator=self.pdf_generator,
+                    storage=self.storage,
                 )
                 _send_commitment_email(
                     email_sender=self.email_sender,
@@ -774,3 +810,15 @@ class DownloadOnboardingDocumentUseCase:
             "solicitud": f"solicitud-firmada{suffix}",
         }
         return filenames[kind], file_path
+
+
+class VerifyAffiliationCommitmentUseCase:
+    def __init__(self, storage: MembershipFileStorage) -> None:
+        self.storage = storage
+
+    def execute(self, digest: str) -> dict:
+        lookup = getattr(self.storage, "get_commitment_by_hash", None)
+        record = lookup(digest) if callable(lookup) else None
+        if not record:
+            raise MembershipNotFoundError("Este compromiso no consta en el registro de COPSSTEC.")
+        return record

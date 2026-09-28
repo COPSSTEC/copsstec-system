@@ -1,3 +1,4 @@
+from json import dumps, loads
 from pathlib import Path
 from uuid import uuid4
 
@@ -63,6 +64,48 @@ class LocalMembershipFileStorage:
     def _commitment_flag_path(self, user_id: int) -> Path:
         return self.base_path / str(user_id) / "commitment-emailed.flag"
 
+    def load_commitment_issuance(self, user_id: int) -> dict | None:
+        path = self._commitment_issued_path(user_id)
+        if not path.is_file():
+            return None
+        try:
+            data = loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def save_commitment_issuance(self, payload: dict) -> None:
+        digest = _safe_commitment_hash(str(payload.get("hash") or ""))
+        user_id = int(payload.get("user_id") or 0)
+        if not digest or user_id <= 0:
+            return
+        issued_path = self._commitment_issued_path(user_id)
+        issued_path.parent.mkdir(parents=True, exist_ok=True)
+        body = dumps(payload, ensure_ascii=False, indent=2)
+        issued_path.write_text(body, encoding="utf-8")
+        public_path = self._commitment_public_path(digest)
+        public_path.parent.mkdir(parents=True, exist_ok=True)
+        public_path.write_text(body, encoding="utf-8")
+
+    def get_commitment_by_hash(self, digest: str) -> dict | None:
+        cleaned = _safe_commitment_hash(digest)
+        if not cleaned:
+            return None
+        path = self._commitment_public_path(cleaned)
+        if not path.is_file():
+            return None
+        try:
+            data = loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def _commitment_issued_path(self, user_id: int) -> Path:
+        return self.base_path / str(user_id) / "commitment-issued.json"
+
+    def _commitment_public_path(self, digest: str) -> Path:
+        return self.base_path / "commitments" / f"{digest}.json"
+
     def _save_image(
         self,
         user_id: int,
@@ -86,3 +129,8 @@ class LocalMembershipFileStorage:
         target = target_dir / f"{uuid4().hex}{suffix}"
         target.write_bytes(content)
         return f"{url_prefix}/{user_id}/{folder}/{target.name}"
+
+
+def _safe_commitment_hash(digest: str) -> str:
+    cleaned = "".join(character for character in (digest or "").lower() if character in "0123456789abcdef")
+    return cleaned if len(cleaned) == 64 else ""
