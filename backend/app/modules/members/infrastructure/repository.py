@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.members.domain.entities import (
@@ -17,8 +18,12 @@ from app.modules.members.domain.entities import (
     MemberListResult,
     MemberWriteData,
 )
-from app.modules.members.domain.exceptions import MemberNotFoundError
-from app.modules.membership.domain.cedula import ACTIVE_PROFILE_CEDULA_SQL, normalize_cedula
+from app.modules.members.domain.exceptions import MemberConflictError, MemberNotFoundError
+from app.modules.membership.domain.cedula import (
+    ACTIVE_PROFILE_CEDULA_SQL,
+    RELEASE_DELETED_PROFILE_CEDULA_SQL,
+    normalize_cedula,
+)
 from app.shared.infrastructure.sequences import sync_serial_sequence
 
 
@@ -258,29 +263,43 @@ class SqlAlchemyMemberRepository:
         )
 
         self.session.execute(
-            text(
-                """
-                INSERT INTO profiles (
-                    user_id, names, lastname, identifier, email, birtday, blood_type,
-                    mobile_phone, fixed_phone, title_academic, level_academic, cod_senescyt,
-                    date_register, linkdink, want_notifications, is_work, foto_id,
-                    province, city, street_principal, street_secondary, state_id,
-                    type_profile, fourth_title, type_commision, codigo_senescyt_cuarto,
-                    gender, created_at, updated_at
-                )
-                VALUES (
-                    :user_id, :names, :lastname, :identifier, :email, :birtday, :blood_type,
-                    :mobile_phone, :fixed_phone, :title_academic, :level_academic, :cod_senescyt,
-                    :date_register, :linkdink, :want_notifications, :is_work, :foto_id,
-                    :province, :city, :street_principal, :street_secondary, :state_id,
-                    :type_profile, :fourth_title, :type_commision, :codigo_senescyt_cuarto,
-                    :gender, :now, :now
-                )
-                """,
-            ),
-            self._profile_params(user_id, data, now),
+            text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
+            {"identifier": normalize_cedula(data.identifier), "now": now},
         )
-        self.session.commit()
+
+        try:
+            self.session.execute(
+                text(
+                    """
+                    INSERT INTO profiles (
+                        user_id, names, lastname, identifier, email, birtday, blood_type,
+                        mobile_phone, fixed_phone, title_academic, level_academic, cod_senescyt,
+                        date_register, linkdink, want_notifications, is_work, foto_id,
+                        province, city, street_principal, street_secondary, state_id,
+                        type_profile, fourth_title, type_commision, codigo_senescyt_cuarto,
+                        gender, created_at, updated_at
+                    )
+                    VALUES (
+                        :user_id, :names, :lastname, :identifier, :email, :birtday, :blood_type,
+                        :mobile_phone, :fixed_phone, :title_academic, :level_academic, :cod_senescyt,
+                        :date_register, :linkdink, :want_notifications, :is_work, :foto_id,
+                        :province, :city, :street_principal, :street_secondary, :state_id,
+                        :type_profile, :fourth_title, :type_commision, :codigo_senescyt_cuarto,
+                        :gender, :now, :now
+                    )
+                    """,
+                ),
+                self._profile_params(user_id, data, now),
+            )
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            detail = str(getattr(exc, "orig", exc)).lower()
+            if "identifier" in detail:
+                raise MemberConflictError("Ya existe un miembro con esa cédula.") from exc
+            if "email" in detail:
+                raise MemberConflictError("Ya existe un miembro con ese correo de contacto.") from exc
+            raise MemberConflictError("Ya existe un miembro con esos datos.") from exc
 
         member = self.get_member(user_id)
         if member is None:

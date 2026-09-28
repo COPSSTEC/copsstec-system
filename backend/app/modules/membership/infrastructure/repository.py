@@ -3,9 +3,14 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.modules.membership.domain.cedula import ACTIVE_PROFILE_CEDULA_SQL, normalize_cedula
+from app.modules.membership.domain.cedula import (
+    ACTIVE_PROFILE_CEDULA_SQL,
+    RELEASE_DELETED_PROFILE_CEDULA_SQL,
+    normalize_cedula,
+)
 from app.modules.membership.domain.entities import (
     ENABLED_STATE_ID,
     GATE_DOCUMENTS,
@@ -25,7 +30,11 @@ from app.modules.membership.domain.entities import (
     MembershipStatus,
     RegisteredMember,
 )
-from app.modules.membership.domain.exceptions import MembershipNotFoundError, MembershipValidationError
+from app.modules.membership.domain.exceptions import (
+    MembershipConflictError,
+    MembershipNotFoundError,
+    MembershipValidationError,
+)
 from app.shared.infrastructure.sequences import sync_serial_sequence
 
 
@@ -97,119 +106,128 @@ class SqlAlchemyMembershipRepository:
         fourth_title = (data.fourth_title or "").strip() or None
         senescyt_cuarto = (data.codigo_senescyt_cuarto or "").strip() or None
 
-        user_id = self.session.execute(
-            text(
-                """
-                INSERT INTO users (name, email, password, state_id, created_at, updated_at)
-                VALUES (:name, :email, :password, :state_id, :now, :now)
-                RETURNING id
-                """,
-            ),
-            {
-                "name": full_name,
-                "email": data.email.strip().lower(),
-                "password": password_hash,
-                "state_id": PENDING_ENABLE_STATE_ID,
-                "now": now,
-            },
-        ).scalar_one()
+        try:
+            user_id = self.session.execute(
+                text(
+                    """
+                    INSERT INTO users (name, email, password, state_id, created_at, updated_at)
+                    VALUES (:name, :email, :password, :state_id, :now, :now)
+                    RETURNING id
+                    """,
+                ),
+                {
+                    "name": full_name,
+                    "email": data.email.strip().lower(),
+                    "password": password_hash,
+                    "state_id": PENDING_ENABLE_STATE_ID,
+                    "now": now,
+                },
+            ).scalar_one()
 
-        role_id = self.session.execute(
-            text("SELECT id FROM roles WHERE name = :name LIMIT 1"),
-            {"name": MEMBER_ROLE_NAME},
-        ).scalar_one()
+            role_id = self.session.execute(
+                text("SELECT id FROM roles WHERE name = :name LIMIT 1"),
+                {"name": MEMBER_ROLE_NAME},
+            ).scalar_one()
 
-        self.session.execute(
-            text(
-                """
-                INSERT INTO model_has_roles (role_id, model_id, model_type)
-                VALUES (:role_id, :model_id, :model_type)
-                """,
-            ),
-            {"role_id": role_id, "model_id": user_id, "model_type": USER_MODEL_TYPE},
-        )
+            self.session.execute(
+                text(
+                    """
+                    INSERT INTO model_has_roles (role_id, model_id, model_type)
+                    VALUES (:role_id, :model_id, :model_type)
+                    """,
+                ),
+                {"role_id": role_id, "model_id": user_id, "model_type": USER_MODEL_TYPE},
+            )
 
-        profile_id = self.session.execute(
-            text(
-                """
-                INSERT INTO profiles (
-                    user_id, names, lastname, identifier, email, birtday, blood_type,
-                    mobile_phone, fixed_phone, title_academic, level_academic, cod_senescyt,
-                    date_register, linkdink, want_notifications, is_work, foto_id,
-                    province, city, street_principal, street_secondary, state_id,
-                    type_profile, fourth_title, type_commision, codigo_senescyt_cuarto,
-                    gender, created_at, updated_at
-                )
-                VALUES (
-                    :user_id, :names, :lastname, :identifier, :email, :birtday, :blood_type,
-                    :mobile_phone, :fixed_phone, :title_academic, :level_academic, :cod_senescyt,
-                    :date_register, '', :want_notifications, false, '',
-                    :province, :city, :street_principal, :street_secondary, :state_id,
-                    'miembro', :fourth_title, 'NA', :codigo_senescyt_cuarto,
-                    :gender, :now, :now
-                )
-                RETURNING id
-                """,
-            ),
-            {
-                "user_id": user_id,
-                "names": data.names.strip(),
-                "lastname": data.lastname.strip(),
-                "identifier": normalize_cedula(data.identifier),
-                "email": data.email.strip().lower(),
-                "birtday": data.birtday.strip(),
-                "blood_type": data.blood_type,
-                "mobile_phone": data.mobile_phone.strip(),
-                "fixed_phone": (data.fixed_phone or "").strip(),
-                "title_academic": data.title_academic.strip(),
-                "level_academic": data.title_academic.strip(),
-                "cod_senescyt": data.cod_senescyt.strip(),
-                "date_register": today,
-                "want_notifications": data.accept_birthday_notifications,
-                "province": data.province.strip(),
-                "city": data.city.strip(),
-                "street_principal": data.street_principal.strip(),
-                "street_secondary": (data.street_secondary or "").strip(),
-                "state_id": PENDING_ENABLE_STATE_ID,
-                "fourth_title": fourth_title,
-                "codigo_senescyt_cuarto": senescyt_cuarto if fourth_title else None,
-                "gender": data.gender,
-                "now": now,
-            },
-        ).scalar_one()
+            self.session.execute(
+                text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
+                {"identifier": normalize_cedula(data.identifier), "now": now},
+            )
 
-        payment_id = self.session.execute(
-            text(
-                """
-                INSERT INTO membership_payments (
-                    user_id, profile_id, amount, currency, bank_name, account_type,
-                    account_number, account_holder, account_ruc, reference, status,
-                    created_at, updated_at
-                )
-                VALUES (
-                    :user_id, :profile_id, :amount, 'USD', :bank_name, :account_type,
-                    :account_number, :account_holder, :account_ruc, :reference, :status,
-                    :now, :now
-                )
-                RETURNING id
-                """,
-            ),
-            {
-                "user_id": user_id,
-                "profile_id": profile_id,
-                "amount": amount,
-                "bank_name": bank_name,
-                "account_type": account_type,
-                "account_number": account_number,
-                "account_holder": account_holder,
-                "account_ruc": account_ruc or None,
-                "reference": data.identifier.strip(),
-                "status": PAYMENT_PENDING,
-                "now": now,
-            },
-        ).scalar_one()
+            profile_id = self.session.execute(
+                text(
+                    """
+                    INSERT INTO profiles (
+                        user_id, names, lastname, identifier, email, birtday, blood_type,
+                        mobile_phone, fixed_phone, title_academic, level_academic, cod_senescyt,
+                        date_register, linkdink, want_notifications, is_work, foto_id,
+                        province, city, street_principal, street_secondary, state_id,
+                        type_profile, fourth_title, type_commision, codigo_senescyt_cuarto,
+                        gender, created_at, updated_at
+                    )
+                    VALUES (
+                        :user_id, :names, :lastname, :identifier, :email, :birtday, :blood_type,
+                        :mobile_phone, :fixed_phone, :title_academic, :level_academic, :cod_senescyt,
+                        :date_register, '', :want_notifications, false, '',
+                        :province, :city, :street_principal, :street_secondary, :state_id,
+                        'miembro', :fourth_title, 'NA', :codigo_senescyt_cuarto,
+                        :gender, :now, :now
+                    )
+                    RETURNING id
+                    """,
+                ),
+                {
+                    "user_id": user_id,
+                    "names": data.names.strip(),
+                    "lastname": data.lastname.strip(),
+                    "identifier": normalize_cedula(data.identifier),
+                    "email": data.email.strip().lower(),
+                    "birtday": data.birtday.strip(),
+                    "blood_type": data.blood_type,
+                    "mobile_phone": data.mobile_phone.strip(),
+                    "fixed_phone": (data.fixed_phone or "").strip(),
+                    "title_academic": data.title_academic.strip(),
+                    "level_academic": data.title_academic.strip(),
+                    "cod_senescyt": data.cod_senescyt.strip(),
+                    "date_register": today,
+                    "want_notifications": data.accept_birthday_notifications,
+                    "province": data.province.strip(),
+                    "city": data.city.strip(),
+                    "street_principal": data.street_principal.strip(),
+                    "street_secondary": (data.street_secondary or "").strip(),
+                    "state_id": PENDING_ENABLE_STATE_ID,
+                    "fourth_title": fourth_title,
+                    "codigo_senescyt_cuarto": senescyt_cuarto if fourth_title else None,
+                    "gender": data.gender,
+                    "now": now,
+                },
+            ).scalar_one()
 
-        self.session.commit()
+            payment_id = self.session.execute(
+                text(
+                    """
+                    INSERT INTO membership_payments (
+                        user_id, profile_id, amount, currency, bank_name, account_type,
+                        account_number, account_holder, account_ruc, reference, status,
+                        created_at, updated_at
+                    )
+                    VALUES (
+                        :user_id, :profile_id, :amount, 'USD', :bank_name, :account_type,
+                        :account_number, :account_holder, :account_ruc, :reference, :status,
+                        :now, :now
+                    )
+                    RETURNING id
+                    """,
+                ),
+                {
+                    "user_id": user_id,
+                    "profile_id": profile_id,
+                    "amount": amount,
+                    "bank_name": bank_name,
+                    "account_type": account_type,
+                    "account_number": account_number,
+                    "account_holder": account_holder,
+                    "account_ruc": account_ruc or None,
+                    "reference": data.identifier.strip(),
+                    "status": PAYMENT_PENDING,
+                    "now": now,
+                },
+            ).scalar_one()
+            self.session.commit()
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise _conflict_from_integrity(exc) from exc
+
         payment = self.get_payment(user_id)
         if payment is None:
             raise MembershipValidationError("No se pudo crear el pago de afiliación.")
@@ -625,3 +643,13 @@ class SqlAlchemyMembershipRepository:
             signed_solicitud_path=row.get("signed_solicitud_path"),
             accepted_affiliation_year=bool(row.get("accepted_affiliation_year")),
         )
+
+
+def _conflict_from_integrity(exc: IntegrityError) -> MembershipConflictError:
+    detail = str(getattr(exc, "orig", exc)).lower()
+    if "identifier" in detail:
+        return MembershipConflictError("Ya existe un miembro con esa cédula.", code="identifier_taken")
+    if "email" in detail:
+        return MembershipConflictError("Ya existe un miembro con ese correo.", code="email_taken")
+    return MembershipConflictError("Ya existe un miembro con esos datos.")
+

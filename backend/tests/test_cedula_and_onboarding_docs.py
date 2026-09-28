@@ -14,6 +14,7 @@ from app.modules.membership.application.use_cases import GetPaymentInfoUseCase, 
 from app.modules.membership.domain.cedula import (
     ACTIVE_PROFILE_CEDULA_SQL,
     CEDULA_INVALID_MESSAGE,
+    RELEASE_DELETED_PROFILE_CEDULA_SQL,
     is_valid_ecuadorian_cedula,
     normalize_cedula,
 )
@@ -52,6 +53,9 @@ def test_cedula_conflict_uses_normalized_active_profiles() -> None:
     assert "identifier" in sql
     assert normalize_cedula(" 171-003-4065 ") == "1710034065"
     assert normalize_cedula("1710034065") == "1710034065"
+    release = " ".join(RELEASE_DELETED_PROFILE_CEDULA_SQL.split()).lower()
+    assert "deleted_at is not null" in release
+    assert "-del-" in release
 
 
 def test_register_rejects_invalid_cedula() -> None:
