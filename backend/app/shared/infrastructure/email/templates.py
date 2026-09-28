@@ -223,6 +223,37 @@ def render_affiliation_resume(context: dict) -> tuple[str, str, str]:
     return subject, text, html
 
 
+def render_affiliation_commitment(context: dict) -> tuple[str, str, str]:
+    nombres = context.get("nombres") or "aspirante"
+    subject = "Tu compromiso de afiliación a COPSSTEC"
+    text = (
+        f"Hola {nombres},\n\n"
+        "Recibimos tus documentos de afiliación. El administrador revisará tu solicitud.\n"
+        "Adjuntamos tu compromiso de afiliación en PDF. Consérvalo en tu correo.\n"
+        "Cuando te aprueben te enviaremos el usuario corporativo y la contraseña de acceso.\n"
+    )
+    inner = f"""
+      <p style="margin:0 0 16px;">Hola <strong>{_esc(nombres)}</strong>,</p>
+      <p style="margin:0 0 16px;">
+        Recibimos tu comprobante, la autorización firmada, la solicitud y la copia de tu cédula.
+        El administrador revisará tu afiliación. Mientras tanto no puedes ingresar al dashboard.
+      </p>
+      <p style="margin:0 0 16px;">
+        Adjuntamos tu <strong>compromiso de afiliación</strong> en PDF, generado con tus datos.
+        Guárdalo en este correo o en tu carpeta de descargas.
+      </p>
+      <p style="margin:0;">
+        Cuando te aprueben te llegará el usuario corporativo, la contraseña y las instrucciones de acceso.
+      </p>
+    """
+    html = branded_layout(
+        preview="Adjuntamos tu compromiso de afiliación a COPSSTEC",
+        heading="<strong>Compromiso de afiliación</strong>",
+        inner_html=inner,
+    )
+    return subject, text, html
+
+
 def render_password_reset(context: dict) -> tuple[str, str, str]:
     nombres = context.get("nombres") or "usuario"
     token = context.get("token") or ""
@@ -528,6 +559,7 @@ RENDERERS = {
     "corporate_mailbox": render_corporate_mailbox,
     "password_reset": render_password_reset,
     "affiliation_resume": render_affiliation_resume,
+    "affiliation_commitment": render_affiliation_commitment,
     "new_member_admin": render_new_member_admin,
     "course_inscription_received": lambda ctx: render_course_inscription({**ctx, "pending_payment": True}),
     "course_inscription_confirmed": render_course_inscription,

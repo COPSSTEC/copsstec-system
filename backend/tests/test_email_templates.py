@@ -25,6 +25,7 @@ def test_email_templates_include_logo_and_copy() -> None:
             "expire_minutes": 15,
             "resume_url": "http://localhost:3000/continuar-afiliacion",
         },
+        "affiliation_commitment": {"nombres": "Ana Pérez"},
         "new_member_admin": {"nombres": "Ana Pérez", "email": "ana@example.com"},
         "course_inscription_received": {
             "nombres": "Ana Pérez",

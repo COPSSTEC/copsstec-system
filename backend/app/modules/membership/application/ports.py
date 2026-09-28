@@ -101,7 +101,13 @@ class EmailPort(Protocol):
     def send(self, to_email: str, subject: str, body: str) -> None:
         ...
 
-    def send_template(self, to_email: str, template_key: str, context: dict | None = None) -> None:
+    def send_template(
+        self,
+        to_email: str,
+        template_key: str,
+        context: dict | None = None,
+        attachments: list | None = None,
+    ) -> None:
         ...
 
 
@@ -138,4 +144,10 @@ class MembershipFileStorage(Protocol):
         ...
 
     def save_pdf(self, user_id: int, folder: str, filename: str, content: bytes, content_type: str) -> str:
+        ...
+
+    def was_commitment_emailed(self, user_id: int) -> bool:
+        ...
+
+    def mark_commitment_emailed(self, user_id: int) -> None:
         ...

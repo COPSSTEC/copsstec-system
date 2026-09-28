@@ -106,19 +106,29 @@ def get_solicitud_pdf_use_case(
 def get_affiliation_commitment_pdf_use_case(
     repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
     session: Annotated[Session, Depends(get_db_session)],
+    storage: Annotated[LocalMembershipFileStorage, Depends(get_membership_storage)],
 ) -> DownloadAffiliationCommitmentPdfUseCase:
     return DownloadAffiliationCommitmentPdfUseCase(
         member_lookup=SqlAlchemyMemberRepository(session),
         pdf_generator=AffiliationCommitmentPdfGenerator(),
         membership_repository=repository,
+        email_sender=SmtpOrLogEmailSender(),
+        storage=storage,
     )
 
 
 def get_upload_onboarding_documents_use_case(
     repository: Annotated[SqlAlchemyMembershipRepository, Depends(get_membership_repository)],
     storage: Annotated[LocalMembershipFileStorage, Depends(get_membership_storage)],
+    session: Annotated[Session, Depends(get_db_session)],
 ) -> UploadOnboardingDocumentsUseCase:
-    return UploadOnboardingDocumentsUseCase(repository, storage)
+    return UploadOnboardingDocumentsUseCase(
+        repository,
+        storage,
+        email_sender=SmtpOrLogEmailSender(),
+        pdf_generator=AffiliationCommitmentPdfGenerator(),
+        member_lookup=SqlAlchemyMemberRepository(session),
+    )
 
 
 def get_approval_preview_use_case(

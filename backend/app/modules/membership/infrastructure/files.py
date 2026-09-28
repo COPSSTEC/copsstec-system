@@ -52,6 +52,17 @@ class LocalMembershipFileStorage:
         target.write_bytes(content)
         return f"/media/membership/{user_id}/{folder}/{target.name}"
 
+    def was_commitment_emailed(self, user_id: int) -> bool:
+        return self._commitment_flag_path(user_id).is_file()
+
+    def mark_commitment_emailed(self, user_id: int) -> None:
+        path = self._commitment_flag_path(user_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("sent", encoding="utf-8")
+
+    def _commitment_flag_path(self, user_id: int) -> Path:
+        return self.base_path / str(user_id) / "commitment-emailed.flag"
+
     def _save_image(
         self,
         user_id: int,

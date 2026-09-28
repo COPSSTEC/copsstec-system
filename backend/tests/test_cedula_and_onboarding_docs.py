@@ -11,6 +11,7 @@ from app.modules.members.infrastructure.pdfs import (
     build_solicitud_body,
 )
 from app.modules.membership.application.use_cases import (
+    DownloadAffiliationCommitmentPdfUseCase,
     DownloadOnboardingDocumentUseCase,
     GetApprovalPreviewUseCase,
     GetPaymentInfoUseCase,
@@ -617,4 +618,89 @@ def test_upload_onboarding_accepts_one_pdf_at_a_time() -> None:
     assert saved[0][0] == "/media/membership/778/authorization/autorizacion.pdf"
     assert saved[0][1] is None
     assert saved[0][2] is None
+
+
+def test_download_commitment_emails_pdf_once() -> None:
+    member = Member(
+        user_id=7,
+        profile_id=12,
+        name="Ana Pérez",
+        login_email="ana@copsstec.com",
+        state_id=ENABLED_STATE_ID,
+        state_label="HABILITADO",
+        last_conexion=None,
+        names="Ana",
+        lastname="Pérez",
+        identifier="1710034065",
+        email="ana@example.com",
+        birtday="01/01/1990",
+        blood_type="O+",
+        mobile_phone="0990000000",
+        fixed_phone="",
+        title_academic="Ingeniera",
+        level_academic="Ingeniera",
+        cod_senescyt="12345",
+        date_register="23/09/2026",
+        linkdink="",
+        want_notifications=True,
+        is_work=True,
+        foto_id="",
+        province="Pichincha",
+        city="Quito",
+        street_principal="Av. Amazonas N12",
+        street_secondary="",
+        type_profile="miembro",
+        date_exit=None,
+        fourth_title=None,
+        type_commision=None,
+        codigo_senescyt_cuarto=None,
+        cod="00007",
+        gender="Femenino",
+    )
+    sent: list[tuple[str, str, str]] = []
+
+    class _Repo:
+        def get_payment(self, user_id: int) -> MembershipPayment:
+            return _payment(
+                status=PAYMENT_REVIEW,
+                signed_authorization_path="/a.pdf",
+                identity_document_path="/i.pdf",
+                signed_solicitud_path="/s.pdf",
+                accepted_affiliation_year=True,
+            )
+
+    class _Members:
+        def get_member(self, user_id: int) -> Member:
+            return member
+
+    class _Pdf:
+        def generate(self, member: Member, *, debit_plan: str = "", issued_at: datetime | None = None) -> bytes:
+            return b"%PDF-commitment"
+
+    class _Mail:
+        def send_template(self, to_email: str, template_key: str, context=None, attachments=None) -> bool:
+            sent.append((to_email, template_key, attachments[0].filename if attachments else ""))
+            return True
+
+    class _Storage:
+        flagged = False
+
+        def was_commitment_emailed(self, user_id: int) -> bool:
+            return self.flagged
+
+        def mark_commitment_emailed(self, user_id: int) -> None:
+            self.flagged = True
+
+    storage = _Storage()
+    use_case = DownloadAffiliationCommitmentPdfUseCase(
+        _Members(),
+        _Pdf(),
+        _Repo(),
+        email_sender=_Mail(),
+        storage=storage,
+    )
+    assert use_case.execute(7) == b"%PDF-commitment"
+    assert sent == [("ana@example.com", "affiliation_commitment", "compromiso-afiliacion-copsstec.pdf")]
+    assert use_case.execute(7) == b"%PDF-commitment"
+    assert len(sent) == 1
 

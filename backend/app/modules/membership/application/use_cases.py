@@ -51,6 +51,39 @@ from app.modules.membership.domain.exceptions import (
     MembershipValidationError,
 )
 from app.modules.payments.domain.subscription import apply_subscription_gate, days_overdue
+from app.shared.infrastructure.email.messages import EmailAttachment
+
+
+def _send_commitment_email(
+    *,
+    email_sender: EmailPort | None,
+    storage: MembershipFileStorage | None,
+    user_id: int,
+    to_email: str,
+    nombres: str,
+    pdf_bytes: bytes,
+) -> None:
+    if email_sender is None or storage is None:
+        return
+    destination = (to_email or "").strip()
+    if not destination or not pdf_bytes:
+        return
+    if storage.was_commitment_emailed(user_id):
+        return
+    sent = email_sender.send_template(
+        destination,
+        "affiliation_commitment",
+        {"nombres": nombres.strip() or "aspirante"},
+        attachments=[
+            EmailAttachment(
+                filename="compromiso-afiliacion-copsstec.pdf",
+                content=pdf_bytes,
+            ),
+        ],
+    )
+    if sent is False:
+        return
+    storage.mark_commitment_emailed(user_id)
 
 
 def _validate_registration(data: MembershipRegistrationData) -> None:
@@ -557,10 +590,19 @@ class DownloadSolicitudPdfUseCase:
 
 
 class DownloadAffiliationCommitmentPdfUseCase:
-    def __init__(self, member_lookup, pdf_generator, membership_repository: MembershipRepository) -> None:
+    def __init__(
+        self,
+        member_lookup,
+        pdf_generator,
+        membership_repository: MembershipRepository,
+        email_sender: EmailPort | None = None,
+        storage: MembershipFileStorage | None = None,
+    ) -> None:
         self.member_lookup = member_lookup
         self.pdf_generator = pdf_generator
         self.membership_repository = membership_repository
+        self.email_sender = email_sender
+        self.storage = storage
 
     def execute(self, user_id: int, issued_at: datetime | None = None) -> bytes:
         payment = self.membership_repository.get_payment(user_id)
@@ -578,17 +620,36 @@ class DownloadAffiliationCommitmentPdfUseCase:
         member = self.member_lookup.get_member(user_id)
         if member is None:
             raise MembershipNotFoundError()
-        return self.pdf_generator.generate(
+        pdf_bytes = self.pdf_generator.generate(
             member,
             debit_plan=payment.member_debit_plan or "",
             issued_at=issued_at,
         )
+        _send_commitment_email(
+            email_sender=self.email_sender,
+            storage=self.storage,
+            user_id=user_id,
+            to_email=member.email or member.login_email,
+            nombres=f"{member.names} {member.lastname}".strip(),
+            pdf_bytes=pdf_bytes,
+        )
+        return pdf_bytes
 
 
 class UploadOnboardingDocumentsUseCase:
-    def __init__(self, repository: MembershipRepository, storage: MembershipFileStorage) -> None:
+    def __init__(
+        self,
+        repository: MembershipRepository,
+        storage: MembershipFileStorage,
+        email_sender: EmailPort | None = None,
+        pdf_generator=None,
+        member_lookup=None,
+    ) -> None:
         self.repository = repository
         self.storage = storage
+        self.email_sender = email_sender
+        self.pdf_generator = pdf_generator
+        self.member_lookup = member_lookup
 
     def execute(
         self,
@@ -605,6 +666,13 @@ class UploadOnboardingDocumentsUseCase:
             raise MembershipForbiddenError("Tu afiliación ya fue aprobada.")
         if payment.status != PAYMENT_REVIEW:
             raise MembershipForbiddenError("Debes subir el comprobante de pago antes de enviar los documentos.")
+
+        already_complete = onboarding_documents_complete(
+            payment.signed_authorization_path,
+            payment.identity_document_path,
+            payment.signed_solicitud_path,
+            payment.accepted_affiliation_year,
+        )
 
         auth_upload = signed_authorization if signed_authorization and signed_authorization[1] else None
         identity_upload = identity_document if identity_document and identity_document[1] else None
@@ -640,6 +708,28 @@ class UploadOnboardingDocumentsUseCase:
         status = self.repository.get_status(user_id)
         if status is None:
             raise MembershipNotFoundError()
+
+        now_complete = onboarding_documents_complete(
+            updated.signed_authorization_path,
+            updated.identity_document_path,
+            updated.signed_solicitud_path,
+            updated.accepted_affiliation_year,
+        )
+        if now_complete and not already_complete and self.pdf_generator is not None and self.member_lookup is not None:
+            member = self.member_lookup.get_member(user_id)
+            if member is not None:
+                pdf_bytes = self.pdf_generator.generate(
+                    member,
+                    debit_plan=updated.member_debit_plan or "",
+                )
+                _send_commitment_email(
+                    email_sender=self.email_sender,
+                    storage=self.storage,
+                    user_id=user_id,
+                    to_email=member.email or status.personal_email or member.login_email,
+                    nombres=f"{member.names} {member.lastname}".strip(),
+                    pdf_bytes=pdf_bytes,
+                )
         return updated, status
 
 

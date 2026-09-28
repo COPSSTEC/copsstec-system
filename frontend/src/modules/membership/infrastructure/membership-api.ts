@@ -185,6 +185,26 @@ export async function downloadAffiliationCommitmentPdf(token: string): Promise<v
   await downloadPdfFile(token, "/api/membership/compromiso-pdf", "compromiso-afiliacion-copsstec.pdf");
 }
 
+async function snapshotPdf(file: File): Promise<File> {
+  const bytes = await file.arrayBuffer();
+  return new File([bytes], file.name, {
+    type: file.type || "application/pdf",
+    lastModified: Date.now(),
+  });
+}
+
+function uploadAbortedError(error: unknown): MembershipApiError {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/failed to fetch|networkerror|load failed|upload_file_changed/i.test(message)) {
+    return new MembershipApiError(
+      "El navegador canceló la subida porque el PDF cambió en el disco. Vuelve a seleccionar los archivos e inténtalo de nuevo.",
+    );
+  }
+  return error instanceof MembershipApiError
+    ? error
+    : new MembershipApiError(message || "No se pudieron enviar los documentos.");
+}
+
 export async function uploadOnboardingDocuments(
   token: string,
   files: {
@@ -202,20 +222,28 @@ export async function uploadOnboardingDocuments(
   gate: string;
   message: string;
 }> {
+  const signedAuthorization = files.signedAuthorization
+    ? await snapshotPdf(files.signedAuthorization)
+    : undefined;
+  const identityDocument = files.identityDocument
+    ? await snapshotPdf(files.identityDocument)
+    : undefined;
+  const signedSolicitud = files.signedSolicitud ? await snapshotPdf(files.signedSolicitud) : undefined;
+
   const parts: Array<{
     signedAuthorization?: File;
     identityDocument?: File;
     signedSolicitud?: File;
     acceptedAffiliationYear?: boolean;
   }> = [];
-  if (files.signedAuthorization) {
-    parts.push({ signedAuthorization: files.signedAuthorization });
+  if (signedAuthorization) {
+    parts.push({ signedAuthorization });
   }
-  if (files.identityDocument) {
-    parts.push({ identityDocument: files.identityDocument });
+  if (identityDocument) {
+    parts.push({ identityDocument });
   }
-  if (files.signedSolicitud) {
-    parts.push({ signedSolicitud: files.signedSolicitud });
+  if (signedSolicitud) {
+    parts.push({ signedSolicitud });
   }
   if (files.acceptedAffiliationYear) {
     if (parts.length > 0) {
@@ -263,12 +291,16 @@ async function postOnboardingDocuments(
     body.append("signed_solicitud", files.signedSolicitud);
   }
   body.append("accepted_affiliation_year", String(Boolean(files.acceptedAffiliationYear)));
-  const response = await authorizedFetch(`${API_URL}/api/membership/onboarding-documents`, {
-    method: "POST",
-    headers: authHeaders(token),
-    body,
-  });
-  return parseResponse(response);
+  try {
+    const response = await authorizedFetch(`${API_URL}/api/membership/onboarding-documents`, {
+      method: "POST",
+      headers: authHeaders(token),
+      body,
+    });
+    return await parseResponse(response);
+  } catch (error) {
+    throw uploadAbortedError(error);
+  }
 }
 
 export async function getApprovalPreview(token: string, memberId: number): Promise<ApprovalPreview> {

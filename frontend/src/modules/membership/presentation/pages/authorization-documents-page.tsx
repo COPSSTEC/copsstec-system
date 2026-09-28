@@ -345,7 +345,7 @@ export function AuthorizationDocumentsPage() {
     }
   }
 
-  function assignPdf(setter: (file: File | null) => void, file: File | null, label: string) {
+  async function assignPdf(setter: (file: File | null) => void, file: File | null, label: string) {
     if (!file) {
       setter(null);
       return;
@@ -355,8 +355,18 @@ export function AuthorizationDocumentsPage() {
       setError(invalid);
       return;
     }
-    setError(null);
-    setter(file);
+    try {
+      const bytes = await file.arrayBuffer();
+      setter(
+        new File([bytes], file.name, {
+          type: file.type || "application/pdf",
+          lastModified: Date.now(),
+        }),
+      );
+      setError(null);
+    } catch {
+      setError(`No se pudo leer ${label}. Vuelve a seleccionarlo.`);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

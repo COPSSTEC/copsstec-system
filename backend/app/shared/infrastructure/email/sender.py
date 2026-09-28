@@ -24,10 +24,10 @@ class MailtrapEmailSender:
         text_body: str,
         html_body: str,
         attachments: list[EmailAttachment] | None = None,
-    ) -> None:
+    ) -> bool:
         if not to_email:
-            return
-        self.deliver(
+            return False
+        return self.deliver(
             OutgoingEmail(
                 to=to_email,
                 subject=subject,
@@ -43,14 +43,14 @@ class MailtrapEmailSender:
         template_key: str,
         context: dict | None = None,
         attachments: list[EmailAttachment] | None = None,
-    ) -> None:
+    ) -> bool:
         subject, text_body, html_body = render_email(template_key, context)
-        self.send_html(to_email, subject, text_body, html_body, attachments)
+        return self.send_html(to_email, subject, text_body, html_body, attachments)
 
-    def deliver(self, message: OutgoingEmail) -> None:
+    def deliver(self, message: OutgoingEmail) -> bool:
         settings = get_settings()
         if not message.to:
-            return
+            return False
         if not settings.smtp_host:
             print(
                 "EMAIL_LOG",
@@ -60,7 +60,7 @@ class MailtrapEmailSender:
                     "attachments": [item.filename for item in message.attachments],
                 },
             )
-            return
+            return True
 
         envelope = EmailMessage()
         envelope["From"] = settings.smtp_from
@@ -79,10 +79,12 @@ class MailtrapEmailSender:
 
         try:
             self._deliver(settings, envelope)
+            return True
         except Exception as exc:
             print("EMAIL_SEND_FAILED", {"to": message.to, "subject": message.subject, "error": str(exc)})
             if getattr(self, "raise_on_error", False):
                 raise
+            return False
 
     def _deliver(self, settings, envelope: EmailMessage) -> None:
         last_error: Exception | None = None

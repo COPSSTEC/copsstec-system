@@ -104,8 +104,8 @@ export function MembershipPendingApprovalPage() {
           tu afiliación.
         </p>
         <p className="muted">
-          Descarga tu compromiso de afiliación. El archivo se genera con tus datos y debe quedar en
-          tu correo o carpeta de descargas.
+          También te enviamos el compromiso al correo con el que te registraste. Si no lo ves,
+          revisa spam o descárgalo aquí. El archivo se genera con tus datos.
         </p>
         <div className="pending-download">
           <button className="create-button" disabled={isDownloading} onClick={() => void handleDownload()} type="button">
