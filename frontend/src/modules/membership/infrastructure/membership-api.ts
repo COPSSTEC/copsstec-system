@@ -30,6 +30,12 @@ async function parseResponse<T>(response: Response): Promise<T> {
     return response.json() as Promise<T>;
   }
 
+  if (response.status === 413) {
+    throw new MembershipApiError(
+      "Los archivos superan el límite del servidor. Cada PDF debe pesar máximo 8 MB.",
+    );
+  }
+
   let message = "No fue posible completar la solicitud.";
   let code: string | undefined;
   try {
@@ -180,6 +186,56 @@ export async function downloadAffiliationCommitmentPdf(token: string): Promise<v
 }
 
 export async function uploadOnboardingDocuments(
+  token: string,
+  files: {
+    signedAuthorization?: File;
+    identityDocument?: File;
+    signedSolicitud?: File;
+    acceptedAffiliationYear?: boolean;
+  },
+): Promise<{
+  status: string;
+  has_signed_authorization: boolean;
+  has_identity_document: boolean;
+  has_signed_solicitud?: boolean;
+  accepted_affiliation_year?: boolean;
+  gate: string;
+  message: string;
+}> {
+  const parts: Array<{
+    signedAuthorization?: File;
+    identityDocument?: File;
+    signedSolicitud?: File;
+    acceptedAffiliationYear?: boolean;
+  }> = [];
+  if (files.signedAuthorization) {
+    parts.push({ signedAuthorization: files.signedAuthorization });
+  }
+  if (files.identityDocument) {
+    parts.push({ identityDocument: files.identityDocument });
+  }
+  if (files.signedSolicitud) {
+    parts.push({ signedSolicitud: files.signedSolicitud });
+  }
+  if (files.acceptedAffiliationYear) {
+    if (parts.length > 0) {
+      parts[parts.length - 1] = { ...parts[parts.length - 1], acceptedAffiliationYear: true };
+    } else {
+      parts.push({ acceptedAffiliationYear: true });
+    }
+  }
+  if (parts.length === 0) {
+    parts.push({});
+  }
+
+  let last = await postOnboardingDocuments(token, parts[0]);
+  for (const part of parts.slice(1)) {
+    last = await postOnboardingDocuments(token, part);
+  }
+  return last;
+}
+
+async function postOnboardingDocuments(
   token: string,
   files: {
     signedAuthorization?: File;

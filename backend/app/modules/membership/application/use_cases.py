@@ -607,20 +607,13 @@ class UploadOnboardingDocumentsUseCase:
         auth_upload = signed_authorization if signed_authorization and signed_authorization[1] else None
         identity_upload = identity_document if identity_document and identity_document[1] else None
         solicitud_upload = signed_solicitud if signed_solicitud and signed_solicitud[1] else None
-        if auth_upload is None and identity_upload is None and solicitud_upload is None and accepted_affiliation_year is None:
+        if (
+            auth_upload is None
+            and identity_upload is None
+            and solicitud_upload is None
+            and not accepted_affiliation_year
+        ):
             raise MembershipValidationError("Debe adjuntar al menos un archivo PDF o aceptar la afiliación de 1 año.")
-
-        has_signed = bool((payment.signed_authorization_path or "").strip())
-        has_identity = bool((payment.identity_document_path or "").strip())
-        has_solicitud = bool((payment.signed_solicitud_path or "").strip())
-        if not has_signed and auth_upload is None:
-            raise MembershipValidationError("La autorización firmada es obligatoria.")
-        if not has_identity and identity_upload is None:
-            raise MembershipValidationError("La copia de cédula es obligatoria.")
-        if not has_solicitud and solicitud_upload is None:
-            raise MembershipValidationError("La solicitud firmada a mano es obligatoria.")
-        if not payment.accepted_affiliation_year and not accepted_affiliation_year:
-            raise MembershipValidationError("Debes aceptar permanecer afiliado 1 año al colegio.")
 
         signed_path = None
         identity_path = None

@@ -14,6 +14,7 @@ from app.modules.membership.application.use_cases import (
     DownloadOnboardingDocumentUseCase,
     GetApprovalPreviewUseCase,
     GetPaymentInfoUseCase,
+    UploadOnboardingDocumentsUseCase,
     _validate_registration,
 )
 from app.modules.membership.domain.entities import (
@@ -31,7 +32,10 @@ from app.modules.membership.domain.exceptions import MembershipNotFoundError, Me
 from app.modules.membership.domain.cedula import (
     ACTIVE_PROFILE_CEDULA_SQL,
     CEDULA_INVALID_MESSAGE,
+    PROFILE_IS_ACTIVE_SQL,
+    PROFILE_IS_DELETED_SQL,
     RELEASE_DELETED_PROFILE_CEDULA_SQL,
+    RELEASE_DELETED_PROFILE_EMAIL_SQL,
     is_valid_ecuadorian_cedula,
     normalize_cedula,
 )
@@ -61,11 +65,34 @@ def test_cedula_conflict_uses_normalized_active_profiles() -> None:
     assert "deleted_at is null" in sql
     assert "regexp_replace" in sql
     assert "identifier" in sql
+    assert "btrim" in PROFILE_IS_ACTIVE_SQL.lower()
+    assert "is not null" in PROFILE_IS_DELETED_SQL.lower()
     assert normalize_cedula(" 171-003-4065 ") == "1710034065"
     assert normalize_cedula("1710034065") == "1710034065"
     release = " ".join(RELEASE_DELETED_PROFILE_CEDULA_SQL.split()).lower()
-    assert "deleted_at is not null" in release
-    assert "-del-" in release
+    compact = release.replace(" ", "")
+    assert "d'||id" in compact
+    assert "left(" in release
+    assert "-del-" not in release
+    assert "255" not in release
+    email_release = " ".join(RELEASE_DELETED_PROFILE_EMAIL_SQL.split()).lower()
+    assert "deleted_at is not null" in email_release
+    assert "@invalid.local" in email_release
+
+
+def test_integrity_conflict_maps_overflow_to_cedula() -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    from app.modules.membership.infrastructure.repository import _conflict_from_integrity
+
+    class Orig(Exception):
+        def __str__(self) -> str:
+            return "value too long for type character varying(10)"
+
+    error = _conflict_from_integrity(IntegrityError("INSERT", {}, Orig()))
+    assert error.code == "identifier_taken"
+    assert "cédula" in error.message
+    assert "esos datos" not in error.message
 
 
 def test_register_rejects_invalid_cedula() -> None:
@@ -458,3 +485,57 @@ def test_has_uploaded_file_and_onboarding_stage() -> None:
     assert has_uploaded_file("  ") is False
     assert resolve_onboarding_stage(None) == "legacy_no_payment"
     assert resolve_onboarding_stage(_payment()) == "awaiting_voucher"
+
+
+def test_upload_onboarding_accepts_one_pdf_at_a_time() -> None:
+    payment = _payment(status=PAYMENT_REVIEW)
+    saved: list[tuple[str | None, str | None, str | None, bool | None]] = []
+
+    class _Repo:
+        def get_payment(self, user_id: int) -> MembershipPayment:
+            return payment
+
+        def save_onboarding_documents(
+            self,
+            user_id: int,
+            signed_authorization_path: str | None,
+            identity_document_path: str | None,
+            signed_solicitud_path: str | None = None,
+            accepted_affiliation_year: bool | None = None,
+        ) -> MembershipPayment:
+            saved.append(
+                (signed_authorization_path, identity_document_path, signed_solicitud_path, accepted_affiliation_year),
+            )
+            return payment
+
+        def get_status(self, user_id: int) -> MembershipStatus:
+            return MembershipStatus(
+                user_id=user_id,
+                state_id=PENDING_ENABLE_STATE_ID,
+                personal_email="a@b.com",
+                login_email="a@b.com",
+                payment_status=PAYMENT_REVIEW,
+                gate="documents",
+                must_complete_payment=False,
+                must_wait_approval=True,
+                has_invoice=False,
+                names="Ana",
+                lastname="Pérez",
+                identifier="1710034065",
+            )
+
+    class _Storage:
+        def save_pdf(self, user_id: int, folder: str, filename: str, content: bytes, content_type: str) -> str:
+            return f"/media/membership/{user_id}/{folder}/{filename}"
+
+    UploadOnboardingDocumentsUseCase(_Repo(), _Storage()).execute(
+        778,
+        ("autorizacion.pdf", b"%PDF-1.4 test", "application/pdf"),
+        None,
+        None,
+        False,
+    )
+    assert saved[0][0] == "/media/membership/778/authorization/autorizacion.pdf"
+    assert saved[0][1] is None
+    assert saved[0][2] is None
+

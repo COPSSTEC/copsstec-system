@@ -11,7 +11,7 @@ export function mapAffiliationError(message: string, code?: string | null): Affi
   if (code === "email_taken" || (/correo/i.test(message) && /existe/i.test(message))) {
     return { message, step: 2, field: "email" };
   }
-  if (/cédula/i.test(message)) {
+  if (/cédula/i.test(message) || /esos datos/i.test(message)) {
     return { message, step: 1, field: "identifier" };
   }
   if (/foto/i.test(message)) {
@@ -26,7 +26,7 @@ export function mapAffiliationError(message: string, code?: string | null): Affi
   if (/senescyt|título|titulo/i.test(message)) {
     return { message, step: 3 };
   }
-  if (/cumpleaños|cumpleanos|política|politica|datos/i.test(message)) {
+  if (/cumpleaños|cumpleanos|pol[ií]tica de tratamiento|tratamiento de datos/i.test(message)) {
     return { message, step: 4 };
   }
   return { message, step: 1 };

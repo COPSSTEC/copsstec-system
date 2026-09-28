@@ -8,8 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.modules.membership.domain.cedula import (
     ACTIVE_PROFILE_CEDULA_SQL,
+    RELEASE_DELETED_LOGIN_EMAIL_SQL,
     RELEASE_DELETED_PROFILE_CEDULA_SQL,
+    RELEASE_DELETED_PROFILE_EMAIL_SQL,
     normalize_cedula,
+    profile_is_active_sql,
+    profile_is_deleted_sql,
 )
 from app.modules.membership.domain.entities import (
     ENABLED_STATE_ID,
@@ -54,10 +58,23 @@ class SqlAlchemyMembershipRepository:
                     EXISTS(
                         SELECT 1 FROM profiles
                         WHERE lower(email) = lower(:email)
-                          AND deleted_at IS NULL
+                          AND {profile_is_active_sql()}
                     ) AS profile_email_taken,
                     EXISTS(
-                        SELECT 1 FROM users WHERE lower(email) = lower(:email)
+                        SELECT 1 FROM users u
+                        WHERE lower(u.email) = lower(:email)
+                          AND NOT (
+                              EXISTS (
+                                  SELECT 1 FROM profiles p
+                                  WHERE p.user_id = u.id
+                                    AND {profile_is_deleted_sql("p")}
+                              )
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM profiles p2
+                                  WHERE p2.user_id = u.id
+                                    AND {profile_is_active_sql("p2")}
+                              )
+                          )
                     ) AS login_email_taken
                 """,
             ),
@@ -106,6 +123,19 @@ class SqlAlchemyMembershipRepository:
         fourth_title = (data.fourth_title or "").strip() or None
         senescyt_cuarto = (data.codigo_senescyt_cuarto or "").strip() or None
 
+        self.session.execute(
+            text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
+            {"identifier": normalize_cedula(data.identifier), "now": now},
+        )
+        self.session.execute(
+            text(RELEASE_DELETED_PROFILE_EMAIL_SQL),
+            {"email": data.email.strip().lower(), "now": now},
+        )
+        self.session.execute(
+            text(RELEASE_DELETED_LOGIN_EMAIL_SQL),
+            {"email": data.email.strip().lower(), "now": now},
+        )
+
         try:
             user_id = self.session.execute(
                 text(
@@ -137,11 +167,6 @@ class SqlAlchemyMembershipRepository:
                     """,
                 ),
                 {"role_id": role_id, "model_id": user_id, "model_type": USER_MODEL_TYPE},
-            )
-
-            self.session.execute(
-                text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
-                {"identifier": normalize_cedula(data.identifier), "now": now},
             )
 
             profile_id = self.session.execute(
@@ -659,9 +684,11 @@ class SqlAlchemyMembershipRepository:
 
 def _conflict_from_integrity(exc: IntegrityError) -> MembershipConflictError:
     detail = str(getattr(exc, "orig", exc)).lower()
-    if "identifier" in detail:
+    if "identifier" in detail or "identif" in detail:
         return MembershipConflictError("Ya existe un miembro con esa cédula.", code="identifier_taken")
     if "email" in detail:
         return MembershipConflictError("Ya existe un miembro con ese correo.", code="email_taken")
-    return MembershipConflictError("Ya existe un miembro con esos datos.")
+    if "duplicate" in detail or "unique" in detail or "unicidad" in detail:
+        return MembershipConflictError("Ya existe un miembro con esa cédula.", code="identifier_taken")
+    return MembershipConflictError("Ya existe un miembro con esa cédula.", code="identifier_taken")
 

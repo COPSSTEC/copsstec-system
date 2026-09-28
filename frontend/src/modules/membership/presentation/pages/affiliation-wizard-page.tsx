@@ -204,6 +204,7 @@ export function AffiliationWizardPage() {
       const code = err instanceof MembershipApiError ? err.code : undefined;
       const issue = mapAffiliationError(message, code);
       setErrors([issue]);
+      goToError(issue);
     } finally {
       setIsSubmitting(false);
     }

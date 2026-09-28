@@ -21,8 +21,12 @@ from app.modules.members.domain.entities import (
 from app.modules.members.domain.exceptions import MemberConflictError, MemberNotFoundError
 from app.modules.membership.domain.cedula import (
     ACTIVE_PROFILE_CEDULA_SQL,
+    RELEASE_DELETED_LOGIN_EMAIL_SQL,
     RELEASE_DELETED_PROFILE_CEDULA_SQL,
+    RELEASE_DELETED_PROFILE_EMAIL_SQL,
     normalize_cedula,
+    profile_is_active_sql,
+    profile_is_deleted_sql,
 )
 from app.shared.infrastructure.sequences import sync_serial_sequence
 
@@ -235,48 +239,59 @@ class SqlAlchemyMemberRepository:
         sync_serial_sequence(self.session, "profiles")
         full_name = f"{data.names} {data.lastname}".strip()
 
-        user_id = self.session.execute(
-            text(
-                """
-                INSERT INTO users (name, email, password, state_id, must_change_password, created_at, updated_at)
-                VALUES (:name, :email, :password, :state_id, true, :now, :now)
-                RETURNING id
-                """,
-            ),
-            {
-                "name": full_name,
-                "email": data.login_email,
-                "password": password_hash,
-                "state_id": data.state_id,
-                "now": now,
-            },
-        ).scalar_one()
-
-        role_id = self.session.execute(
-            text("SELECT id FROM roles WHERE name = :name LIMIT 1"),
-            {"name": MEMBER_ROLE_NAME},
-        ).scalar_one()
-
-        self.session.execute(
-            text(
-                """
-                INSERT INTO model_has_roles (role_id, model_id, model_type)
-                VALUES (:role_id, :model_id, :model_type)
-                """,
-            ),
-            {
-                "role_id": role_id,
-                "model_id": user_id,
-                "model_type": USER_MODEL_TYPE,
-            },
-        )
-
         self.session.execute(
             text(RELEASE_DELETED_PROFILE_CEDULA_SQL),
             {"identifier": normalize_cedula(data.identifier), "now": now},
         )
+        for raw_email in {data.email.strip().lower(), data.login_email.strip().lower()}:
+            if not raw_email:
+                continue
+            self.session.execute(
+                text(RELEASE_DELETED_PROFILE_EMAIL_SQL),
+                {"email": raw_email, "now": now},
+            )
+            self.session.execute(
+                text(RELEASE_DELETED_LOGIN_EMAIL_SQL),
+                {"email": raw_email, "now": now},
+            )
 
         try:
+            user_id = self.session.execute(
+                text(
+                    """
+                    INSERT INTO users (name, email, password, state_id, must_change_password, created_at, updated_at)
+                    VALUES (:name, :email, :password, :state_id, true, :now, :now)
+                    RETURNING id
+                    """,
+                ),
+                {
+                    "name": full_name,
+                    "email": data.login_email,
+                    "password": password_hash,
+                    "state_id": data.state_id,
+                    "now": now,
+                },
+            ).scalar_one()
+
+            role_id = self.session.execute(
+                text("SELECT id FROM roles WHERE name = :name LIMIT 1"),
+                {"name": MEMBER_ROLE_NAME},
+            ).scalar_one()
+
+            self.session.execute(
+                text(
+                    """
+                    INSERT INTO model_has_roles (role_id, model_id, model_type)
+                    VALUES (:role_id, :model_id, :model_type)
+                    """,
+                ),
+                {
+                    "role_id": role_id,
+                    "model_id": user_id,
+                    "model_type": USER_MODEL_TYPE,
+                },
+            )
+
             self.session.execute(
                 text(
                     """
@@ -304,11 +319,11 @@ class SqlAlchemyMemberRepository:
         except IntegrityError as exc:
             self.session.rollback()
             detail = str(getattr(exc, "orig", exc)).lower()
-            if "identifier" in detail:
+            if "identifier" in detail or "identif" in detail:
                 raise MemberConflictError("Ya existe un miembro con esa cédula.") from exc
             if "email" in detail:
                 raise MemberConflictError("Ya existe un miembro con ese correo de contacto.") from exc
-            raise MemberConflictError("Ya existe un miembro con esos datos.") from exc
+            raise MemberConflictError("Ya existe un miembro con esa cédula.") from exc
 
         member = self.get_member(user_id)
         if member is None:
@@ -422,7 +437,9 @@ class SqlAlchemyMemberRepository:
             text(
                 """
                 UPDATE users
-                SET state_id = :state_id, updated_at = :now
+                SET state_id = :state_id,
+                    email = left('deleted-' || id::text || '@invalid.local', 255),
+                    updated_at = :now
                 WHERE id = :user_id
                 """,
             ),
@@ -433,6 +450,8 @@ class SqlAlchemyMemberRepository:
                 """
                 UPDATE profiles
                 SET state_id = :state_id,
+                    identifier = left('d' || id::text, 10),
+                    email = left('deleted-' || id::text || '@invalid.local', 255),
                     deleted_at = :deleted_at,
                     deleted_by = :deleted_by,
                     updated_at = :now
@@ -546,13 +565,25 @@ class SqlAlchemyMemberRepository:
                     EXISTS(
                         SELECT 1 FROM profiles
                         WHERE lower(email) = lower(:email)
-                          AND deleted_at IS NULL
+                          AND {profile_is_active_sql()}
                           AND (:exclude_user_id IS NULL OR user_id <> :exclude_user_id)
                     ) AS profile_email_taken,
                     EXISTS(
-                        SELECT 1 FROM users
-                        WHERE lower(email) = lower(:login_email)
-                          AND (:exclude_user_id IS NULL OR id <> :exclude_user_id)
+                        SELECT 1 FROM users u
+                        WHERE lower(u.email) = lower(:login_email)
+                          AND (:exclude_user_id IS NULL OR u.id <> :exclude_user_id)
+                          AND NOT (
+                              EXISTS (
+                                  SELECT 1 FROM profiles p
+                                  WHERE p.user_id = u.id
+                                    AND {profile_is_deleted_sql("p")}
+                              )
+                              AND NOT EXISTS (
+                                  SELECT 1 FROM profiles p2
+                                  WHERE p2.user_id = u.id
+                                    AND {profile_is_active_sql("p2")}
+                              )
+                          )
                     ) AS login_email_taken
                 """,
             ),

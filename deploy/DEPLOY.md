@@ -205,6 +205,11 @@ sudo -u copsstec git pull
 sudo -u copsstec /var/www/copsstec-system/.venv/bin/pip install -r backend/requirements.txt
 cd frontend && sudo -u copsstec npm ci && sudo -u copsstec npm run build
 systemctl restart copsstec-backend copsstec-frontend
+
+# Si cambió deploy/nginx/copsstec.conf, copia y recarga.
+# Tras Let's Encrypt hay un server { listen 443 } — pon client_max_body_size 32M en los dos bloques.
+# nano /etc/nginx/sites-available/copsstec
+nginx -t && systemctl reload nginx
 ```
 
 `backend/storage/` no va en git: no lo borres en un redeploy.
@@ -224,6 +229,6 @@ tail -f /var/log/nginx/error.log
 | CORS en consola | `FRONTEND_ORIGIN` no coincide con la URL exacta (`www` vs apex, `http` vs `https`) |
 | `/api` 502 | backend caído: `systemctl status copsstec-backend` |
 | Login OK pero media rota | `NEXT_PUBLIC_API_URL` mal en el build; rebuild frontend |
-| 413 al subir archivo | `client_max_body_size` no está en 10M |
+| 413 al subir archivo | Falta `client_max_body_size 32M;` en el server 80 **y** en el 443 |
 | Emails no salen | SMTP vacío: el backend solo loguea en stdout |
 | Puerto 8000 ocupado | este deploy no lo usa; busca otro servicio: `ss -tlnp \| grep 8000` |
