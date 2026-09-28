@@ -38,8 +38,10 @@ from app.modules.membership.domain.entities import (
     MembershipRegistrationData,
     MembershipStatus,
     RegisteredMember,
+    has_uploaded_file,
     membership_gate_from_payment,
     onboarding_documents_complete,
+    resolve_onboarding_stage,
 )
 from app.modules.membership.domain.exceptions import (
     MailboxError,
@@ -317,33 +319,16 @@ class GetApprovalPreviewUseCase:
             raise MembershipValidationError("Este miembro no está pendiente de habilitar.")
 
         payment = self.repository.get_payment(user_id)
-        if payment is None:
-            try:
-                suggested = suggest_corporate_email(status.names, status.lastname)
-            except ValueError as exc:
-                raise MembershipValidationError(str(exc)) from exc
-            transfer = live_membership_transfer()
-            return {
-                "user_id": status.user_id,
-                "names": status.names,
-                "lastname": status.lastname,
-                "identifier": status.identifier,
-                "personal_email": status.personal_email,
-                "suggested_corporate_email": suggested,
-                "payment_status": None,
-                "voucher_url": None,
-                "signed_authorization_url": None,
-                "identity_document_url": None,
-                "signed_solicitud_url": None,
-                "amount": transfer.fee,
-            }
-        if payment.status != PAYMENT_REVIEW:
-            raise MembershipValidationError("El miembro aún no ha subido el comprobante de pago.")
-
         try:
             suggested = suggest_corporate_email(status.names, status.lastname)
         except ValueError as exc:
             raise MembershipValidationError(str(exc)) from exc
+
+        has_voucher = has_uploaded_file(payment.voucher_path) if payment is not None else False
+        has_authorization = has_uploaded_file(payment.signed_authorization_path) if payment is not None else False
+        has_identity = has_uploaded_file(payment.identity_document_path) if payment is not None else False
+        has_solicitud = has_uploaded_file(payment.signed_solicitud_path) if payment is not None else False
+        transfer = live_membership_transfer()
         return {
             "user_id": status.user_id,
             "names": status.names,
@@ -351,12 +336,17 @@ class GetApprovalPreviewUseCase:
             "identifier": status.identifier,
             "personal_email": status.personal_email,
             "suggested_corporate_email": suggested,
-            "payment_status": payment.status,
-            "voucher_url": payment.voucher_path,
-            "signed_authorization_url": payment.signed_authorization_path,
-            "identity_document_url": payment.identity_document_path,
-            "signed_solicitud_url": payment.signed_solicitud_path,
-            "amount": str(payment.amount),
+            "payment_status": payment.status if payment is not None else None,
+            "onboarding_stage": resolve_onboarding_stage(payment),
+            "has_voucher": has_voucher,
+            "has_signed_authorization": has_authorization,
+            "has_identity_document": has_identity,
+            "has_signed_solicitud": has_solicitud,
+            "voucher_url": payment.voucher_path if payment is not None else None,
+            "signed_authorization_url": payment.signed_authorization_path if payment is not None else None,
+            "identity_document_url": payment.identity_document_path if payment is not None else None,
+            "signed_solicitud_url": payment.signed_solicitud_path if payment is not None else None,
+            "amount": str(payment.amount) if payment is not None else transfer.fee,
         }
 
 
@@ -667,7 +657,9 @@ class DownloadOnboardingDocumentUseCase:
             raise MembershipValidationError("Documento no válido.")
         payment = self.repository.get_payment(user_id)
         if payment is None:
-            raise MembershipNotFoundError()
+            if kind == "solicitud":
+                raise MembershipNotFoundError("El miembro no ha subido la solicitud firmada.")
+            raise MembershipNotFoundError("Documento no encontrado.")
         stored = {
             "authorization": payment.signed_authorization_path,
             "identity": payment.identity_document_path,
@@ -675,7 +667,9 @@ class DownloadOnboardingDocumentUseCase:
             "solicitud": payment.signed_solicitud_path,
         }[kind]
         if not (stored or "").strip():
-            raise MembershipNotFoundError()
+            if kind == "solicitud":
+                raise MembershipNotFoundError("El miembro no ha subido la solicitud firmada.")
+            raise MembershipNotFoundError("Documento no encontrado.")
 
         relative = stored.replace("/media/membership/", "").lstrip("/")
         candidates = [

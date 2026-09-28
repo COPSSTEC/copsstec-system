@@ -70,6 +70,9 @@ class MemberResponse(BaseModel):
     cod: str | None
     gender: str | None
     created_at: datetime | None
+    has_signed_authorization: bool = False
+    has_signed_solicitud: bool = False
+    has_identity_document: bool = False
 
     @classmethod
     def from_domain(cls, member: Member) -> "MemberResponse":

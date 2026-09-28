@@ -10,7 +10,24 @@ from app.modules.members.infrastructure.pdfs import (
     MemberDocumentGenerator,
     build_solicitud_body,
 )
-from app.modules.membership.application.use_cases import GetApprovalPreviewUseCase, GetPaymentInfoUseCase, _validate_registration
+from app.modules.membership.application.use_cases import (
+    DownloadOnboardingDocumentUseCase,
+    GetApprovalPreviewUseCase,
+    GetPaymentInfoUseCase,
+    _validate_registration,
+)
+from app.modules.membership.domain.entities import (
+    MembershipPayment,
+    MembershipRegistrationData,
+    MembershipStatus,
+    PAYMENT_PENDING,
+    PAYMENT_REVIEW,
+    PENDING_ENABLE_STATE_ID,
+    has_uploaded_file,
+    onboarding_documents_complete,
+    resolve_onboarding_stage,
+)
+from app.modules.membership.domain.exceptions import MembershipNotFoundError, MembershipValidationError
 from app.modules.membership.domain.cedula import (
     ACTIVE_PROFILE_CEDULA_SQL,
     CEDULA_INVALID_MESSAGE,
@@ -18,15 +35,6 @@ from app.modules.membership.domain.cedula import (
     is_valid_ecuadorian_cedula,
     normalize_cedula,
 )
-from app.modules.membership.domain.entities import (
-    MembershipPayment,
-    MembershipRegistrationData,
-    MembershipStatus,
-    PAYMENT_PENDING,
-    PENDING_ENABLE_STATE_ID,
-    onboarding_documents_complete,
-)
-from app.modules.membership.domain.exceptions import MembershipValidationError
 from app.modules.membership.infrastructure.affiliation_commitment_pdf import (
     AffiliationCommitmentPdfGenerator,
     add_months,
@@ -338,5 +346,115 @@ def test_approval_preview_allows_pending_member_without_payment() -> None:
     preview = GetApprovalPreviewUseCase(_Repo()).execute(778)
     assert preview["user_id"] == 778
     assert preview["payment_status"] is None
+    assert preview["onboarding_stage"] == "legacy_no_payment"
+    assert preview["has_voucher"] is False
     assert preview["identifier"] == "1718678194"
     assert "@copsstec.com" in str(preview["suggested_corporate_email"])
+
+
+def _payment(**overrides: object) -> MembershipPayment:
+    data: dict[str, object] = {
+        "id": 1,
+        "user_id": 778,
+        "profile_id": 463,
+        "amount": Decimal("10.00"),
+        "currency": "USD",
+        "bank_name": "Pichincha",
+        "account_type": "Ahorros",
+        "account_number": "1",
+        "account_holder": "COPSSTEC",
+        "account_ruc": None,
+        "reference": "ref",
+        "voucher_path": None,
+        "status": PAYMENT_PENDING,
+        "reviewed_by": None,
+        "reviewed_at": None,
+    }
+    data.update(overrides)
+    return MembershipPayment(**data)  # type: ignore[arg-type]
+
+
+def test_approval_preview_awaiting_voucher_does_not_fail() -> None:
+    payment = _payment()
+
+    class _Repo:
+        def get_status(self, user_id: int) -> MembershipStatus:
+            return MembershipStatus(
+                user_id=user_id,
+                state_id=PENDING_ENABLE_STATE_ID,
+                personal_email="hqcs060599@gmail.com",
+                login_email="hqcs060599@gmail.com",
+                payment_status=PAYMENT_PENDING,
+                gate="payment",
+                must_complete_payment=True,
+                must_wait_approval=True,
+                has_invoice=False,
+                names="Hitler Sadan",
+                lastname="Quinzo Castellano",
+                identifier="1718678194",
+            )
+
+        def get_payment(self, user_id: int) -> MembershipPayment:
+            return payment
+
+    preview = GetApprovalPreviewUseCase(_Repo()).execute(778)
+    assert preview["onboarding_stage"] == "awaiting_voucher"
+    assert preview["has_voucher"] is False
+    assert preview["has_signed_authorization"] is False
+
+
+def test_approval_preview_paints_uploaded_documents() -> None:
+    payment = _payment(
+        status=PAYMENT_REVIEW,
+        voucher_path="/media/membership/voucher.pdf",
+        signed_authorization_path="/media/membership/auth.pdf",
+        identity_document_path="/media/membership/cedula.pdf",
+        signed_solicitud_path=None,
+        accepted_affiliation_year=True,
+    )
+
+    class _Repo:
+        def get_status(self, user_id: int) -> MembershipStatus:
+            return MembershipStatus(
+                user_id=user_id,
+                state_id=PENDING_ENABLE_STATE_ID,
+                personal_email="hqcs060599@gmail.com",
+                login_email="hqcs060599@gmail.com",
+                payment_status=PAYMENT_REVIEW,
+                gate="documents",
+                must_complete_payment=False,
+                must_wait_approval=True,
+                has_invoice=False,
+                names="Hitler Sadan",
+                lastname="Quinzo Castellano",
+                identifier="1718678194",
+            )
+
+        def get_payment(self, user_id: int) -> MembershipPayment:
+            return payment
+
+    preview = GetApprovalPreviewUseCase(_Repo()).execute(778)
+    assert preview["onboarding_stage"] == "awaiting_documents"
+    assert preview["has_voucher"] is True
+    assert preview["has_signed_authorization"] is True
+    assert preview["has_identity_document"] is True
+    assert preview["has_signed_solicitud"] is False
+
+
+def test_download_solicitud_without_upload_returns_not_found() -> None:
+    class _Repo:
+        def get_payment(self, user_id: int) -> None:
+            return None
+
+    try:
+        DownloadOnboardingDocumentUseCase(_Repo()).execute(778, "solicitud")
+        raise AssertionError("expected MembershipNotFoundError")
+    except MembershipNotFoundError as exc:
+        assert "solicitud firmada" in str(exc.message)
+
+
+def test_has_uploaded_file_and_onboarding_stage() -> None:
+    assert has_uploaded_file(" /x.pdf ") is True
+    assert has_uploaded_file("  ") is False
+    assert resolve_onboarding_stage(None) == "legacy_no_payment"
+    assert resolve_onboarding_stage(_payment()) == "awaiting_voucher"

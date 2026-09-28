@@ -75,6 +75,23 @@ from app.modules.payments.presentation.api.dependencies import (
 router = APIRouter(prefix="/api/members", tags=["members"])
 
 
+def _inline_file(path: str, filename: str, media_type: str) -> FileResponse:
+    return FileResponse(
+        path=path,
+        media_type=media_type,
+        filename=filename,
+        content_disposition_type="inline",
+    )
+
+
+def _inline_bytes(content: bytes, filename: str, media_type: str = "application/pdf") -> Response:
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
 def _http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, MemberNotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Miembro no encontrado.")
@@ -85,7 +102,10 @@ def _http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, InvalidMemberPhotoError):
         return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=exc.message)
     if isinstance(exc, AffiliationNotFoundError):
-        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Miembro no encontrado.")
+        return HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=getattr(exc, "message", None) or "Miembro no encontrado.",
+        )
     if isinstance(exc, AffiliationConflictError):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.message)
     if isinstance(exc, AffiliationValidationError):
@@ -124,6 +144,9 @@ def list_members(
     fixed_phone: str | None = None,
     cod_senescyt: str | None = None,
     login_email: str | None = None,
+    has_signed_authorization: bool | None = None,
+    has_signed_solicitud: bool | None = None,
+    has_identity_document: bool | None = None,
     sort_by: str = "names",
     sort_dir: str = "asc",
 ) -> MemberListResponse:
@@ -150,6 +173,9 @@ def list_members(
             fixed_phone=fixed_phone,
             cod_senescyt=cod_senescyt,
             login_email=login_email,
+            has_signed_authorization=has_signed_authorization,
+            has_signed_solicitud=has_signed_solicitud,
+            has_identity_document=has_identity_document,
             sort_by=sort_by,
             sort_dir=sort_dir,
         ),
@@ -290,18 +316,18 @@ async def upload_member_photo(
 def download_member_file(
     member_id: int,
     _: Annotated[User, Depends(require_access("admin"))],
-    use_case: Annotated[DownloadMemberPdfUseCase, Depends(get_download_pdf_use_case)],
-) -> Response:
+    use_case: Annotated[
+        DownloadOnboardingDocumentUseCase,
+        Depends(get_download_onboarding_document_use_case),
+    ],
+) -> FileResponse:
     try:
-        filename, content = use_case.execute(member_id, "solicitud")
-    except MemberNotFoundError as exc:
+        filename, file_path = use_case.execute(member_id, "solicitud")
+    except (AffiliationNotFoundError, AffiliationValidationError) as exc:
         raise _http_error(exc) from exc
 
-    return Response(
-        content=content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
+    return _inline_file(str(file_path), filename, media_type)
 
 
 @router.get("/{member_id}/certificate")
@@ -315,11 +341,7 @@ def download_member_certificate(
     except MemberNotFoundError as exc:
         raise _http_error(exc) from exc
 
-    return Response(
-        content=content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return _inline_bytes(content, filename)
 
 
 @router.get("/{member_id}/debit-agreement/{kind}")
@@ -355,7 +377,14 @@ def download_onboarding_document(
         raise _http_error(exc) from exc
 
     media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
-    return FileResponse(path=str(file_path), media_type=media_type, filename=filename)
+    suffix = str(file_path).lower()
+    if suffix.endswith(".png"):
+        media_type = "image/png"
+    elif suffix.endswith(".jpg") or suffix.endswith(".jpeg"):
+        media_type = "image/jpeg"
+    elif suffix.endswith(".webp"):
+        media_type = "image/webp"
+    return _inline_file(str(file_path), filename, media_type)
 
 
 @router.get("/{member_id}/approval-preview", response_model=ApprovalPreviewResponse)

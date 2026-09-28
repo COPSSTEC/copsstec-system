@@ -13,6 +13,11 @@ PAYMENT_PENDING = "pending_payment"
 PAYMENT_REVIEW = "pending_review"
 PAYMENT_APPROVED = "approved"
 
+ONBOARDING_LEGACY = "legacy_no_payment"
+ONBOARDING_AWAITING_VOUCHER = "awaiting_voucher"
+ONBOARDING_AWAITING_DOCUMENTS = "awaiting_documents"
+ONBOARDING_READY = "ready_to_approve"
+
 GATE_PAYMENT = "payment"
 GATE_DOCUMENTS = "documents"
 GATE_PENDING_APPROVAL = "pending_approval"
@@ -41,6 +46,29 @@ DEBIT_PLAN_OPTIONS = (
     ("semiannual", "Semestral", "$60,00"),
     ("annual", "Anual", "$120,00"),
 )
+
+
+def has_uploaded_file(path: str | None) -> bool:
+    return bool((path or "").strip())
+
+
+def resolve_onboarding_stage(payment: "MembershipPayment | None") -> str:
+    if payment is None:
+        return ONBOARDING_LEGACY
+    has_voucher = has_uploaded_file(payment.voucher_path) or payment.status in {
+        PAYMENT_REVIEW,
+        PAYMENT_APPROVED,
+    }
+    if not has_voucher:
+        return ONBOARDING_AWAITING_VOUCHER
+    if onboarding_documents_complete(
+        payment.signed_authorization_path,
+        payment.identity_document_path,
+        payment.signed_solicitud_path,
+        payment.accepted_affiliation_year,
+    ):
+        return ONBOARDING_READY
+    return ONBOARDING_AWAITING_DOCUMENTS
 
 
 def onboarding_documents_complete(

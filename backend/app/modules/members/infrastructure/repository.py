@@ -88,13 +88,17 @@ MEMBER_SELECT = """
         p.type_commision,
         p.codigo_senescyt_cuarto,
         p.cod,
-        p.gender
+        p.gender,
+        (COALESCE(mp.signed_authorization_path, '') <> '') AS has_signed_authorization,
+        (COALESCE(mp.signed_solicitud_path, '') <> '') AS has_signed_solicitud,
+        (COALESCE(mp.identity_document_path, '') <> '') AS has_identity_document
     FROM users u
     INNER JOIN model_has_roles mhr
         ON mhr.model_id = u.id
        AND mhr.model_type = :model_type
     INNER JOIN roles r ON r.id = mhr.role_id
     LEFT JOIN profiles p ON p.user_id = u.id
+    LEFT JOIN membership_payments mp ON mp.user_id = u.id
     WHERE r.name = :member_role
       AND p.deleted_at IS NULL
 """
@@ -134,9 +138,13 @@ PROFILE_SELECT = """
         p.type_commision,
         p.codigo_senescyt_cuarto,
         p.cod,
-        p.gender
+        p.gender,
+        (COALESCE(mp.signed_authorization_path, '') <> '') AS has_signed_authorization,
+        (COALESCE(mp.signed_solicitud_path, '') <> '') AS has_signed_solicitud,
+        (COALESCE(mp.identity_document_path, '') <> '') AS has_identity_document
     FROM profiles p
     INNER JOIN users u ON u.id = p.user_id
+    LEFT JOIN membership_payments mp ON mp.user_id = u.id
     WHERE p.deleted_at IS NULL
 """
 
@@ -163,6 +171,7 @@ class SqlAlchemyMemberRepository:
                    AND mhr.model_type = :model_type
                 INNER JOIN roles r ON r.id = mhr.role_id
                 LEFT JOIN profiles p ON p.user_id = u.id
+                LEFT JOIN membership_payments mp ON mp.user_id = u.id
                 WHERE r.name = :member_role
                   AND p.deleted_at IS NULL
                   {filters}
@@ -615,6 +624,17 @@ class SqlAlchemyMemberRepository:
             clauses.append("lower(u.email) LIKE lower(:login_email)")
             params["login_email"] = f"%{query.login_email.strip()}%"
 
+        document_filters = {
+            "has_signed_authorization": (query.has_signed_authorization, "mp.signed_authorization_path"),
+            "has_signed_solicitud": (query.has_signed_solicitud, "mp.signed_solicitud_path"),
+            "has_identity_document": (query.has_identity_document, "mp.identity_document_path"),
+        }
+        for flag, column in document_filters.values():
+            if flag is True:
+                clauses.append(f"COALESCE({column}, '') <> ''")
+            elif flag is False:
+                clauses.append(f"COALESCE({column}, '') = ''")
+
         text_filters = {
             "blood_type": ("p.blood_type", query.blood_type),
             "title_academic": ("p.title_academic", query.title_academic),
@@ -744,6 +764,9 @@ class SqlAlchemyMemberRepository:
             cod=row["cod"],
             gender=row["gender"],
             created_at=row["created_at"],
+            has_signed_authorization=bool(row.get("has_signed_authorization")),
+            has_signed_solicitud=bool(row.get("has_signed_solicitud")),
+            has_identity_document=bool(row.get("has_identity_document")),
         )
 
 

@@ -239,20 +239,31 @@ export async function uploadMemberPhoto(
   return parseResponse<Member>(response);
 }
 
-export async function downloadMemberFile(token: string, memberId: number): Promise<void> {
-  await downloadPdf(
-    token,
-    `/api/members/${memberId}/download`,
-    `solicitud-afiliacion-${memberId}.pdf`,
-  );
-}
+export type MemberPreviewKind = "authorization" | "identity" | "voucher" | "solicitud" | "certificate";
 
-export async function downloadMemberCertificate(token: string, memberId: number): Promise<void> {
-  await downloadPdf(
-    token,
-    `/api/members/${memberId}/certificate`,
-    `certificado-afiliacion-${memberId}.pdf`,
-  );
+export async function fetchMemberDocumentBlob(
+  token: string,
+  memberId: number,
+  kind: MemberPreviewKind,
+): Promise<{ blob: Blob; contentType: string }> {
+  const path =
+    kind === "certificate"
+      ? `/api/members/${memberId}/certificate`
+      : kind === "solicitud"
+        ? `/api/members/${memberId}/download`
+        : `/api/members/${memberId}/onboarding-documents/${kind}`;
+
+  const response = await authorizedFetch(`${API_URL}${path}`, {
+    headers: authHeaders(token),
+  });
+
+  if (!response.ok) {
+    await parseResponse<void>(response);
+  }
+
+  const blob = await response.blob();
+  const contentType = response.headers.get("content-type") || blob.type || "application/pdf";
+  return { blob, contentType };
 }
 
 export type DebitAgreementKind = "authorization" | "identity";

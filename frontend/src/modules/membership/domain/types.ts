@@ -53,6 +53,12 @@ export interface PaymentInfo {
   qr_payload: string;
 }
 
+export type OnboardingStage =
+  | "legacy_no_payment"
+  | "awaiting_voucher"
+  | "awaiting_documents"
+  | "ready_to_approve";
+
 export interface ApprovalPreview {
   user_id: number;
   names: string;
@@ -61,6 +67,11 @@ export interface ApprovalPreview {
   personal_email: string;
   suggested_corporate_email: string;
   payment_status: string | null;
+  onboarding_stage: OnboardingStage;
+  has_voucher: boolean;
+  has_signed_authorization: boolean;
+  has_identity_document: boolean;
+  has_signed_solicitud: boolean;
   voucher_url: string | null;
   signed_authorization_url: string | null;
   identity_document_url: string | null;

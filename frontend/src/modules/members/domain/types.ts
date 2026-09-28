@@ -46,6 +46,9 @@ export interface Member {
   cod: string | null;
   gender: string | null;
   created_at: string | null;
+  has_signed_authorization: boolean;
+  has_signed_solicitud: boolean;
+  has_identity_document: boolean;
 }
 
 export interface MemberListResponse {

@@ -117,7 +117,11 @@ export function MemberActionsMenu({
             <button onClick={() => run(onPayments)} type="button">
               Pagos
             </button>
-            <button onClick={() => run(onDownload)} type="button">
+            <button
+              disabled={!member.has_signed_solicitud}
+              onClick={() => run(onDownload)}
+              type="button"
+            >
               Descargar solicitud
             </button>
             <button onClick={() => run(onDownloadCertificate)} type="button">

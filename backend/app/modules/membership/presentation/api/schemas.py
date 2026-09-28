@@ -164,6 +164,11 @@ class ApprovalPreviewResponse(BaseModel):
     personal_email: str
     suggested_corporate_email: str
     payment_status: str | None = None
+    onboarding_stage: str
+    has_voucher: bool = False
+    has_signed_authorization: bool = False
+    has_identity_document: bool = False
+    has_signed_solicitud: bool = False
     voucher_url: str | None
     signed_authorization_url: str | None = None
     identity_document_url: str | None = None

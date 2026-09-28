@@ -15,19 +15,21 @@ import {
   createMember,
   deleteMember,
   disableMember,
-  downloadMemberCertificate,
-  downloadMemberFile,
   enableMember,
+  fetchMemberDocumentBlob,
   listMembers,
   resendMemberCredentials,
   updateMember,
   uploadMemberPhoto,
+  type MemberPreviewKind,
 } from "@/modules/members/infrastructure/members-api";
 import { MemberActionsMenu } from "@/modules/members/presentation/components/member-actions-menu";
+import { MemberDocumentStatusChip, type MemberDocumentKind } from "@/modules/members/presentation/components/member-document-chips";
 import { MemberStatusBadge } from "@/modules/members/presentation/components/member-status-badge";
 import { CEDULA_INVALID_MESSAGE, isValidEcuadorianCedula } from "@/modules/membership/presentation/lib/cedula";
 import { ApproveMemberModal } from "@/modules/members/presentation/modals/approve-member-modal";
 import { ConfirmActionModal } from "@/modules/members/presentation/modals/confirm-action-modal";
+import { MemberDocumentViewerModal } from "@/modules/members/presentation/modals/member-document-viewer-modal";
 import { MemberFormModal } from "@/modules/members/presentation/modals/member-form-modal";
 import { MemberPaymentsModal } from "@/modules/payments";
 import { DataTable, type DataTableColumn } from "@/shared/components/data-table";
@@ -35,6 +37,27 @@ import { RoleGate } from "@/shared/components/role-gate";
 import { UserAvatar } from "@/shared/components/user-avatar";
 
 const COLUMNS_STORAGE_KEY = "copsstec.members.visible_columns";
+const DOCUMENT_COLUMN_IDS = [
+  "has_signed_authorization",
+  "has_signed_solicitud",
+  "has_identity_document",
+];
+const DOCUMENT_FILTER_OPTIONS = [
+  { value: "true", label: "Subida" },
+  { value: "false", label: "Pendiente" },
+];
+
+function withDefaultDocumentColumns(ids: string[], catalog: MemberColumn[]): string[] {
+  const alreadyMigrated = DOCUMENT_COLUMN_IDS.some((id) => ids.includes(id));
+  if (alreadyMigrated) {
+    return ids.includes("actions") ? ids : [...ids, "actions"];
+  }
+  const extra = catalog
+    .filter((column) => column.default_visible && DOCUMENT_COLUMN_IDS.includes(column.id))
+    .map((column) => column.id);
+  const withoutActions = ids.filter((id) => id !== "actions");
+  return [...withoutActions, ...extra, "actions"];
+}
 
 function todayLabel(): string {
   const now = new Date();
@@ -99,6 +122,7 @@ export function MembersPage() {
   } | null>(null);
   const [approvingMember, setApprovingMember] = useState<Member | null>(null);
   const [paymentsMember, setPaymentsMember] = useState<Member | null>(null);
+  const [viewer, setViewer] = useState<{ title: string; blobUrl: string; contentType: string } | null>(null);
 
   const loadMembers = useCallback(async () => {
     if (!token) {
@@ -126,19 +150,22 @@ export function MembersPage() {
           return current;
         }
 
+        const defaults = result.columns.filter((column) => column.default_visible).map((column) => column.id).concat("actions");
         const stored = window.localStorage.getItem(COLUMNS_STORAGE_KEY);
         if (stored) {
           try {
             const parsed = JSON.parse(stored) as string[];
             if (Array.isArray(parsed) && parsed.length > 0) {
-              return parsed;
+              const merged = withDefaultDocumentColumns(parsed, result.columns);
+              window.localStorage.setItem(COLUMNS_STORAGE_KEY, JSON.stringify(merged));
+              return merged;
             }
           } catch {
             window.localStorage.removeItem(COLUMNS_STORAGE_KEY);
           }
         }
 
-        return result.columns.filter((column) => column.default_visible).map((column) => column.id).concat("actions");
+        return defaults;
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo cargar miembros.");
@@ -150,6 +177,14 @@ export function MembersPage() {
   useEffect(() => {
     void loadMembers();
   }, [loadMembers]);
+
+  useEffect(() => {
+    return () => {
+      if (viewer) {
+        window.URL.revokeObjectURL(viewer.blobUrl);
+      }
+    };
+  }, [viewer]);
 
   function handleVisibleColumnsChange(ids: string[]) {
     const next = ids.includes("actions") ? ids : [...ids, "actions"];
@@ -257,20 +292,35 @@ export function MembersPage() {
     }
   }
 
-  async function handleDownload(member: Member, kind: "solicitud" | "certificate") {
+  async function openMemberDocument(member: Member, kind: MemberPreviewKind, title: string) {
     if (!token) {
       return;
     }
 
     try {
-      if (kind === "solicitud") {
-        await downloadMemberFile(token, member.user_id);
-      } else {
-        await downloadMemberCertificate(token, member.user_id);
-      }
+      const { blob, contentType } = await fetchMemberDocumentBlob(token, member.user_id, kind);
+      setViewer((current) => {
+        if (current) {
+          window.URL.revokeObjectURL(current.blobUrl);
+        }
+        return {
+          title,
+          blobUrl: window.URL.createObjectURL(blob),
+          contentType,
+        };
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo descargar el PDF.");
+      setError(err instanceof Error ? err.message : "No se pudo abrir el documento.");
     }
+  }
+
+  function handlePreviewChip(member: Member, kind: MemberDocumentKind) {
+    const titles: Record<MemberDocumentKind, string> = {
+      authorization: "Autorización firmada",
+      solicitud: "Solicitud firmada",
+      identity: "Cédula",
+    };
+    void openMemberDocument(member, kind, titles[kind]);
   }
 
   const tableColumns = useMemo<DataTableColumn<Member>[]>(() => {
@@ -310,6 +360,35 @@ export function MembersPage() {
       cod_senescyt: (member) => member.cod_senescyt || "—",
       last_conexion: (member) =>
         member.last_conexion ? new Date(member.last_conexion).toLocaleString("es-EC") : "—",
+      has_signed_authorization: (member) => (
+        <MemberDocumentStatusChip
+          label="Autorización"
+          onPreview={
+            member.has_signed_authorization
+              ? () => handlePreviewChip(member, "authorization")
+              : undefined
+          }
+          uploaded={member.has_signed_authorization}
+        />
+      ),
+      has_signed_solicitud: (member) => (
+        <MemberDocumentStatusChip
+          label="Solicitud"
+          onPreview={
+            member.has_signed_solicitud ? () => handlePreviewChip(member, "solicitud") : undefined
+          }
+          uploaded={member.has_signed_solicitud}
+        />
+      ),
+      has_identity_document: (member) => (
+        <MemberDocumentStatusChip
+          label="Cédula"
+          onPreview={
+            member.has_identity_document ? () => handlePreviewChip(member, "identity") : undefined
+          }
+          uploaded={member.has_identity_document}
+        />
+      ),
     };
 
     const dataColumns: DataTableColumn<Member>[] = columnsMeta.map((column) => ({
@@ -318,7 +397,7 @@ export function MembersPage() {
       sortable: column.sortable,
       filterable: column.filterable,
       filterType:
-        column.id === "state"
+        column.id === "state" || DOCUMENT_COLUMN_IDS.includes(column.id)
           ? "select"
           : column.filter_type === "date-range"
             ? "date-range"
@@ -331,7 +410,9 @@ export function MembersPage() {
               { value: "3", label: "Deshabilitado" },
               { value: "16", label: "Desafiliado" },
             ]
-          : undefined,
+          : DOCUMENT_COLUMN_IDS.includes(column.id)
+            ? DOCUMENT_FILTER_OPTIONS
+            : undefined,
       filterPlaceholder: `Filtrar ${column.label.toLowerCase()}`,
       defaultVisible: column.default_visible,
       cell: renderers[column.id] ?? ((member: Member) => String((member as never)[column.id] ?? "—")),
@@ -351,8 +432,8 @@ export function MembersPage() {
           <MemberActionsMenu
             member={member}
             onDelete={(item) => setConfirm({ type: "delete", member: item })}
-            onDownload={(item) => void handleDownload(item, "solicitud")}
-            onDownloadCertificate={(item) => void handleDownload(item, "certificate")}
+            onDownload={(item) => void openMemberDocument(item, "solicitud", "Solicitud firmada")}
+            onDownloadCertificate={(item) => void openMemberDocument(item, "certificate", "Certificado de afiliación")}
             onEdit={openEdit}
             onApprove={(item) => setApprovingMember(item)}
             onPayments={(item) => setPaymentsMember(item)}
@@ -367,7 +448,7 @@ export function MembersPage() {
         ),
       },
     ];
-  }, [columnsMeta]);
+  }, [columnsMeta, token]);
 
   const confirmCopy = confirm
     ? {
@@ -494,6 +575,18 @@ export function MembersPage() {
           member={paymentsMember}
           onClose={() => setPaymentsMember(null)}
           open
+        />
+      ) : null}
+
+      {viewer ? (
+        <MemberDocumentViewerModal
+          blobUrl={viewer.blobUrl}
+          contentType={viewer.contentType}
+          onClose={() => {
+            window.URL.revokeObjectURL(viewer.blobUrl);
+            setViewer(null);
+          }}
+          title={viewer.title}
         />
       ) : null}
 

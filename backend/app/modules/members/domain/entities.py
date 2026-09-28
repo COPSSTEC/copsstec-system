@@ -49,6 +49,30 @@ MEMBER_COLUMNS: tuple[MemberColumn, ...] = (
     MemberColumn("birtday", "Fecha de cumpleaños", "profiles.birtday", True, filter_type="date-range"),
     MemberColumn("state", "Estado", "users.state_id", True, filter_type="text"),
     MemberColumn("date_register", "Fecha de registro", "profiles.date_register", True, filter_type="date-range"),
+    MemberColumn(
+        "has_signed_authorization",
+        "Autorización",
+        "membership_payments.signed_authorization_path",
+        True,
+        sortable=False,
+        filter_type="select",
+    ),
+    MemberColumn(
+        "has_signed_solicitud",
+        "Solicitud",
+        "membership_payments.signed_solicitud_path",
+        True,
+        sortable=False,
+        filter_type="select",
+    ),
+    MemberColumn(
+        "has_identity_document",
+        "Cédula",
+        "membership_payments.identity_document_path",
+        True,
+        sortable=False,
+        filter_type="select",
+    ),
     MemberColumn("login_email", "Correo de acceso", "users.email", False),
     MemberColumn("blood_type", "Tipo de sangre", "profiles.blood_type", False),
     MemberColumn("title_academic", "Título académico", "profiles.title_academic", False),
@@ -99,6 +123,9 @@ class Member:
     cod: str | None
     gender: str | None
     created_at: datetime | None = None
+    has_signed_authorization: bool = False
+    has_signed_solicitud: bool = False
+    has_identity_document: bool = False
 
 
 @dataclass(frozen=True)
@@ -133,6 +160,9 @@ class MemberListQuery:
     fixed_phone: str | None = None
     cod_senescyt: str | None = None
     login_email: str | None = None
+    has_signed_authorization: bool | None = None
+    has_signed_solicitud: bool | None = None
+    has_identity_document: bool | None = None
     sort_by: str = "names"
     sort_dir: str = "asc"
 

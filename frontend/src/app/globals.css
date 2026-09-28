@@ -2651,6 +2651,95 @@ button.form-error-link {
   justify-self: start;
 }
 
+.approve-voucher-alert {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  color: #991b1b;
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.approve-voucher-alert p {
+  margin: 0;
+}
+
+.onboarding-document-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.85rem;
+  justify-content: space-between;
+}
+
+.onboarding-document-row > div {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.onboarding-document-row .muted {
+  margin: 0;
+}
+
+.member-document-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.member-document-chip-button {
+  border: 0;
+  cursor: pointer;
+}
+
+.member-document-chip-button:hover {
+  filter: brightness(0.96);
+}
+
+.document-viewer-backdrop {
+  z-index: 90;
+}
+
+.document-viewer-dialog {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: min(90vh, 900px);
+  max-width: min(960px, 96vw);
+  width: 96vw;
+}
+
+.document-viewer-body {
+  background: #0f172a;
+  border-radius: 12px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.document-viewer-frame {
+  background: white;
+  border: 0;
+  height: 100%;
+  min-height: 70vh;
+  width: 100%;
+}
+
+.document-viewer-image {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+.actions-dropdown button:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.actions-dropdown button:disabled:hover {
+  background: transparent;
+}
+
 .status-badge-warning {
   background: #fef3c7;
   color: #92400e;
