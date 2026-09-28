@@ -29,7 +29,7 @@ from app.modules.membership.domain.cedula import (
     profile_is_active_sql,
 )
 from app.modules.membership.infrastructure.soft_delete_uniques import ensure_profile_soft_delete_uniques
-from app.shared.infrastructure.sequences import sync_serial_sequence
+from app.shared.infrastructure.sequences import sync_serial_sequence, sync_user_id_sequence
 
 
 SORT_COLUMNS: dict[str, str] = {
@@ -236,7 +236,7 @@ class SqlAlchemyMemberRepository:
 
     def create_member(self, data: MemberWriteData, password_hash: str) -> Member:
         now = datetime.now(UTC).replace(tzinfo=None)
-        sync_serial_sequence(self.session, "users")
+        sync_user_id_sequence(self.session)
         sync_serial_sequence(self.session, "profiles")
         full_name = f"{data.names} {data.lastname}".strip()
 

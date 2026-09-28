@@ -14,7 +14,6 @@ from app.modules.membership.domain.cedula import (
     RELEASE_DELETED_PROFILE_EMAIL_SQL,
     normalize_cedula,
     profile_holds_live_cedula,
-    profile_is_active_sql,
 )
 from app.modules.membership.domain.entities import (
     ENABLED_STATE_ID,
@@ -41,7 +40,7 @@ from app.modules.membership.domain.exceptions import (
     MembershipValidationError,
 )
 from app.modules.membership.infrastructure.soft_delete_uniques import ensure_profile_soft_delete_uniques
-from app.shared.infrastructure.sequences import sync_serial_sequence
+from app.shared.infrastructure.sequences import sync_serial_sequence, sync_user_id_sequence
 
 
 class SqlAlchemyMembershipRepository:
@@ -69,7 +68,7 @@ class SqlAlchemyMembershipRepository:
         rows = self.session.execute(
             text(
                 f"""
-                SELECT id, identifier, deleted_at, names, lastname
+                SELECT id, identifier, deleted_at
                 FROM profiles
                 WHERE {CEDULA_CANDIDATE_SQL}
                 """,
@@ -84,31 +83,6 @@ class SqlAlchemyMembershipRepository:
                 cedula=cedula,
             ):
                 return "Ya existe un miembro con esa cédula."
-
-        email_row = self.session.execute(
-            text(
-                f"""
-                SELECT
-                    EXISTS(
-                        SELECT 1 FROM profiles
-                        WHERE lower(email) = lower(:email)
-                          AND {profile_is_active_sql()}
-                    ) AS profile_email_taken,
-                    EXISTS(
-                        SELECT 1 FROM users u
-                        WHERE lower(u.email) = lower(:email)
-                          AND EXISTS (
-                              SELECT 1 FROM profiles p2
-                              WHERE p2.user_id = u.id
-                                AND {profile_is_active_sql("p2")}
-                          )
-                    ) AS login_email_taken
-                """,
-            ),
-            {"email": email},
-        ).mappings().first()
-        if email_row and (email_row["profile_email_taken"] or email_row["login_email_taken"]):
-            return "Ya existe un miembro con ese correo."
         return None
 
     def login_email_taken(self, email: str, exclude_user_id: int | None = None) -> bool:
@@ -140,7 +114,7 @@ class SqlAlchemyMembershipRepository:
         _retried: bool = False,
     ) -> RegisteredMember:
         now = datetime.now(UTC).replace(tzinfo=None)
-        sync_serial_sequence(self.session, "users")
+        sync_user_id_sequence(self.session)
         sync_serial_sequence(self.session, "profiles")
         sync_serial_sequence(self.session, "membership_payments")
         full_name = f"{data.names.strip()} {data.lastname.strip()}".strip()

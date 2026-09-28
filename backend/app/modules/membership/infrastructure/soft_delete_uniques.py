@@ -49,6 +49,10 @@ ENSURE_PROFILE_SOFT_DELETE_UNIQUES_STATEMENTS = (
           )
       AND COALESCE(u.email, '') NOT ILIKE '%@invalid.local'
     """,
+    """
+    DELETE FROM model_has_roles m
+    WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = m.model_id)
+    """,
 )
 
 _applied = False

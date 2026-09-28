@@ -129,8 +129,7 @@ class RegisterMembershipUseCase:
         self.repository.release_deleted_identity(identifier, email)
         conflict = self.repository.find_conflict(identifier, email)
         if conflict:
-            code = "identifier_taken" if "cédula" in conflict.lower() else "email_taken"
-            raise MembershipConflictError(conflict, code=code)
+            raise MembershipConflictError(conflict, code="identifier_taken")
 
         transfer = live_membership_transfer()
         member = self.repository.register_member(

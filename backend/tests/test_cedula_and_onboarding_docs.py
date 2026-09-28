@@ -85,6 +85,12 @@ def test_cedula_conflict_uses_normalized_active_profiles() -> None:
         profile_id=12,
         cedula="1710034065",
     )
+    assert not profile_holds_live_cedula(
+        identifier="1761048378",
+        deleted_at="2026-09-24T21:52:13.645632",
+        profile_id=480,
+        cedula="1761048378",
+    )
     release = " ".join(RELEASE_DELETED_PROFILE_CEDULA_SQL.split()).lower()
     compact = release.replace(" ", "")
     assert "'d'||cast(id" in compact
@@ -104,6 +110,7 @@ def test_soft_delete_uniques_are_partial_and_release_deleted_rows() -> None:
     assert "where deleted_at is null" in sql
     assert "'d' || cast(id as text)" in sql
     assert "@invalid.local" in sql
+    assert "delete from model_has_roles" in sql
 
 
 def test_integrity_conflict_maps_identifier_constraint() -> None:

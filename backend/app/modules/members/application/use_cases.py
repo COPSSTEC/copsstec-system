@@ -65,7 +65,7 @@ class CreateMemberUseCase:
             email=data.email,
             login_email=data.login_email,
         )
-        if conflict:
+        if conflict and "cédula" in conflict.lower():
             raise MemberConflictError(conflict)
 
         password = generate_temporary_password()
