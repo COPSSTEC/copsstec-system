@@ -13,6 +13,7 @@ import {
   saveBankDetails,
   uploadOnboardingDocuments,
 } from "@/modules/membership/infrastructure/membership-api";
+import { BankAutocomplete } from "@/modules/membership/presentation/components/bank-autocomplete";
 import { AppLogo } from "@/shared/components/app-logo";
 import { PublicFooter } from "@/shared/components/public-footer";
 
@@ -24,21 +25,6 @@ const DEBIT_PLANS = [
   { id: "semiannual", label: "Semestral: $60,00" },
   { id: "annual", label: "Anual: $120,00" },
 ] as const;
-const ECUADOR_BANKS = [
-  "Banco Pichincha",
-  "Banco Guayaquil",
-  "Banco del Pacífico",
-  "Produbanco",
-  "Banco Internacional",
-  "Banco Bolivariano",
-  "Banco de Machala",
-  "Banco General Rumiñahui",
-  "Banco del Austro",
-  "Banco Solidario",
-  "Cooperativa JEP",
-  "Cooperativa Policía Nacional",
-] as const;
-
 const STEPS = [
   { id: 1, label: "1. Cuenta" },
   { id: 2, label: "2. Descargar" },
@@ -446,13 +432,6 @@ export function AuthorizationDocumentsPage() {
     !confirmComplete ? "confirmación" : null,
   ].filter((item): item is string => Boolean(item));
 
-  const bankOptions = useMemo(() => {
-    if (bankName && !ECUADOR_BANKS.includes(bankName as (typeof ECUADOR_BANKS)[number])) {
-      return [bankName, ...ECUADOR_BANKS];
-    }
-    return [...ECUADOR_BANKS];
-  }, [bankName]);
-
   if (!status) {
     return <main className="affiliation-page">Cargando...</main>;
   }
@@ -538,14 +517,7 @@ export function AuthorizationDocumentsPage() {
             </label>
             <label className="field">
               Entidad bancaria *
-              <select onChange={(event) => setBankName(event.target.value)} required value={bankName}>
-                <option value="">Selecciona el banco</option>
-                {bankOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
+              <BankAutocomplete onChange={setBankName} required value={bankName} />
             </label>
           </div>
           <label className="field">

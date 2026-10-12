@@ -57,13 +57,20 @@ CASH_BANKS: dict[str, tuple[str, int, str]] = {
     "banco del austro": ("BANCO DEL AUSTRO", 35, "Banco"),
     "banco solidario": ("BANCO SOLIDARIO", 59, "Banco"),
     "cooperativa jep": ("COAC JUVENTUD ECUATORIANA PROGRESISTA LTDA.", 213, "Cooperativa"),
+    "coop. a. y c. juventud ecuatoriana progresista limitada": (
+        "COAC JUVENTUD ECUATORIANA PROGRESISTA LTDA.",
+        213,
+        "Cooperativa",
+    ),
     "coac juventud ecuatoriana progresista ltda.": (
         "COAC JUVENTUD ECUATORIANA PROGRESISTA LTDA.",
         213,
         "Cooperativa",
     ),
     "cooperativa policia nacional": ("COAC POLICIA NACIONAL LTDA.", 9997, "Cooperativa"),
+    "coop. a. y c. policia nacional limitada": ("COAC POLICIA NACIONAL LTDA.", 9997, "Cooperativa"),
     "coac policia nacional ltda.": ("COAC POLICIA NACIONAL LTDA.", 9997, "Cooperativa"),
+    "banco de machala": ("BANCO DE MACHALA", 25, "Banco"),
 }
 
 TITLE_FONT = Font(name="Calibri", size=14, bold=True)
