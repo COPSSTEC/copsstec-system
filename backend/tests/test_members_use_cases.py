@@ -36,6 +36,9 @@ class FakeMemberRepository:
         items = list(self.members.values())
         return MemberListResult(items=items, total=len(items), page=query.page, page_size=query.page_size)
 
+    def list_cobros_export_rows(self):
+        return []
+
     def get_member(self, user_id: int) -> Member | None:
         return self.members.get(user_id)
 

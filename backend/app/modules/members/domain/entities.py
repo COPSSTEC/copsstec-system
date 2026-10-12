@@ -129,6 +129,18 @@ class Member:
 
 
 @dataclass(frozen=True)
+class MemberCobrosRow:
+    identifier: str
+    names: str
+    lastname: str
+    email: str
+    member_bank_name: str = ""
+    member_account_type: str = ""
+    member_account_number: str = ""
+    member_debit_plan: str = ""
+
+
+@dataclass(frozen=True)
 class MemberListResult:
     items: list[Member]
     total: int

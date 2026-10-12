@@ -15,6 +15,7 @@ import {
   createMember,
   deleteMember,
   disableMember,
+  downloadMembersCobrosExport,
   enableMember,
   fetchMemberDocumentBlob,
   listMembers,
@@ -116,6 +117,7 @@ export function MembersPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDownloadingCobros, setIsDownloadingCobros] = useState(false);
   const [confirm, setConfirm] = useState<{
     type: "delete" | "disable" | "enable" | "credentials";
     member: Member;
@@ -195,6 +197,23 @@ export function MembersPage() {
   function handleFilterChange(columnId: string, value: string) {
     setPage(1);
     setFilters((current) => ({ ...current, [columnId]: value }));
+  }
+
+  async function handleDownloadCobros() {
+    if (!token) {
+      return;
+    }
+
+    setIsDownloadingCobros(true);
+    setError(null);
+
+    try {
+      await downloadMembersCobrosExport(token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo descargar la plantilla de cobros.");
+    } finally {
+      setIsDownloadingCobros(false);
+    }
   }
 
   function openCreate() {
@@ -481,14 +500,25 @@ export function MembersPage() {
 
   return (
     <RoleGate requiredAccess="admin">
+      <section className="members-admin">
       <section className="page-heading page-heading-actions">
         <div>
           <h1>Miembros del copsstec</h1>
           <p>Administra el padrón, el profile asociado y el acceso al sistema.</p>
         </div>
-        <button className="create-button" onClick={openCreate} type="button">
-          + Crear miembro
-        </button>
+        <div className="page-heading-action-group">
+          <button
+            className="secondary-button"
+            disabled={isDownloadingCobros}
+            onClick={() => void handleDownloadCobros()}
+            type="button"
+          >
+            {isDownloadingCobros ? "Descargando…" : "Descargar plantilla de cobros"}
+          </button>
+          <button className="create-button" onClick={openCreate} type="button">
+            + Crear miembro
+          </button>
+        </div>
       </section>
 
       {notice ? (
@@ -542,6 +572,7 @@ export function MembersPage() {
         }
         visibleColumnIds={visibleColumnIds}
       />
+      </section>
 
       {formOpen ? (
         <MemberFormModal

@@ -1,3 +1,4 @@
+from datetime import date
 from secrets import token_urlsafe
 
 from app.core.security import hash_password
@@ -19,6 +20,7 @@ from app.modules.members.domain.entities import (
     MemberWriteData,
     ProfileSelfUpdate,
 )
+from app.modules.members.infrastructure.cobros_excel import build_cobros_workbook
 from app.modules.members.domain.exceptions import MemberConflictError, MemberNotFoundError, MemberValidationError
 from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula
 
@@ -33,6 +35,17 @@ class ListMembersUseCase:
 
     def execute(self, query: MemberListQuery) -> MemberListResult:
         return self.repository.list_members(query)
+
+
+class ExportMembersCobrosUseCase:
+    def __init__(self, repository: MemberRepository) -> None:
+        self.repository = repository
+
+    def execute(self, today: date | None = None) -> tuple[bytes, str]:
+        issued = today or date.today()
+        content = build_cobros_workbook(self.repository.list_cobros_export_rows())
+        filename = f"Plantilla_Cobros_COPSSTEC_{issued:%Y-%m-%d}.xlsx"
+        return content, filename
 
 
 class GetMemberUseCase:

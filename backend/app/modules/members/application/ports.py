@@ -1,10 +1,19 @@
 from typing import Protocol
 
-from app.modules.members.domain.entities import Member, MemberListQuery, MemberListResult, MemberWriteData
+from app.modules.members.domain.entities import (
+    Member,
+    MemberCobrosRow,
+    MemberListQuery,
+    MemberListResult,
+    MemberWriteData,
+)
 
 
 class MemberRepository(Protocol):
     def list_members(self, query: MemberListQuery) -> MemberListResult:
+        ...
+
+    def list_cobros_export_rows(self) -> list[MemberCobrosRow]:
         ...
 
     def get_member(self, user_id: int) -> Member | None:

@@ -9,6 +9,7 @@ from app.modules.members.application.use_cases import (
     CreateMemberUseCase,
     DeleteMemberUseCase,
     DownloadMemberPdfUseCase,
+    ExportMembersCobrosUseCase,
     GetMemberUseCase,
     ListMembersUseCase,
     ResendMemberCredentialsUseCase,
@@ -27,6 +28,7 @@ from app.modules.members.presentation.api.dependencies import (
     get_create_member_use_case,
     get_delete_member_use_case,
     get_download_pdf_use_case,
+    get_export_members_cobros_use_case,
     get_get_member_use_case,
     get_list_members_use_case,
     get_resend_credentials_use_case,
@@ -181,6 +183,19 @@ def list_members(
         ),
     )
     return MemberListResponse.from_domain(result)
+
+
+@router.get("/export/cobros")
+def export_members_cobros(
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[ExportMembersCobrosUseCase, Depends(get_export_members_cobros_use_case)],
+) -> Response:
+    content, filename = use_case.execute()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{member_id}", response_model=MemberResponse)

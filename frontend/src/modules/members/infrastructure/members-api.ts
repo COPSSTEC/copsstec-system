@@ -268,6 +268,53 @@ export async function fetchMemberDocumentBlob(
 
 export type DebitAgreementKind = "authorization" | "identity";
 
+function filenameFromDisposition(header: string | null, fallback: string): string {
+  if (header) {
+    const utf = header.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf?.[1]) {
+      try {
+        return decodeURIComponent(utf[1].trim());
+      } catch {
+        return utf[1].trim();
+      }
+    }
+    const quoted = header.match(/filename="([^"]+)"/i);
+    if (quoted?.[1]) {
+      return quoted[1];
+    }
+    const plain = header.match(/filename=([^;]+)/i);
+    if (plain?.[1]) {
+      return plain[1].trim().replace(/^["']|["']$/g, "");
+    }
+  }
+  return fallback;
+}
+
+export async function downloadMembersCobrosExport(token: string): Promise<void> {
+  const response = await authorizedFetch(`${API_URL}/api/members/export/cobros`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    await parseResponse<void>(response);
+    return;
+  }
+
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = filenameFromDisposition(
+    response.headers.get("Content-Disposition"),
+    "Plantilla_Cobros_COPSSTEC.xlsx",
+  );
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(objectUrl);
+}
+
 export async function downloadMemberDebitDocument(
   token: string,
   memberId: number,

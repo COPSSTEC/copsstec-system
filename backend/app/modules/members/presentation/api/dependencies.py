@@ -8,6 +8,7 @@ from app.modules.members.application.use_cases import (
     CreateMemberUseCase,
     DeleteMemberUseCase,
     DownloadMemberPdfUseCase,
+    ExportMembersCobrosUseCase,
     GetMemberUseCase,
     GetPublicMemberUseCase,
     ListMembersUseCase,
@@ -43,6 +44,12 @@ def get_list_members_use_case(
     repository: Annotated[SqlAlchemyMemberRepository, Depends(get_member_repository)],
 ) -> ListMembersUseCase:
     return ListMembersUseCase(repository)
+
+
+def get_export_members_cobros_use_case(
+    repository: Annotated[SqlAlchemyMemberRepository, Depends(get_member_repository)],
+) -> ExportMembersCobrosUseCase:
+    return ExportMembersCobrosUseCase(repository)
 
 
 def get_get_member_use_case(

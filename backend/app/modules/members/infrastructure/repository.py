@@ -14,6 +14,7 @@ from app.modules.members.domain.entities import (
     STATE_LABELS,
     USER_MODEL_TYPE,
     Member,
+    MemberCobrosRow,
     MemberListQuery,
     MemberListResult,
     MemberWriteData,
@@ -153,6 +154,30 @@ PROFILE_SELECT = """
     WHERE p.deleted_at IS NULL
 """
 
+COBROS_EXPORT_SELECT = """
+    SELECT
+        COALESCE(p.identifier, '') AS identifier,
+        COALESCE(p.names, '') AS names,
+        COALESCE(p.lastname, '') AS lastname,
+        COALESCE(p.email, u.email) AS email,
+        COALESCE(mp.member_account_type, '') AS member_account_type,
+        COALESCE(mp.member_account_number, '') AS member_account_number,
+        COALESCE(mp.member_bank_name, '') AS member_bank_name,
+        COALESCE(mp.member_debit_plan, '') AS member_debit_plan
+    FROM users u
+    INNER JOIN model_has_roles mhr
+        ON mhr.model_id = u.id
+       AND mhr.model_type = :model_type
+    INNER JOIN roles r ON r.id = mhr.role_id
+    LEFT JOIN profiles p ON p.user_id = u.id
+    INNER JOIN membership_payments mp ON mp.user_id = u.id
+    WHERE r.name = :member_role
+      AND p.deleted_at IS NULL
+      AND COALESCE(mp.signed_authorization_path, '') <> ''
+      AND COALESCE(mp.identity_document_path, '') <> ''
+    ORDER BY p.lastname ASC NULLS LAST, p.names ASC NULLS LAST, u.id ASC
+"""
+
 
 class SqlAlchemyMemberRepository:
     def __init__(self, session: Session) -> None:
@@ -204,6 +229,28 @@ class SqlAlchemyMemberRepository:
             page_size=page_size,
             columns=MEMBER_COLUMNS,
         )
+
+    def list_cobros_export_rows(self) -> list[MemberCobrosRow]:
+        rows = self.session.execute(
+            text(COBROS_EXPORT_SELECT),
+            {
+                "model_type": USER_MODEL_TYPE,
+                "member_role": MEMBER_ROLE_NAME,
+            },
+        ).mappings().all()
+        return [
+            MemberCobrosRow(
+                identifier=row["identifier"] or "",
+                names=row["names"] or "",
+                lastname=row["lastname"] or "",
+                email=row["email"] or "",
+                member_bank_name=row["member_bank_name"] or "",
+                member_account_type=row["member_account_type"] or "",
+                member_account_number=row["member_account_number"] or "",
+                member_debit_plan=row["member_debit_plan"] or "",
+            )
+            for row in rows
+        ]
 
     def get_member(self, user_id: int) -> Member | None:
         row = self.session.execute(
