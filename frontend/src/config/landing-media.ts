@@ -10,27 +10,27 @@ export const LANDING_MEDIA = {
   aboutTv: "https://i.postimg.cc/g05kGkG8/Imagen-4.png",
   youtubeChannel: "https://www.youtube.com/@copsstec",
   visionGlobe:
-    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1400&q=80",
+    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
   valuesGallery: [
-    "https://img.freepik.com/foto-gratis/escena-blanco-negro-que-muestra-vida-trabajadores-construccion-sitio_23-2151333249.jpg?w=2000",
-    "https://img.freepik.com/fotos-premium/excelencia-ingenieria-orgullo-frances-diseno-construccion_976564-48635.jpg?w=1480",
-    "https://img.freepik.com/foto-gratis/mujeres-ingenieras-trabajando_23-2151657915.jpg?w=2000",
-    "https://img.freepik.com/fotos-premium/grupo-trabajadores-construccion-cascos-chalecos-seguridad-estan-pie-fila-mirando-algo_1162225-54899.jpg?w=2000",
+    "https://img.freepik.com/foto-gratis/escena-blanco-negro-que-muestra-vida-trabajadores-construccion-sitio_23-2151333249.jpg?w=1280",
+    "https://img.freepik.com/fotos-premium/excelencia-ingenieria-orgullo-frances-diseno-construccion_976564-48635.jpg?w=800",
+    "https://img.freepik.com/foto-gratis/mujeres-ingenieras-trabajando_23-2151657915.jpg?w=800",
+    "https://img.freepik.com/fotos-premium/grupo-trabajadores-construccion-cascos-chalecos-seguridad-estan-pie-fila-mirando-algo_1162225-54899.jpg?w=800",
   ],
   contactEmail: "copsstec@gmail.com",
   contactPhone: "+593 958762480",
   overview: {
     estructura: "https://i.postimg.cc/XYjv8z2G/Imagen-3.png",
     educacion:
-      "https://img.freepik.com/foto-gratis/mujeres-ingenieras-trabajando_23-2151657915.jpg?w=2000",
+      "https://img.freepik.com/foto-gratis/mujeres-ingenieras-trabajando_23-2151657915.jpg?w=1280",
     blogs:
-      "https://img.freepik.com/fotos-premium/excelencia-ingenieria-orgullo-frances-diseno-construccion_976564-48635.jpg?w=1480",
+      "https://img.freepik.com/fotos-premium/excelencia-ingenieria-orgullo-frances-diseno-construccion_976564-48635.jpg?w=1280",
     ssoter:
-      "https://images.unsplash.com/photo-1578269174936-2709b6aeb913?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1578269174936-2709b6aeb913?auto=format&fit=crop&w=1200&q=80",
     servicios:
-      "https://img.freepik.com/fotos-premium/grupo-trabajadores-construccion-cascos-chalecos-seguridad-estan-pie-fila-mirando-algo_1162225-54899.jpg?w=2000",
+      "https://img.freepik.com/fotos-premium/grupo-trabajadores-construccion-cascos-chalecos-seguridad-estan-pie-fila-mirando-algo_1162225-54899.jpg?w=1280",
     alianzas:
-      "https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1400&q=80",
+      "https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1200&q=80",
   },
 } as const;
 

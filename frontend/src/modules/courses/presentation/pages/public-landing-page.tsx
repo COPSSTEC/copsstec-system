@@ -8,6 +8,7 @@ import { LANDING_MEDIA, LANDING_SERVICES } from "@/config/landing-media";
 import type { Partner } from "@/modules/partners/domain/types";
 import { listPublicPartners } from "@/modules/partners/infrastructure/partners-api";
 import { PublicElectionCalendarTeaser } from "@/modules/votaciones";
+import { LazyStageVideo } from "@/shared/components/lazy-stage-video";
 import { PublicFooter } from "@/shared/components/public-footer";
 import { RevealOnScroll } from "@/shared/components/reveal-on-scroll";
 import { ScrollFillTitle } from "@/shared/components/scroll-fill-title";
@@ -103,7 +104,12 @@ export function PublicLandingPage() {
 
         <article className="avp-module">
           <div className="avp-stage">
-            <img alt="Miembros de COPSSTEC con cascos y chalecos de seguridad" src={LANDING_MEDIA.aboutTeam} />
+            <img
+              alt="Miembros de COPSSTEC con cascos y chalecos de seguridad"
+              decoding="async"
+              loading="lazy"
+              src={LANDING_MEDIA.aboutTeam}
+            />
             <div className="avp-stage-copy">
               <p className="avp-eyebrow">Misión</p>
               <h2>
@@ -125,7 +131,12 @@ export function PublicLandingPage() {
 
         <article className="avp-module">
           <div className="avp-stage">
-            <img alt={VALUE_ALTS[0]} src={LANDING_MEDIA.valuesGallery[0]} />
+            <img
+              alt={VALUE_ALTS[0]}
+              decoding="async"
+              loading="lazy"
+              src={LANDING_MEDIA.valuesGallery[0]}
+            />
             <div className="avp-stage-copy">
               <p className="avp-eyebrow">Valores</p>
               <h2>
@@ -145,14 +156,25 @@ export function PublicLandingPage() {
           </div>
           <div className="avp-look">
             {LANDING_MEDIA.valuesGallery.map((src, index) => (
-              <img alt={VALUE_ALTS[index] ?? "Profesionales de SST"} key={src} src={src} />
+              <img
+                alt={VALUE_ALTS[index] ?? "Profesionales de SST"}
+                decoding="async"
+                key={src}
+                loading="lazy"
+                src={src}
+              />
             ))}
           </div>
         </article>
 
         <article className="avp-module">
           <div className="avp-stage">
-            <img alt="Profesionales de COPSSTEC en contenido audiovisual" src={LANDING_MEDIA.aboutTv} />
+            <img
+              alt="Profesionales de COPSSTEC en contenido audiovisual"
+              decoding="async"
+              loading="lazy"
+              src={LANDING_MEDIA.aboutTv}
+            />
             <div className="avp-stage-copy">
               <p className="avp-eyebrow">COPSSTEC TV</p>
               <h2>
@@ -189,7 +211,12 @@ export function PublicLandingPage() {
 
         <article className="avp-module">
           <div className="avp-stage">
-            <img alt="Visión global de COPSSTEC en seguridad y salud en el trabajo" src={LANDING_MEDIA.visionGlobe} />
+            <img
+              alt="Visión global de COPSSTEC en seguridad y salud en el trabajo"
+              decoding="async"
+              loading="lazy"
+              src={LANDING_MEDIA.visionGlobe}
+            />
             <div className="avp-stage-copy">
               <p className="avp-eyebrow">Visión</p>
               <h2>
@@ -225,7 +252,7 @@ export function PublicLandingPage() {
         {LANDING_SERVICES.map((service) => (
           <article className="avp-module" key={service.id}>
             <div className="avp-stage">
-              <video autoPlay loop muted playsInline src={service.video} />
+              <LazyStageVideo src={service.video} />
               <div className="avp-stage-copy">
                 <p className="avp-eyebrow">{service.kicker}</p>
                 <h3>{service.title}.</h3>
@@ -275,7 +302,12 @@ export function PublicLandingPage() {
                 <h3>{partner.name.replace(/\.$/, "")}.</h3>
               </div>
               <div className="avp-partner-mark">
-                <img alt={`Logo de ${partner.name}`} src={partner.logo_url} />
+                <img
+                  alt={`Logo de ${partner.name}`}
+                  decoding="async"
+                  loading="lazy"
+                  src={partner.logo_url}
+                />
               </div>
             </div>
             <div className="avp-copy-band">
