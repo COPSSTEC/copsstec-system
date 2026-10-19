@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
+from app.core.object_storage import firebase_enabled, save_object
 from app.modules.votaciones.domain.exceptions import ElectionValidationError
 
 IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
@@ -44,9 +45,20 @@ class LocalElectionFileStorage:
         elif suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
             suffix = ".jpg"
 
+        filename = f"{uuid4().hex}{suffix}"
+        if firebase_enabled():
+            return save_object(
+                module="votaciones",
+                db_id=election_id,
+                kind=kind,
+                filename=filename,
+                content=content,
+                content_type=content_type,
+            )
+
         target_dir = self.base_path / str(election_id) / kind
         target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / f"{uuid4().hex}{suffix}"
+        target = target_dir / filename
         target.write_bytes(content)
         return f"/media/votaciones/{election_id}/{kind}/{target.name}"
 

@@ -111,6 +111,13 @@ class MailtrapEmailSender:
 def attachment_from_path(path: str | None) -> EmailAttachment | None:
     if not path:
         return None
+    from app.core.object_storage import is_remote_url, read_bytes, stored_filename
+
+    if is_remote_url(path):
+        content = read_bytes(path)
+        if content is None:
+            return None
+        return EmailAttachment(filename=stored_filename(path, "adjunto.pdf"), content=content)
     file_path = Path(path)
     if not file_path.is_file():
         return None

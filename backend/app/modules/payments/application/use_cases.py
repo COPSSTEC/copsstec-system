@@ -430,6 +430,10 @@ class GetPaymentMediaUseCase:
             raise PaymentForbiddenError("No puedes ver el comprobante de otro miembro.")
         if not payment.voucher_path:
             raise PaymentNotFoundError()
+        from app.core.object_storage import is_remote_url, stored_filename
+
+        if is_remote_url(payment.voucher_path):
+            return payment.voucher_path, stored_filename(payment.voucher_path, "comprobante")
         path = self.storage.resolve_path(payment.voucher_path)
         if path is None or not path.exists():
             raise PaymentNotFoundError()
@@ -633,11 +637,15 @@ class DownloadAdminAgreementDocumentUseCase:
         )
         if not (stored or "").strip():
             raise PaymentNotFoundError()
-        path = self.storage.resolve_path(stored)
-        if path is None or not path.exists():
-            raise PaymentNotFoundError()
+        from app.core.object_storage import is_remote_url
+
         filenames = {
             "authorization": "autorizacion-debito-adv-firmada.pdf",
             "identity": "cedula-adv.pdf",
         }
+        if is_remote_url(stored):
+            return stored, filenames[kind]
+        path = self.storage.resolve_path(stored)
+        if path is None or not path.exists():
+            raise PaymentNotFoundError()
         return str(path), filenames[kind]

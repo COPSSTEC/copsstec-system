@@ -3,6 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse, Response
 
+from app.core.object_storage import is_remote_url
+from app.shared.presentation.stored_files import remote_file_response
 from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import require_access
 from app.modules.members.application.use_cases import (
@@ -335,12 +337,14 @@ def download_member_file(
         DownloadOnboardingDocumentUseCase,
         Depends(get_download_onboarding_document_use_case),
     ],
-) -> FileResponse:
+) -> Response:
     try:
         filename, file_path = use_case.execute(member_id, "solicitud")
     except (AffiliationNotFoundError, AffiliationValidationError) as exc:
         raise _http_error(exc) from exc
 
+    if is_remote_url(str(file_path)):
+        return remote_file_response(str(file_path), filename)
     media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
     return _inline_file(str(file_path), filename, media_type)
 
@@ -368,11 +372,13 @@ def download_debit_agreement_document(
         DownloadAdminAgreementDocumentUseCase,
         Depends(get_download_admin_agreement_document_use_case),
     ],
-) -> FileResponse:
+) -> Response:
     try:
         path, filename = use_case.execute(member_id, kind)
     except (PaymentNotFoundError, PaymentValidationError) as exc:
         raise _http_error(exc) from exc
+    if is_remote_url(path):
+        return remote_file_response(path, filename, inline=False)
     return FileResponse(path=path, media_type="application/pdf", filename=filename)
 
 
@@ -385,11 +391,14 @@ def download_onboarding_document(
         DownloadOnboardingDocumentUseCase,
         Depends(get_download_onboarding_document_use_case),
     ],
-) -> FileResponse:
+) -> Response:
     try:
         filename, file_path = use_case.execute(member_id, document_kind)
     except (AffiliationNotFoundError, AffiliationValidationError) as exc:
         raise _http_error(exc) from exc
+
+    if is_remote_url(str(file_path)):
+        return remote_file_response(str(file_path), filename)
 
     media_type = "application/pdf" if filename.lower().endswith(".pdf") else "application/octet-stream"
     suffix = str(file_path).lower()

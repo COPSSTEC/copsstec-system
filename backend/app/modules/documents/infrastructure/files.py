@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
+from app.core.object_storage import firebase_enabled, is_remote_url, remote_content_length, save_object
 from app.modules.documents.domain.exceptions import InvalidDocumentFileError
 
 
@@ -13,6 +14,8 @@ MEDIA_PREFIX = "/media/member-documents/"
 
 
 def document_file_size(file_path: str | None, base_path: str = "storage/member-documents") -> int | None:
+    if is_remote_url(file_path):
+        return remote_content_length(file_path or "")
     if not file_path or not file_path.startswith(MEDIA_PREFIX):
         return None
     relative = Path(file_path[len(MEDIA_PREFIX) :])
@@ -41,9 +44,19 @@ class LocalMemberDocumentStorage:
         if not content:
             raise InvalidDocumentFileError("El archivo está vacío.")
 
+        filename = f"{uuid4().hex}.pdf"
+        if firebase_enabled():
+            return save_object(
+                module="member-documents",
+                db_id=document_key,
+                kind="files",
+                filename=filename,
+                content=content,
+                content_type="application/pdf",
+            )
         target_dir = self.base_path / document_key
         target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / f"{uuid4().hex}.pdf"
+        target = target_dir / filename
         target.write_bytes(content)
         return f"/media/member-documents/{document_key}/{target.name}"
 
@@ -59,8 +72,18 @@ class LocalMemberDocumentStorage:
         if suffix not in COVER_SUFFIXES:
             suffix = ".jpg"
 
+        filename = f"cover-{uuid4().hex}{suffix}"
+        if firebase_enabled():
+            return save_object(
+                module="member-documents",
+                db_id=document_key,
+                kind="covers",
+                filename=filename,
+                content=content,
+                content_type=resolved_type,
+            )
         target_dir = self.base_path / document_key
         target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / f"cover-{uuid4().hex}{suffix}"
+        target = target_dir / filename
         target.write_bytes(content)
         return f"/media/member-documents/{document_key}/{target.name}"

@@ -4,6 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse, Response
 
+from app.core.object_storage import is_remote_url
+from app.shared.presentation.stored_files import remote_file_response
 from app.modules.auth.application.rbac import resolve_access_policy
 from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import get_current_user, require_access
@@ -398,12 +400,15 @@ def payment_media(
     payment_id: int,
     user: Annotated[User, Depends(get_current_user)],
     use_case: Annotated[GetPaymentMediaUseCase, Depends(get_payment_media_use_case)],
-) -> FileResponse:
+) -> Response:
     policy = resolve_access_policy(user.roles)
     try:
         path, filename = use_case.execute(payment_id, user.id, policy.access_level == "admin")
     except (PaymentNotFoundError, PaymentForbiddenError) as exc:
         raise _http_error(exc) from exc
+
+    if is_remote_url(path):
+        return remote_file_response(path, filename, missing_detail="Comprobante no encontrado.")
 
     suffix = Path(filename).suffix.lower()
     media_types = {

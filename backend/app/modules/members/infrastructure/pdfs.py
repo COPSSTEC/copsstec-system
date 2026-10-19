@@ -143,10 +143,12 @@ def load_photo_reader(foto_id: str) -> ImageReader | None:
 
     value = (foto_id or "").strip()
     if value.startswith("http://") or value.startswith("https://"):
-        try:
-            from urllib.request import Request, urlopen
+        from app.core.object_storage import read_bytes
 
-            data = urlopen(Request(value, headers={"User-Agent": "COPSSTEC"}), timeout=8).read()
+        data = read_bytes(value)
+        if data is None:
+            return None
+        try:
             return _square_photo_reader(data)
         except Exception:
             return None

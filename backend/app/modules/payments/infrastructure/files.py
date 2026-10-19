@@ -1,6 +1,8 @@
 from pathlib import Path
 from uuid import uuid4
 
+from app.core.object_storage import firebase_enabled, save_object
+
 
 ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_FILE_BYTES = 5 * 1024 * 1024
@@ -29,9 +31,20 @@ class LocalPaymentFileStorage:
         if suffix not in {".jpg", ".jpeg", ".png", ".webp"}:
             suffix = ".jpg"
 
+        filename = f"{uuid4().hex}{suffix}"
+        if firebase_enabled():
+            return save_object(
+                module="payments",
+                db_id=user_id,
+                kind="vouchers",
+                filename=filename,
+                content=content,
+                content_type=content_type,
+            )
+
         target_dir = self.base_path / str(user_id)
         target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / f"{uuid4().hex}{suffix}"
+        target = target_dir / filename
         target.write_bytes(content)
         return f"{MEDIA_PREFIX}/{user_id}/{target.name}"
 

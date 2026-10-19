@@ -4,6 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, Response
 
+from app.core.object_storage import is_remote_url
+from app.shared.presentation.stored_files import remote_file_response
 from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import get_current_user, require_access
 from app.modules.courses.application.use_cases import (
@@ -206,7 +208,7 @@ def download_member_certificate(
         Depends(get_manage_course_inscriptions_use_case),
     ],
     user: Annotated[User, Depends(require_access("member"))],
-) -> FileResponse:
+) -> Response:
     inscription = use_case.repository.get_inscription(inscription_id)
     if inscription is None or inscription.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inscripción no encontrada.")
@@ -218,6 +220,14 @@ def download_member_certificate(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El certificado estará disponible cuando tengas asistencia marcada.",
         ) from exc
+
+    if is_remote_url(certificate.pdf_path):
+        return remote_file_response(
+            certificate.pdf_path,
+            f"{certificate.certificate_code}.pdf",
+            inline=False,
+            missing_detail="Certificado no encontrado.",
+        )
 
     if not Path(certificate.pdf_path).exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificado no encontrado.")
@@ -453,9 +463,18 @@ def download_certificate(
         Depends(get_manage_course_inscriptions_use_case),
     ],
     _: Annotated[User, Depends(require_access("admin"))],
-) -> FileResponse:
+) -> Response:
     certificate = use_case.repository.get_certificate(certificate_id)
-    if certificate is None or not Path(certificate.pdf_path).exists():
+    if certificate is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificado no encontrado.")
+    if is_remote_url(certificate.pdf_path):
+        return remote_file_response(
+            certificate.pdf_path,
+            f"{certificate.certificate_code}.pdf",
+            inline=False,
+            missing_detail="Certificado no encontrado.",
+        )
+    if not Path(certificate.pdf_path).exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Certificado no encontrado.")
 
     return FileResponse(

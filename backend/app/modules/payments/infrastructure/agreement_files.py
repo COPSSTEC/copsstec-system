@@ -1,6 +1,8 @@
 from pathlib import Path
 from uuid import uuid4
 
+from app.core.object_storage import firebase_enabled, save_object
+
 
 ALLOWED_PDF_CONTENT_TYPES = {"application/pdf", "application/octet-stream", ""}
 MAX_FILE_BYTES = 8 * 1024 * 1024
@@ -33,9 +35,20 @@ class LocalAgreementFileStorage:
         if suffix != ".pdf":
             suffix = ".pdf"
 
+        filename = f"{uuid4().hex}{suffix}"
+        if firebase_enabled():
+            return save_object(
+                module="agreements",
+                db_id=user_id,
+                kind=folder,
+                filename=filename,
+                content=content,
+                content_type="application/pdf",
+            )
+
         target_dir = self.base_path / str(user_id) / folder
         target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / f"{uuid4().hex}{suffix}"
+        target = target_dir / filename
         target.write_bytes(content)
         return f"{MEDIA_PREFIX}/{user_id}/{folder}/{target.name}"
 

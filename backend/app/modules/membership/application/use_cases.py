@@ -773,7 +773,7 @@ class DownloadOnboardingDocumentUseCase:
     def __init__(self, repository: MembershipRepository) -> None:
         self.repository = repository
 
-    def execute(self, user_id: int, kind: str) -> tuple[str, Path]:
+    def execute(self, user_id: int, kind: str) -> tuple[str, Path | str]:
         if kind not in {"authorization", "identity", "voucher", "solicitud"}:
             raise MembershipValidationError("Documento no válido.")
         payment = self.repository.get_payment(user_id)
@@ -791,6 +791,18 @@ class DownloadOnboardingDocumentUseCase:
             if kind == "solicitud":
                 raise MembershipNotFoundError("El miembro no ha subido la solicitud firmada.")
             raise MembershipNotFoundError("Documento no encontrado.")
+
+        from app.core.object_storage import is_remote_url, stored_filename
+
+        if is_remote_url(stored):
+            suffix = Path(stored_filename(stored, "documento.pdf")).suffix or ".pdf"
+            filenames = {
+                "authorization": f"autorizacion-firmada{suffix}",
+                "identity": f"cedula{suffix}",
+                "voucher": f"comprobante{suffix}",
+                "solicitud": f"solicitud-firmada{suffix}",
+            }
+            return filenames[kind], stored
 
         relative = stored.replace("/media/membership/", "").lstrip("/")
         candidates = [

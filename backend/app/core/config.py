@@ -108,6 +108,10 @@ class Settings:
     )
     mailbox_web_url: str = getenv("MAILBOX_WEB_URL", "https://box.copsstec.com/mail/")
     corporate_email_domain: str = getenv("CORPORATE_EMAIL_DOMAIN", "copsstec.com")
+    firebase_storage_bucket: str = getenv("FIREBASE_STORAGE_BUCKET", "")
+    firebase_storage_prefix: str = getenv("FIREBASE_STORAGE_PREFIX", "")
+    firebase_credentials_json: str = getenv("FIREBASE_CREDENTIALS_JSON", "")
+    google_application_credentials: str = getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 
 
 @lru_cache

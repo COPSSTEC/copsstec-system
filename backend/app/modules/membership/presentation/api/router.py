@@ -4,6 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, Response
 
+from app.core.object_storage import is_remote_url
+from app.shared.presentation.stored_files import remote_file_response
 from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import get_current_user
 from app.modules.membership.application.use_cases import (
@@ -216,11 +218,19 @@ async def upload_payment_voucher(
 def download_invoice(
     user: Annotated[User, Depends(get_current_user)],
     use_case: Annotated[GetMembershipInvoiceUseCase, Depends(get_invoice_use_case)],
-) -> FileResponse:
+) -> Response:
     try:
         number, pdf_path = use_case.execute(user.id)
     except MembershipNotFoundError as exc:
         raise _http_error(exc) from exc
+
+    if is_remote_url(pdf_path):
+        return remote_file_response(
+            pdf_path,
+            f"{number}.pdf",
+            inline=False,
+            missing_detail="La factura no está disponible.",
+        )
 
     relative = pdf_path.replace("/media/membership/", "")
     file_path = Path("storage/membership") / relative
