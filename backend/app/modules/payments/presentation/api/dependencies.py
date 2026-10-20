@@ -29,12 +29,19 @@ from app.modules.payments.infrastructure.agreement_files import LocalAgreementFi
 from app.modules.payments.infrastructure.email import PaymentsEmailSender
 from app.modules.payments.infrastructure.files import LocalPaymentFileStorage
 from app.modules.payments.infrastructure.repository import SqlAlchemyPaymentsRepository
+from app.modules.payments.public import GetMembershipBalanceUseCase
 
 
 def get_payments_repository(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> SqlAlchemyPaymentsRepository:
     return SqlAlchemyPaymentsRepository(session)
+
+
+def get_membership_balance_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+) -> GetMembershipBalanceUseCase:
+    return GetMembershipBalanceUseCase(repository)
 
 
 def get_payment_storage() -> LocalPaymentFileStorage:

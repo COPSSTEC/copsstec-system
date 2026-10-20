@@ -9,6 +9,7 @@ import { getAccessPolicy, getCurrentUser } from "@/modules/auth/infrastructure/a
 import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import { membershipPathForStatus } from "@/modules/membership/domain/types";
 import { getMembershipStatus } from "@/modules/membership/infrastructure/membership-api";
+import { getSstCalculatorAccess } from "@/modules/sst-calculator/infrastructure/sst-calculator-api";
 import { AppHeader } from "@/shared/components/app-header";
 import { AppSidebar } from "@/shared/components/app-sidebar";
 import { RouteLoader } from "@/shared/components/route-loader";
@@ -66,8 +67,23 @@ export function DashboardShell({ children }: DashboardShellProps) {
           }
         }
 
+        let navigation = policy.navigation;
+        if (currentUser.access_level === "member") {
+          try {
+            const sstAccess = await getSstCalculatorAccess();
+            if (sstAccess.allowed && !navigation.some((item) => item.href === "/mi-espacio/calcular-sst")) {
+              navigation = [
+                ...navigation,
+                { label: "Calcular SST", href: "/mi-espacio/calcular-sst" },
+              ];
+            }
+          } catch {
+            // El beneficio se oculta si la elegibilidad no puede confirmarse.
+          }
+        }
+
         setUser(currentUser);
-        setAccessPolicy(policy);
+        setAccessPolicy({ ...policy, navigation });
       } catch {
         router.replace("/login");
       } finally {

@@ -41,6 +41,7 @@ export type NavIconName =
   | "newspaper"
   | "vote"
   | "creditCard"
+  | "calculator"
   | "folder"
   | "megaphone"
   | "academic"
@@ -53,6 +54,10 @@ export function navIconForHref(href: string): NavIconName {
 
   if (href.startsWith("/admin/pagos") || href.startsWith("/mi-espacio/pagos")) {
     return "creditCard";
+  }
+
+  if (href.startsWith("/mi-espacio/calcular-sst")) {
+    return "calculator";
   }
 
   if (href.startsWith("/admin/miembros")) {

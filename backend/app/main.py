@@ -22,6 +22,7 @@ from app.modules.notices.presentation.api.router import router as notices_router
 from app.modules.membership.presentation.api.router import router as membership_router
 from app.modules.partners.presentation.api.router import router as partners_router
 from app.modules.payments.presentation.api.router import router as payments_router
+from app.modules.sst_calculator.presentation.api.router import router as sst_calculator_router
 from app.modules.votaciones.presentation.api.router import router as votaciones_router
 
 settings = get_settings()
@@ -59,6 +60,7 @@ app.include_router(notices_router)
 app.include_router(membership_router)
 app.include_router(partners_router)
 app.include_router(payments_router)
+app.include_router(sst_calculator_router)
 app.include_router(votaciones_router)
 
 notice_media_dir = Path("storage/notices")
