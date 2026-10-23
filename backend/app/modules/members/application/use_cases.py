@@ -23,6 +23,7 @@ from app.modules.members.domain.entities import (
 from app.modules.members.infrastructure.cobros_excel import build_cobros_workbook
 from app.modules.members.domain.exceptions import MemberConflictError, MemberNotFoundError, MemberValidationError
 from app.modules.membership.domain.cedula import CEDULA_INVALID_MESSAGE, is_valid_ecuadorian_cedula
+from app.modules.payments.public import default_debit_period, parse_period
 
 
 def generate_temporary_password() -> str:
@@ -41,10 +42,17 @@ class ExportMembersCobrosUseCase:
     def __init__(self, repository: MemberRepository) -> None:
         self.repository = repository
 
-    def execute(self, today: date | None = None) -> tuple[bytes, str]:
+    def execute(self, today: date | None = None, period: str | None = None) -> tuple[bytes, str]:
         issued = today or date.today()
-        content = build_cobros_workbook(self.repository.list_cobros_export_rows())
-        filename = f"Plantilla_Cobros_COPSSTEC_{issued:%Y-%m-%d}.xlsx"
+        if period and period.strip():
+            try:
+                target = parse_period(period)
+            except ValueError as exc:
+                raise MemberValidationError(str(exc)) from exc
+        else:
+            target = default_debit_period(issued)
+        content = build_cobros_workbook(self.repository.list_cobros_export_rows(target))
+        filename = f"Plantilla_Cobros_COPSSTEC_{target:%Y-%m}_{issued:%Y-%m-%d}.xlsx"
         return content, filename
 
 

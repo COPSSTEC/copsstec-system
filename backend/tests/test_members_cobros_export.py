@@ -23,8 +23,10 @@ from app.modules.members.presentation.api.dependencies import get_export_members
 class FakeCobrosRepository:
     def __init__(self, rows: list[MemberCobrosRow] | None = None) -> None:
         self.rows = list(rows or [])
+        self.periods: list[date] = []
 
-    def list_cobros_export_rows(self) -> list[MemberCobrosRow]:
+    def list_cobros_export_rows(self, period: date) -> list[MemberCobrosRow]:
+        self.periods.append(period)
         return list(self.rows)
 
 
@@ -92,7 +94,7 @@ def test_export_use_case_totals_and_empty_workbook() -> None:
     empty_content, empty_name = ExportMembersCobrosUseCase(FakeCobrosRepository()).execute(
         today=date(2026, 10, 12),
     )
-    assert empty_name == "Plantilla_Cobros_COPSSTEC_2026-10-12.xlsx"
+    assert empty_name == "Plantilla_Cobros_COPSSTEC_2026-11_2026-10-12.xlsx"
     empty_book = load_workbook(BytesIO(empty_content))
     cobros = empty_book["Cobros"]
     assert cobros["B1"].value == COBROS_TITLE

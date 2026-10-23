@@ -10,13 +10,18 @@ from app.modules.payments.domain.entities import (
     DebitAgreement,
     MemberHeader,
     MemberSubscription,
+    NewPaymentPlan,
     Payment,
     PaymentAdminStats,
     PaymentListResult,
+    PaymentPlan,
+    PeriodInstallmentRow,
+    PlanBankDetails,
     PublicAgreementView,
     SubscriptionListQuery,
     SubscriptionListResult,
 )
+from app.modules.payments.domain.subscription import PlanScheduleItem
 
 
 class PaymentsRepository(Protocol):
@@ -60,6 +65,7 @@ class PaymentsRepository(Protocol):
         admin_observation: str | None = None,
         reviewed_by: int | None = None,
         recalculate: bool = True,
+        applies_to_debt: bool = False,
     ) -> Payment:
         ...
 
@@ -155,6 +161,49 @@ class PaymentsRepository(Protocol):
         status: str,
         documents_uploaded_at: datetime | None,
     ) -> DebitAgreement:
+        ...
+
+    def get_payment_plan_bank_defaults(self, user_id: int) -> PlanBankDetails:
+        ...
+
+    def get_current_payment_plan(self, user_id: int) -> PaymentPlan | None:
+        ...
+
+    def get_payment_plan(self, plan_id: int) -> PaymentPlan | None:
+        ...
+
+    def create_payment_plan(self, data: NewPaymentPlan) -> PaymentPlan:
+        ...
+
+    def cancel_payment_plan(self, plan_id: int) -> PaymentPlan:
+        ...
+
+    def complete_payment_plan(self, plan_id: int) -> None:
+        ...
+
+    def list_period_installments(self, period: date) -> list[PeriodInstallmentRow]:
+        ...
+
+    def get_installment_rows(self, installment_ids: list[int]) -> list[PeriodInstallmentRow]:
+        ...
+
+    def mark_installment(
+        self,
+        installment_id: int,
+        *,
+        status: str,
+        confirmed_by: int,
+        fee_payment_id: int | None = None,
+        debt_payment_id: int | None = None,
+    ) -> None:
+        ...
+
+    def replace_pending_installments(
+        self,
+        plan_id: int,
+        after_period: date,
+        schedule: list[PlanScheduleItem],
+    ) -> None:
         ...
 
 

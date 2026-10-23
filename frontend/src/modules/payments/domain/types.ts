@@ -30,6 +30,29 @@ export const AGREEMENT_STATUSES = ["none", "sent", "partial", "uploaded"] as con
 
 export type AgreementStatus = (typeof AGREEMENT_STATUSES)[number];
 
+export const PAYMENT_PLAN_STATUSES = ["none", "active", "completed"] as const;
+
+export type PaymentPlanStatus = (typeof PAYMENT_PLAN_STATUSES)[number] | "cancelled";
+
+export const PAYMENT_PLAN_STATUS_LABELS: Record<PaymentPlanStatus, string> = {
+  none: "Sin convenio",
+  active: "Convenio activo",
+  completed: "Convenio cumplido",
+  cancelled: "Convenio cancelado",
+};
+
+export type InstallmentStatus = "pending" | "debited" | "failed";
+
+export const INSTALLMENT_STATUS_LABELS: Record<InstallmentStatus, string> = {
+  pending: "Pendiente",
+  debited: "Debitado",
+  failed: "Fallido",
+};
+
+export const PLAN_INSTALLMENT_OPTIONS = ["20.00", "30.00"] as const;
+
+export const ACCOUNT_TYPES = ["Ahorros", "Corriente"] as const;
+
 export type RenewalPlan = "monthly" | "yearly";
 
 export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
@@ -112,6 +135,7 @@ export interface Payment {
   voucher_url: string | null;
   admin_observation?: string | null;
   plan?: RenewalPlan | null;
+  applies_to_debt?: boolean;
   created_at: string;
 }
 
@@ -167,6 +191,7 @@ export interface MemberSubscriptionRow {
   has_identity_document?: boolean;
   email?: string;
   state_id?: number;
+  payment_plan_status?: PaymentPlanStatus | string;
 }
 
 export interface PendingVoucher {
@@ -234,6 +259,101 @@ export interface MyPaymentsResponse {
   open_payment: OpenPayment | null;
   subscription: SubscriptionSummary | null;
   payment_info: RenewalPaymentInfo;
+  payment_plan?: PaymentPlan | null;
+}
+
+export interface PlanScheduleItem {
+  period: string;
+  fee_amount: string;
+  debt_amount: string;
+  total_amount: string;
+}
+
+export interface PlanInstallment extends PlanScheduleItem {
+  id: number;
+  plan_id: number;
+  status: InstallmentStatus | string;
+  confirmed_at: string | null;
+}
+
+export interface PlanBankDetails {
+  bank_name: string;
+  account_type: string;
+  account_number: string;
+}
+
+export interface PaymentPlan {
+  id: number;
+  user_id: number;
+  member_name: string;
+  status: PaymentPlanStatus | string;
+  debt_total: string;
+  debt_paid: string;
+  remaining_debt: string;
+  monthly_fee: string;
+  installment_amount: string;
+  monthly_total: string;
+  start_period: string;
+  end_period: string;
+  regular_from_period: string;
+  debt_from_period: string | null;
+  debt_to_period: string | null;
+  debit_window_days: number;
+  bank: PlanBankDetails;
+  created_at: string | null;
+  cancelled_at: string | null;
+  completed_at: string | null;
+  next_installment: PlanInstallment | null;
+  installments: PlanInstallment[];
+}
+
+export interface PaymentPlanPreview {
+  user_id: number;
+  member_name: string;
+  email: string;
+  debt_total: string;
+  monthly_fee: string;
+  installment_amount: string;
+  monthly_total: string;
+  start_period: string;
+  end_period: string;
+  regular_from_period: string;
+  debt_from_period: string;
+  debt_to_period: string;
+  schedule: PlanScheduleItem[];
+  bank: PlanBankDetails;
+}
+
+export interface CreatePaymentPlanInput extends PlanBankDetails {
+  installment_amount: string;
+  start_period: string;
+}
+
+export interface CreatePaymentPlanResponse {
+  plan: PaymentPlan;
+  email: string;
+  email_sent: boolean;
+  message: string;
+}
+
+export interface PeriodInstallment extends PlanInstallment {
+  user_id: number;
+  member_name: string;
+  identifier: string;
+  plan_status: PaymentPlanStatus | string;
+  bank: PlanBankDetails;
+}
+
+export interface PeriodInstallmentsResponse {
+  period: string;
+  items: PeriodInstallment[];
+  total_amount: string;
+}
+
+export interface ConfirmInstallmentsResponse {
+  updated: number;
+  skipped: number;
+  items: PeriodInstallment[];
 }
 
 export interface AdminPaymentsQuery {
@@ -257,6 +377,7 @@ export interface MembershipPaymentsQuery {
   balanceStatus?: BalanceStatus | "";
   agreementStatus?: AgreementStatus | "";
   period?: MembershipPeriod | "";
+  paymentPlanStatus?: (typeof PAYMENT_PLAN_STATUSES)[number] | "";
 }
 
 export interface AdminPaymentStats {
@@ -345,6 +466,51 @@ export function agreementStatusLabel(status: string): string {
     return AGREEMENT_STATUS_LABELS[status as AgreementStatus];
   }
   return status;
+}
+
+export function paymentPlanStatusLabel(status: string | null | undefined): string {
+  const key = (status || "none") as PaymentPlanStatus;
+  return PAYMENT_PLAN_STATUS_LABELS[key] ?? String(status);
+}
+
+export function installmentStatusLabel(status: string): string {
+  if (status in INSTALLMENT_STATUS_LABELS) {
+    return INSTALLMENT_STATUS_LABELS[status as InstallmentStatus];
+  }
+  return status;
+}
+
+const MONTH_NAMES_ES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+
+export function periodLabel(period: string | null | undefined): string {
+  const match = /^(\d{4})-(\d{2})/.exec(period || "");
+  if (!match) {
+    return "—";
+  }
+  return `${MONTH_NAMES_ES[Number(match[2]) - 1]} de ${match[1]}`;
+}
+
+export function currentPeriod(offsetMonths = 0): string {
+  const now = new Date();
+  const date = new Date(now.getFullYear(), now.getMonth() + offsetMonths, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function defaultDebitPeriod(windowDays = 5): string {
+  return currentPeriod(new Date().getDate() <= windowDays ? 0 : 1);
 }
 
 export function formatUsd(amount: string | number): string {

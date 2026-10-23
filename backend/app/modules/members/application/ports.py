@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Protocol
 
 from app.modules.members.domain.entities import (
@@ -13,7 +14,7 @@ class MemberRepository(Protocol):
     def list_members(self, query: MemberListQuery) -> MemberListResult:
         ...
 
-    def list_cobros_export_rows(self) -> list[MemberCobrosRow]:
+    def list_cobros_export_rows(self, period: date) -> list[MemberCobrosRow]:
         ...
 
     def get_member(self, user_id: int) -> Member | None:

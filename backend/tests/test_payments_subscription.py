@@ -323,6 +323,9 @@ class FakePaymentsRepository:
     def list_affiliations(self) -> list[AffiliationRow]:
         return []
 
+    def get_current_payment_plan(self, user_id: int) -> None:
+        return None
+
 
 @dataclass
 class FakeMembershipRepository:

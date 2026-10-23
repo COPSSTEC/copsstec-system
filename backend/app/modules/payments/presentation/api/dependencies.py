@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db_session
 from app.modules.payments.application.use_cases import (
     ApprovePaymentUseCase,
+    CancelPaymentPlanUseCase,
+    ConfirmPlanInstallmentsUseCase,
     CreateAdminPaymentUseCase,
+    CreatePaymentPlanUseCase,
+    GetPaymentPlanUseCase,
+    ListPlanInstallmentsUseCase,
+    PreviewPaymentPlanUseCase,
     CreateRenewalUseCase,
     DeleteAdminPaymentUseCase,
     DownloadAdminAgreementDocumentUseCase,
@@ -172,3 +178,40 @@ def get_download_admin_agreement_document_use_case(
     storage: Annotated[LocalAgreementFileStorage, Depends(get_agreement_storage)],
 ) -> DownloadAdminAgreementDocumentUseCase:
     return DownloadAdminAgreementDocumentUseCase(repository, storage)
+
+
+def get_preview_payment_plan_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+) -> PreviewPaymentPlanUseCase:
+    return PreviewPaymentPlanUseCase(repository)
+
+
+def get_create_payment_plan_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+    email_sender: Annotated[PaymentsEmailSender, Depends(get_agreement_email_sender)],
+) -> CreatePaymentPlanUseCase:
+    return CreatePaymentPlanUseCase(repository, email_sender)
+
+
+def get_payment_plan_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+) -> GetPaymentPlanUseCase:
+    return GetPaymentPlanUseCase(repository)
+
+
+def get_cancel_payment_plan_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+) -> CancelPaymentPlanUseCase:
+    return CancelPaymentPlanUseCase(repository)
+
+
+def get_list_plan_installments_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+) -> ListPlanInstallmentsUseCase:
+    return ListPlanInstallmentsUseCase(repository)
+
+
+def get_confirm_plan_installments_use_case(
+    repository: Annotated[SqlAlchemyPaymentsRepository, Depends(get_payments_repository)],
+) -> ConfirmPlanInstallmentsUseCase:
+    return ConfirmPlanInstallmentsUseCase(repository)

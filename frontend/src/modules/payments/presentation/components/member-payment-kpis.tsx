@@ -19,12 +19,20 @@ interface MemberPaymentKpisProps {
   isLoading: boolean;
   items: Payment[];
   subscription: SubscriptionSummary | null;
+  planRemainingDebt?: string | null;
 }
 
-export function MemberPaymentKpis({ isLoading, items, subscription }: MemberPaymentKpisProps) {
+export function MemberPaymentKpis({ isLoading, items, subscription, planRemainingDebt }: MemberPaymentKpisProps) {
   const openPending = pendingAmountTotal(items);
   const debt = Number(subscription?.pending_balance || 0);
-  const pending = Math.max(openPending, Number.isNaN(debt) ? 0 : debt);
+  const planDebt = Number(planRemainingDebt || 0);
+  const pending = Math.max(openPending, Number.isNaN(debt) ? 0 : debt, Number.isNaN(planDebt) ? 0 : planDebt);
+  const pendingHint =
+    planDebt > 0
+      ? "Deuda en convenio: se descuenta con cada débito mensual."
+      : pending > 0
+        ? "Cuotas de membresía adeudadas."
+        : "No tienes cargos vencidos.";
   const active = isMembershipActive(subscription?.status);
 
   return (
@@ -55,7 +63,7 @@ export function MemberPaymentKpis({ isLoading, items, subscription }: MemberPaym
         value={isLoading ? "—" : formatUsd(subscription?.credit_balance || "0")}
       />
       <KpiCard
-        hint={pending > 0 ? "Cuotas de membresía adeudadas." : "No tienes cargos vencidos."}
+        hint={pendingHint}
         icon="invoice"
         label="Pendiente por pagar"
         tone={pending > 0 ? "rose" : "slate"}

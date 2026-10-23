@@ -1,7 +1,7 @@
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_HALF_UP
 
 MONTHLY_FEE = Decimal("10.00")
 YEARLY_FEE = Decimal("120.00")
@@ -51,6 +51,39 @@ AGREEMENT_STATUSES = (AGREEMENT_SENT, AGREEMENT_PARTIAL, AGREEMENT_UPLOADED)
 ENABLED_MEMBER_STATE_ID = 1
 AGREEMENT_TOKEN_DAYS = 30
 
+PLAN_NONE = "none"
+PLAN_ACTIVE = "active"
+PLAN_COMPLETED = "completed"
+PLAN_CANCELLED = "cancelled"
+PLAN_FILTER_STATUSES = (PLAN_NONE, PLAN_ACTIVE, PLAN_COMPLETED)
+
+INSTALLMENT_PENDING = "pending"
+INSTALLMENT_DEBITED = "debited"
+INSTALLMENT_FAILED = "failed"
+INSTALLMENT_CONFIRM_STATUSES = (INSTALLMENT_DEBITED, INSTALLMENT_FAILED)
+
+PLAN_INSTALLMENT_OPTIONS = (Decimal("20.00"), Decimal("30.00"))
+PLAN_MAX_START_OFFSET_MONTHS = 3
+DEBIT_WINDOW_DAYS = 5
+
+PLAN_FEE_REFERENCE = "Cuota mensual (convenio)"
+PLAN_DEBT_REFERENCE = "Abono a deuda (convenio)"
+
+MONTH_NAMES_ES = (
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+)
+
 DATE_PATTERN = "%d/%m/%Y"
 _TWO_PLACES = Decimal("0.01")
 
@@ -59,6 +92,14 @@ _TWO_PLACES = Decimal("0.01")
 class SubscriptionState:
     coverage_until: date | None
     credit_balance: Decimal
+
+
+@dataclass(frozen=True)
+class PlanScheduleItem:
+    period: date
+    fee_amount: Decimal
+    debt_amount: Decimal
+    total_amount: Decimal
 
 
 def money_str(value: Decimal | str | int | None) -> str:
@@ -232,9 +273,12 @@ def apply_subscription_gate(
     coverage_until: date | None,
     credit_balance: Decimal,
     today: date,
+    has_active_payment_plan: bool = False,
 ) -> str:
     if affiliation_gate != GATE_NONE:
         return affiliation_gate
+    if has_active_payment_plan:
+        return GATE_NONE
     if is_subscription_due(coverage_until, credit_balance, today):
         return GATE_SUBSCRIPTION_DUE
     return GATE_NONE
@@ -265,11 +309,10 @@ def first_renewal_date(enrollment: date) -> date:
     return add_years(enrollment, 1) + timedelta(days=1)
 
 
-def complete_calendar_months(start: date, end: date) -> int:
-    months = (end.year - start.year) * 12 + (end.month - start.month)
-    if end.day < start.day:
-        months -= 1
-    return max(months, 0)
+def calendar_months_due(first_renewal: date, today: date) -> int:
+    if today < first_renewal:
+        return 0
+    return (today.year - first_renewal.year) * 12 + (today.month - first_renewal.month) + 1
 
 
 def pending_membership_balance(
@@ -280,7 +323,7 @@ def pending_membership_balance(
     first_renewal = first_renewal_date(enrollment)
     if today < first_renewal:
         return Decimal("0.00")
-    months_due = complete_calendar_months(first_renewal, today)
+    months_due = calendar_months_due(first_renewal, today)
     paid = sum(
         (as_money(amount) for amount, payment_date in approved_renewals if payment_date >= first_renewal),
         Decimal("0.00"),
@@ -303,3 +346,92 @@ def agreement_status_from_documents(has_authorization: bool, has_identity: bool)
     if has_authorization or has_identity:
         return AGREEMENT_PARTIAL
     return AGREEMENT_SENT
+
+
+def month_start(value: date) -> date:
+    return value.replace(day=1)
+
+
+def parse_period(value: str | None) -> date:
+    text = (value or "").strip()
+    try:
+        if len(text) == 7:
+            return datetime.strptime(text, "%Y-%m").date()
+        return month_start(date.fromisoformat(text))
+    except ValueError as exc:
+        raise ValueError("El periodo debe tener el formato AAAA-MM.") from exc
+
+
+def format_period(value: date | None) -> str | None:
+    if value is None:
+        return None
+    return value.strftime("%Y-%m")
+
+
+def month_label(value: date) -> str:
+    return f"{MONTH_NAMES_ES[value.month - 1]} de {value.year}"
+
+
+def build_plan_schedule(
+    debt_total: Decimal,
+    installment: Decimal,
+    start_period: date,
+    fee: Decimal = MONTHLY_FEE,
+) -> list[PlanScheduleItem]:
+    remaining = as_money(debt_total)
+    step = as_money(installment)
+    monthly = as_money(fee)
+    if step <= 0:
+        raise ValueError("El abono debe ser mayor a 0.")
+    period = month_start(start_period)
+    items: list[PlanScheduleItem] = []
+    while remaining > 0:
+        debt = min(step, remaining)
+        items.append(
+            PlanScheduleItem(
+                period=period,
+                fee_amount=monthly,
+                debt_amount=debt,
+                total_amount=as_money(monthly + debt),
+            ),
+        )
+        remaining = as_money(remaining - debt)
+        period = add_months(period, 1)
+    return items
+
+
+def plan_debt_cutoff(start_period: date) -> date:
+    return month_start(start_period) - timedelta(days=1)
+
+
+def debt_period_range(
+    debt_total: Decimal,
+    cutoff: date,
+    first_renewal: date | None,
+) -> tuple[date, date]:
+    debt_to = month_start(cutoff)
+    months = int((as_money(debt_total) / MONTHLY_FEE).to_integral_value(rounding=ROUND_CEILING))
+    debt_from = add_months(debt_to, -(max(months, 1) - 1))
+    if first_renewal is not None and debt_from < month_start(first_renewal):
+        debt_from = month_start(first_renewal)
+    return debt_from, debt_to
+
+
+def default_debit_period(today: date) -> date:
+    current = month_start(today)
+    if today.day <= DEBIT_WINDOW_DAYS:
+        return current
+    return add_months(current, 1)
+
+
+def remaining_plan_debt(
+    debt_total: Decimal,
+    installments: list[tuple[str, Decimal, Decimal]],
+) -> Decimal:
+    remaining = as_money(debt_total)
+    for status, fee_amount, debt_amount in installments:
+        if status == INSTALLMENT_DEBITED:
+            remaining -= as_money(debt_amount)
+        elif status == INSTALLMENT_FAILED:
+            remaining += as_money(fee_amount)
+    return as_money(max(remaining, Decimal("0.00")))

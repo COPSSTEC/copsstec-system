@@ -6,6 +6,7 @@ import { getStoredToken } from "@/modules/auth/infrastructure/auth-storage";
 import type {
   OpenPayment,
   Payment,
+  PaymentPlan,
   RenewalPaymentInfo,
   RenewalPlan,
   SubscriptionSummary,
@@ -22,6 +23,7 @@ export function useMyPayments(enabled = true) {
   const [openPayment, setOpenPayment] = useState<OpenPayment | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<RenewalPaymentInfo | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionSummary | null>(null);
+  const [paymentPlan, setPaymentPlan] = useState<PaymentPlan | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +42,7 @@ export function useMyPayments(enabled = true) {
       setOpenPayment(result.open_payment ?? null);
       setPaymentInfo(result.payment_info ?? null);
       setSubscription(result.subscription ?? null);
+      setPaymentPlan(result.payment_plan ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron cargar tus pagos.");
     } finally {
@@ -106,6 +109,7 @@ export function useMyPayments(enabled = true) {
     openPayment,
     paymentInfo,
     subscription,
+    paymentPlan,
     isLoading,
     isSubmitting,
     error,

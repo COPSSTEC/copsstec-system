@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 from app.modules.payments.domain.entities import (
     AffiliationRow,
     BankTransferInfo,
+    ConfirmInstallmentsResult,
+    CreatePaymentPlanResult,
     MemberHeader,
     MemberPaymentsView,
     MemberSubscription,
@@ -15,6 +17,10 @@ from app.modules.payments.domain.entities import (
     PaymentAdminStats,
     PaymentListResult,
     PaymentMutationResult,
+    PaymentPlan,
+    PaymentPlanPreview,
+    PeriodInstallmentRow,
+    PlanInstallment,
     PublicAgreementView,
     SendAgreementResult,
     SubscriptionListResult,
@@ -23,9 +29,17 @@ from app.modules.payments.domain.entities import (
 from app.modules.payments.domain.subscription import (
     AGREEMENT_NONE,
     BALANCE_AL_DIA,
+    DEBIT_WINDOW_DAYS,
     GRACE_DAYS,
+    INSTALLMENT_DEBITED,
+    INSTALLMENT_PENDING,
+    PLAN_NONE,
+    PlanScheduleItem,
+    add_months,
+    format_period,
     money_str,
     plan_from_amount,
+    remaining_plan_debt,
 )
 
 
@@ -52,6 +66,7 @@ class PaymentItemResponse(BaseModel):
     created_at: str | None
     plan: str | None = None
     admin_observation: str | None = None
+    applies_to_debt: bool = False
 
     @classmethod
     def from_domain(cls, payment: Payment) -> "PaymentItemResponse":
@@ -69,8 +84,9 @@ class PaymentItemResponse(BaseModel):
             status=payment.status,
             voucher_url=payment.voucher_url,
             created_at=_dt(payment.created_at),
-            plan=plan_from_amount(payment.amount) if payment.type else None,
+            plan=plan_from_amount(payment.amount) if payment.type and not payment.applies_to_debt else None,
             admin_observation=payment.admin_observation,
+            applies_to_debt=payment.applies_to_debt,
         )
 
 
@@ -111,6 +127,7 @@ class SubscriptionResponse(BaseModel):
     has_signed_authorization: bool = False
     has_identity_document: bool = False
     email: str | None = None
+    payment_plan_status: str = PLAN_NONE
 
     @classmethod
     def from_domain(cls, subscription: MemberSubscription | None, include_member: bool = False) -> "SubscriptionResponse | None":
@@ -133,6 +150,7 @@ class SubscriptionResponse(BaseModel):
             "has_signed_authorization": subscription.has_signed_authorization,
             "has_identity_document": subscription.has_identity_document,
             "email": subscription.email or None,
+            "payment_plan_status": subscription.payment_plan_status,
         }
         if include_member:
             payload.update(
@@ -419,11 +437,232 @@ class UploadAgreementDocumentsResponse(BaseModel):
         )
 
 
+class PlanScheduleItemResponse(BaseModel):
+    period: str
+    fee_amount: str
+    debt_amount: str
+    total_amount: str
+
+    @classmethod
+    def from_domain(cls, item: PlanScheduleItem) -> "PlanScheduleItemResponse":
+        return cls(
+            period=format_period(item.period) or "",
+            fee_amount=money_str(item.fee_amount),
+            debt_amount=money_str(item.debt_amount),
+            total_amount=money_str(item.total_amount),
+        )
+
+
+class PlanInstallmentResponse(PlanScheduleItemResponse):
+    id: int
+    plan_id: int
+    status: str
+    confirmed_at: str | None = None
+
+    @classmethod
+    def from_installment(cls, item: PlanInstallment) -> "PlanInstallmentResponse":
+        return cls(
+            id=item.id,
+            plan_id=item.plan_id,
+            period=format_period(item.period) or "",
+            fee_amount=money_str(item.fee_amount),
+            debt_amount=money_str(item.debt_amount),
+            total_amount=money_str(item.total_amount),
+            status=item.status,
+            confirmed_at=_dt(item.confirmed_at),
+        )
+
+
+class PlanBankResponse(BaseModel):
+    bank_name: str
+    account_type: str
+    account_number: str
+
+
+class PaymentPlanResponse(BaseModel):
+    id: int
+    user_id: int
+    member_name: str
+    status: str
+    debt_total: str
+    debt_paid: str
+    remaining_debt: str
+    monthly_fee: str
+    installment_amount: str
+    monthly_total: str
+    start_period: str
+    end_period: str
+    regular_from_period: str
+    debt_from_period: str | None
+    debt_to_period: str | None
+    debit_window_days: int = DEBIT_WINDOW_DAYS
+    bank: PlanBankResponse
+    created_at: str | None
+    cancelled_at: str | None
+    completed_at: str | None
+    next_installment: PlanInstallmentResponse | None
+    installments: list[PlanInstallmentResponse]
+
+    @classmethod
+    def from_domain(cls, plan: PaymentPlan) -> "PaymentPlanResponse":
+        settled = [
+            (item.status, item.fee_amount, item.debt_amount)
+            for item in plan.installments
+            if item.status != INSTALLMENT_PENDING
+        ]
+        paid = sum(
+            (item.debt_amount for item in plan.installments if item.status == INSTALLMENT_DEBITED),
+            Decimal("0.00"),
+        )
+        pending = [item for item in plan.installments if item.status == INSTALLMENT_PENDING]
+        return cls(
+            id=plan.id,
+            user_id=plan.user_id,
+            member_name=plan.member_name,
+            status=plan.status,
+            debt_total=money_str(plan.debt_total),
+            debt_paid=money_str(paid),
+            remaining_debt=money_str(remaining_plan_debt(plan.debt_total, settled)),
+            monthly_fee=money_str(plan.monthly_fee),
+            installment_amount=money_str(plan.installment_amount),
+            monthly_total=money_str(plan.monthly_fee + plan.installment_amount),
+            start_period=format_period(plan.start_period) or "",
+            end_period=format_period(plan.end_period) or "",
+            regular_from_period=format_period(add_months(plan.end_period, 1)) or "",
+            debt_from_period=format_period(plan.debt_from_period),
+            debt_to_period=format_period(plan.debt_to_period),
+            bank=PlanBankResponse(
+                bank_name=plan.bank_name,
+                account_type=plan.account_type,
+                account_number=plan.account_number,
+            ),
+            created_at=_dt(plan.created_at),
+            cancelled_at=_dt(plan.cancelled_at),
+            completed_at=_dt(plan.completed_at),
+            next_installment=PlanInstallmentResponse.from_installment(pending[0]) if pending else None,
+            installments=[PlanInstallmentResponse.from_installment(item) for item in plan.installments],
+        )
+
+
+class PaymentPlanPreviewResponse(BaseModel):
+    user_id: int
+    member_name: str
+    email: str
+    debt_total: str
+    monthly_fee: str
+    installment_amount: str
+    monthly_total: str
+    start_period: str
+    end_period: str
+    regular_from_period: str
+    debt_from_period: str
+    debt_to_period: str
+    schedule: list[PlanScheduleItemResponse]
+    bank: PlanBankResponse
+
+    @classmethod
+    def from_domain(cls, preview: PaymentPlanPreview) -> "PaymentPlanPreviewResponse":
+        return cls(
+            user_id=preview.user_id,
+            member_name=preview.member_name,
+            email=preview.email,
+            debt_total=money_str(preview.debt_total),
+            monthly_fee=money_str(preview.monthly_fee),
+            installment_amount=money_str(preview.installment_amount),
+            monthly_total=money_str(preview.monthly_fee + preview.installment_amount),
+            start_period=format_period(preview.start_period) or "",
+            end_period=format_period(preview.end_period) or "",
+            regular_from_period=format_period(add_months(preview.end_period, 1)) or "",
+            debt_from_period=format_period(preview.debt_from_period) or "",
+            debt_to_period=format_period(preview.debt_to_period) or "",
+            schedule=[PlanScheduleItemResponse.from_domain(item) for item in preview.schedule],
+            bank=PlanBankResponse(
+                bank_name=preview.bank.bank_name,
+                account_type=preview.bank.account_type,
+                account_number=preview.bank.account_number,
+            ),
+        )
+
+
+class CreatePaymentPlanRequest(BaseModel):
+    installment_amount: Decimal
+    start_period: str = Field(min_length=7, max_length=10)
+    bank_name: str = Field(min_length=1, max_length=120)
+    account_type: str = Field(min_length=1, max_length=20)
+    account_number: str = Field(min_length=1, max_length=40)
+
+
+class CreatePaymentPlanResponse(BaseModel):
+    plan: PaymentPlanResponse
+    email: str
+    email_sent: bool
+    message: str
+
+    @classmethod
+    def from_domain(cls, result: CreatePaymentPlanResult) -> "CreatePaymentPlanResponse":
+        return cls(
+            plan=PaymentPlanResponse.from_domain(result.plan),
+            email=result.email,
+            email_sent=result.email_sent,
+            message=result.message,
+        )
+
+
+class PeriodInstallmentResponse(PlanInstallmentResponse):
+    user_id: int
+    member_name: str
+    identifier: str
+    plan_status: str
+    bank: PlanBankResponse
+
+    @classmethod
+    def from_row(cls, row: PeriodInstallmentRow) -> "PeriodInstallmentResponse":
+        base = PlanInstallmentResponse.from_installment(row.installment)
+        return cls(
+            **base.model_dump(),
+            user_id=row.user_id,
+            member_name=row.member_name,
+            identifier=row.identifier,
+            plan_status=row.plan_status,
+            bank=PlanBankResponse(
+                bank_name=row.bank_name,
+                account_type=row.account_type,
+                account_number=row.account_number,
+            ),
+        )
+
+
+class PeriodInstallmentsResponse(BaseModel):
+    period: str
+    items: list[PeriodInstallmentResponse]
+    total_amount: str
+
+
+class ConfirmInstallmentsRequest(BaseModel):
+    installment_ids: list[int] = Field(min_length=1, max_length=500)
+    status: str
+
+
+class ConfirmInstallmentsResponse(BaseModel):
+    updated: int
+    skipped: int
+    items: list[PeriodInstallmentResponse]
+
+    @classmethod
+    def from_domain(cls, result: ConfirmInstallmentsResult) -> "ConfirmInstallmentsResponse":
+        return cls(
+            updated=result.updated,
+            skipped=result.skipped,
+            items=[PeriodInstallmentResponse.from_row(row) for row in result.items],
+        )
+
+
 class MyPaymentsResponse(BaseModel):
     items: list[PaymentItemResponse]
     open_payment: OpenPaymentResponse | None
     subscription: SubscriptionResponse | None
     payment_info: PaymentInfoResponse
+    payment_plan: PaymentPlanResponse | None = None
 
     @classmethod
     def from_domain(cls, view: MyPaymentsView) -> "MyPaymentsResponse":
@@ -432,4 +671,5 @@ class MyPaymentsResponse(BaseModel):
             open_payment=OpenPaymentResponse.from_domain(view.open_payment) if view.open_payment else None,
             subscription=SubscriptionResponse.from_domain(view.subscription),
             payment_info=PaymentInfoResponse.from_domain(view.payment_info),
+            payment_plan=PaymentPlanResponse.from_domain(view.payment_plan) if view.payment_plan else None,
         )

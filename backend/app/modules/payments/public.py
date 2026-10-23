@@ -9,8 +9,18 @@ from app.modules.payments.application.ports import PaymentsRepository
 from app.modules.payments.domain.subscription import (
     as_money,
     balance_status_from_pending,
+    default_debit_period,
+    parse_period,
     pending_membership_balance,
 )
+
+__all__ = [
+    "GetMembershipBalanceUseCase",
+    "MembershipBalanceSnapshot",
+    "MembershipBalanceUnavailableError",
+    "default_debit_period",
+    "parse_period",
+]
 
 BalanceStatus = Literal["al_dia", "saldo_pendiente"]
 

@@ -125,7 +125,7 @@ def map_cobros_row(row: MemberCobrosRow) -> tuple:
         account_type,
         (row.member_account_number or "").strip(),
         COBROS_REFERENCE,
-        amount_for_plan(row.member_debit_plan),
+        row.amount if row.amount is not None else amount_for_plan(row.member_debit_plan),
         bank_code,
         account_code,
     )

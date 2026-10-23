@@ -26,6 +26,7 @@ import {
 } from "@/modules/payments/infrastructure/payments-api";
 import { AgreementDocumentsCell } from "@/modules/payments/presentation/components/agreement-documents-cell";
 import { AgreementStatusBadge } from "@/modules/payments/presentation/components/agreement-status-badge";
+import { PaymentPlanBlock } from "@/modules/payments/presentation/components/payment-plan-block";
 import { PaymentStatusBadge } from "@/modules/payments/presentation/components/payment-status-badge";
 import { PaymentTypeSelect } from "@/modules/payments/presentation/components/payment-type-select";
 import { PaymentUiIcon } from "@/modules/payments/presentation/components/payment-ui-icon";
@@ -254,6 +255,16 @@ export function AdminMemberPaymentPanel({
           {docError ? <p className="admin-payments-docs-error">{docError}</p> : null}
         </div>
       </section>
+
+      <PaymentPlanBlock
+        hasPendingBalance={hasPendingBalance(rowForAgreement)}
+        memberId={member.user_id}
+        memberName={member.member_name}
+        onChanged={() => {
+          void payments.reload();
+          onChanged();
+        }}
+      />
 
       <section className="admin-payments-detail-block">
         <h3>Registrar nuevo pago</h3>

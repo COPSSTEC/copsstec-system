@@ -71,6 +71,24 @@ def test_email_templates_include_logo_and_copy() -> None:
             "pending_balance": "240.00",
             "url": "http://localhost:3000/acuerdo-debito/tok",
         },
+        "payment_plan_agreement": {
+            "nombres": "Pavel",
+            "debt_total": "130.00",
+            "debt_from": "octubre de 2025",
+            "debt_to": "octubre de 2026",
+            "start": "noviembre de 2026",
+            "monthly_fee": "10.00",
+            "installment": "20.00",
+            "monthly_total": "30.00",
+            "has_full": True,
+            "full_until": "abril de 2027",
+            "partial_last": True,
+            "last_period": "mayo de 2027",
+            "last_total": "20.00",
+            "last_debt": "10.00",
+            "regular_from": "junio de 2027",
+            "url": "http://localhost:3000/mi-espacio/pagos",
+        },
     }
 
     for key in RENDERERS:

@@ -196,6 +196,7 @@ class MembershipStatus:
     member_bank_name: str = ""
     member_debit_plan: str = ""
     city: str = ""
+    has_active_payment_plan: bool = False
 
 
 @dataclass(frozen=True)

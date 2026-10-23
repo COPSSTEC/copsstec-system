@@ -18,6 +18,7 @@ import { PaymentStatusBadge } from "@/modules/payments/presentation/components/p
 import { PaymentUiIcon } from "@/modules/payments/presentation/components/payment-ui-icon";
 import { useAdminPayments } from "@/modules/payments/presentation/hooks/use-admin-payments";
 import { ApproveRenewalModal } from "@/modules/payments/presentation/modals/approve-renewal-modal";
+import { ConfirmPlanDebitsModal } from "@/modules/payments/presentation/modals/confirm-plan-debits-modal";
 import { SelectMemberModal } from "@/modules/payments/presentation/modals/select-member-modal";
 import { SendAgreementModal } from "@/modules/payments/presentation/modals/send-agreement-modal";
 import { DataTable, type DataTableColumn } from "@/shared/components/data-table";
@@ -33,6 +34,8 @@ export function AdminPaymentsPage() {
   const [selectedMember, setSelectedMember] = useState<MemberSubscriptionRow | null>(null);
   const [userClosedDetail, setUserClosedDetail] = useState(false);
   const [agreementMember, setAgreementMember] = useState<MemberSubscriptionRow | null>(null);
+  const [debitsOpen, setDebitsOpen] = useState(false);
+  const [panelVersion, setPanelVersion] = useState(0);
 
   useEffect(() => {
     if (tab === "membership") {
@@ -184,10 +187,16 @@ export function AdminPaymentsPage() {
               <p>Gestiona los pagos del colegio, renovaciones, membresías y vouchers de suscripción.</p>
             </div>
           </div>
-          <button className="create-button" onClick={() => setPickerOpen(true)} type="button">
-            <PaymentUiIcon name="plus" />
-            Registrar pago
-          </button>
+          <div className="admin-payments-hero-actions">
+            <button className="secondary-button" onClick={() => setDebitsOpen(true)} type="button">
+              <PaymentUiIcon name="calendar" />
+              Débitos del mes
+            </button>
+            <button className="create-button" onClick={() => setPickerOpen(true)} type="button">
+              <PaymentUiIcon name="plus" />
+              Registrar pago
+            </button>
+          </div>
         </header>
 
         {payments.notice ? (
@@ -314,8 +323,12 @@ export function AdminPaymentsPage() {
               payments.setBalanceStatus("");
               payments.setMembershipPeriod("");
               payments.setAgreementStatus("");
+              payments.setPaymentPlanStatus("");
               payments.setMembershipPage(1);
             }}
+            onPaymentPlanStatusChange={payments.setPaymentPlanStatus}
+            panelVersion={panelVersion}
+            paymentPlanStatus={payments.paymentPlanStatus}
             onPageChange={payments.setMembershipPage}
             onPageSizeChange={payments.setMembershipPageSize}
             onPeriodChange={payments.setMembershipPeriod}
@@ -390,6 +403,17 @@ export function AdminPaymentsPage() {
         }}
         open={pickerOpen}
       />
+
+      {debitsOpen ? (
+        <ConfirmPlanDebitsModal
+          onChanged={(message) => {
+            payments.setNotice(message);
+            setPanelVersion((value) => value + 1);
+            handleMemberChanged();
+          }}
+          onClose={() => setDebitsOpen(false)}
+        />
+      ) : null}
 
       {agreementMember ? (
         <SendAgreementModal

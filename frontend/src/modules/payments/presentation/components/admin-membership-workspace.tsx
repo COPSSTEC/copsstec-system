@@ -3,6 +3,8 @@
 import {
   MEMBERSHIP_PERIODS,
   MEMBERSHIP_PERIOD_LABELS,
+  PAYMENT_PLAN_STATUSES,
+  PAYMENT_PLAN_STATUS_LABELS,
   SUBSCRIPTION_STATUSES,
   SUBSCRIPTION_STATUS_LABELS,
   formatIsoDate,
@@ -10,6 +12,7 @@ import {
   type BalanceStatus,
   type MemberSubscriptionRow,
   type MembershipPaymentsAdminResponse,
+  type MembershipPaymentsQuery,
   type MembershipPeriod,
   type PendingVoucher,
   type SubscriptionStatus,
@@ -17,6 +20,7 @@ import {
 import { AdminMemberPaymentPanel } from "@/modules/payments/presentation/components/admin-member-payment-panel";
 import { AgreementDocumentsCell } from "@/modules/payments/presentation/components/agreement-documents-cell";
 import { BalanceStatusBadge } from "@/modules/payments/presentation/components/balance-status-badge";
+import { PaymentPlanStatusBadge } from "@/modules/payments/presentation/components/payment-plan-status-badge";
 import { PaymentUiIcon } from "@/modules/payments/presentation/components/payment-ui-icon";
 import { SubscriptionStatusBadge } from "@/modules/payments/presentation/components/subscription-status-badge";
 import { coverageRange, rowBalanceStatus } from "@/modules/payments/presentation/lib/admin-payments";
@@ -30,6 +34,8 @@ interface AdminMembershipWorkspaceProps {
   subscriptionStatus: SubscriptionStatus | "";
   balanceStatus: BalanceStatus | "";
   period: MembershipPeriod | "";
+  paymentPlanStatus: MembershipPaymentsQuery["paymentPlanStatus"];
+  panelVersion: number;
   selected: MemberSubscriptionRow | null;
   onSelect: (member: MemberSubscriptionRow | null) => void;
   onPageChange: (page: number) => void;
@@ -38,6 +44,7 @@ interface AdminMembershipWorkspaceProps {
   onStatusChange: (value: SubscriptionStatus | "") => void;
   onBalanceStatusChange: (value: BalanceStatus | "") => void;
   onPeriodChange: (value: MembershipPeriod | "") => void;
+  onPaymentPlanStatusChange: (value: MembershipPaymentsQuery["paymentPlanStatus"]) => void;
   onClearFilters: () => void;
   onChanged: () => void;
   onReview: (voucher: PendingVoucher) => void;
@@ -53,6 +60,8 @@ export function AdminMembershipWorkspace({
   subscriptionStatus,
   balanceStatus,
   period,
+  paymentPlanStatus,
+  panelVersion,
   selected,
   onSelect,
   onPageChange,
@@ -61,6 +70,7 @@ export function AdminMembershipWorkspace({
   onStatusChange,
   onBalanceStatusChange,
   onPeriodChange,
+  onPaymentPlanStatusChange,
   onClearFilters,
   onChanged,
   onReview,
@@ -144,6 +154,23 @@ export function AdminMembershipWorkspace({
                 ))}
               </select>
             </label>
+            <label className="field">
+              <span className="sr-only">Convenio</span>
+              <select
+                onChange={(event) => {
+                  onPaymentPlanStatusChange(event.target.value as MembershipPaymentsQuery["paymentPlanStatus"]);
+                  onPageChange(1);
+                }}
+                value={paymentPlanStatus}
+              >
+                <option value="">Todos los convenios</option>
+                {PAYMENT_PLAN_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {PAYMENT_PLAN_STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="admin-payments-toggle">
               <input
                 checked={balanceStatus === "saldo_pendiente"}
@@ -200,7 +227,12 @@ export function AdminMembershipWorkspace({
                       </td>
                       <td>{coverageRange(row)}</td>
                       <td>
-                        <BalanceStatusBadge amount={row.pending_balance} status={rowBalanceStatus(row)} />
+                        <div className="admin-payments-badges">
+                          <BalanceStatusBadge amount={row.pending_balance} status={rowBalanceStatus(row)} />
+                          {row.payment_plan_status && row.payment_plan_status !== "none" ? (
+                            <PaymentPlanStatusBadge status={row.payment_plan_status} />
+                          ) : null}
+                        </div>
                       </td>
                       <td>
                         <SubscriptionStatusBadge status={row.status} />
@@ -270,7 +302,7 @@ export function AdminMembershipWorkspace({
 
         {selected ? (
           <AdminMemberPaymentPanel
-            key={selected.user_id}
+            key={`${selected.user_id}-${panelVersion}`}
             member={selected}
             onChanged={onChanged}
             onClose={() => onSelect(null)}

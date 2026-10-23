@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { memberNeedsRenewal, paymentTypeLabel, type Payment } from "@/modules/payments/domain/types";
 import { MemberPaymentKpis } from "@/modules/payments/presentation/components/member-payment-kpis";
 import { MemberPaymentPanel } from "@/modules/payments/presentation/components/member-payment-panel";
+import { MemberPaymentPlanCard } from "@/modules/payments/presentation/components/member-payment-plan-card";
 import { MemberPaymentRow } from "@/modules/payments/presentation/components/member-payment-row";
 import { PaymentUiIcon } from "@/modules/payments/presentation/components/payment-ui-icon";
 import { useMyPayments } from "@/modules/payments/presentation/hooks/use-my-payments";
@@ -39,7 +40,8 @@ export function MemberPaymentsPage() {
   const [isBusy, setIsBusy] = useState(false);
   const didAutoSelect = useRef(false);
 
-  const needsRenewal = memberNeedsRenewal(payments.subscription, payments.openPayment);
+  const hasActivePlan = payments.paymentPlan?.status === "active";
+  const needsRenewal = !hasActivePlan && memberNeedsRenewal(payments.subscription, payments.openPayment);
   const inReview = payments.openPayment?.status === "pending_review";
 
   const filtered = useMemo(
@@ -168,8 +170,11 @@ export function MemberPaymentsPage() {
       <MemberPaymentKpis
         isLoading={payments.isLoading}
         items={payments.items}
+        planRemainingDebt={hasActivePlan ? payments.paymentPlan?.remaining_debt : null}
         subscription={payments.subscription}
       />
+
+      {payments.paymentPlan ? <MemberPaymentPlanCard plan={payments.paymentPlan} /> : null}
 
       <div className="member-payments-toolbar">
         <div className="member-payments-tabs" role="tablist">

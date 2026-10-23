@@ -191,8 +191,12 @@ def list_members(
 def export_members_cobros(
     _: Annotated[User, Depends(require_access("admin"))],
     use_case: Annotated[ExportMembersCobrosUseCase, Depends(get_export_members_cobros_use_case)],
+    period: str | None = Query(None, max_length=10),
 ) -> Response:
-    content, filename = use_case.execute()
+    try:
+        content, filename = use_case.execute(period=period)
+    except MemberValidationError as exc:
+        raise _http_error(exc) from exc
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

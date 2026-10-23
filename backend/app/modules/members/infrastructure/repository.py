@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
@@ -156,6 +157,7 @@ PROFILE_SELECT = """
 
 COBROS_EXPORT_SELECT = """
     SELECT
+        u.id AS user_id,
         COALESCE(p.identifier, '') AS identifier,
         COALESCE(p.names, '') AS names,
         COALESCE(p.lastname, '') AS lastname,
@@ -176,6 +178,32 @@ COBROS_EXPORT_SELECT = """
       AND COALESCE(mp.signed_authorization_path, '') <> ''
       AND COALESCE(mp.identity_document_path, '') <> ''
     ORDER BY p.lastname ASC NULLS LAST, p.names ASC NULLS LAST, u.id ASC
+"""
+
+COBROS_PLAN_SELECT = """
+    SELECT
+        u.id AS user_id,
+        COALESCE(p.identifier, '') AS identifier,
+        COALESCE(p.names, '') AS names,
+        COALESCE(p.lastname, '') AS lastname,
+        COALESCE(p.email, u.email) AS email,
+        mpp.account_type AS member_account_type,
+        mpp.account_number AS member_account_number,
+        mpp.bank_name AS member_bank_name,
+        CASE
+            WHEN i.id IS NOT NULL THEN i.total_amount
+            WHEN mpp.end_period < :period THEN mpp.monthly_fee
+        END AS amount
+    FROM membership_payment_plans mpp
+    INNER JOIN users u ON u.id = mpp.user_id
+    LEFT JOIN profiles p ON p.user_id = u.id
+    LEFT JOIN membership_plan_installments i
+        ON i.plan_id = mpp.id
+       AND i.period = :period
+       AND i.status <> 'failed'
+    WHERE mpp.status IN ('active', 'completed')
+      AND p.deleted_at IS NULL
+      AND COALESCE(mpp.account_number, '') <> ''
 """
 
 
@@ -230,16 +258,19 @@ class SqlAlchemyMemberRepository:
             columns=MEMBER_COLUMNS,
         )
 
-    def list_cobros_export_rows(self) -> list[MemberCobrosRow]:
-        rows = self.session.execute(
+    def list_cobros_export_rows(self, period: date) -> list[MemberCobrosRow]:
+        onboarding_rows = self.session.execute(
             text(COBROS_EXPORT_SELECT),
             {
                 "model_type": USER_MODEL_TYPE,
                 "member_role": MEMBER_ROLE_NAME,
             },
         ).mappings().all()
-        return [
-            MemberCobrosRow(
+        plan_rows = self.session.execute(text(COBROS_PLAN_SELECT), {"period": period}).mappings().all()
+
+        by_user: dict[int, MemberCobrosRow] = {}
+        for row in onboarding_rows:
+            by_user[int(row["user_id"])] = MemberCobrosRow(
                 identifier=row["identifier"] or "",
                 names=row["names"] or "",
                 lastname=row["lastname"] or "",
@@ -248,9 +279,26 @@ class SqlAlchemyMemberRepository:
                 member_account_type=row["member_account_type"] or "",
                 member_account_number=row["member_account_number"] or "",
                 member_debit_plan=row["member_debit_plan"] or "",
+                user_id=int(row["user_id"]),
             )
-            for row in rows
-        ]
+        for row in plan_rows:
+            if row["amount"] is None:
+                continue
+            by_user[int(row["user_id"])] = MemberCobrosRow(
+                identifier=row["identifier"] or "",
+                names=row["names"] or "",
+                lastname=row["lastname"] or "",
+                email=row["email"] or "",
+                member_bank_name=row["member_bank_name"] or "",
+                member_account_type=row["member_account_type"] or "",
+                member_account_number=row["member_account_number"] or "",
+                amount=Decimal(str(row["amount"])),
+                user_id=int(row["user_id"]),
+            )
+        return sorted(
+            by_user.values(),
+            key=lambda item: (item.lastname.lower(), item.names.lower(), item.user_id),
+        )
 
     def get_member(self, user_id: int) -> Member | None:
         row = self.session.execute(

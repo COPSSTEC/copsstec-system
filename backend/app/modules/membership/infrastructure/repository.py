@@ -308,7 +308,11 @@ class SqlAlchemyMembershipRepository:
                           AND pay.status IN ('pending_payment', 'pending_review')
                         ORDER BY pay.id DESC
                         LIMIT 1
-                    ) AS open_payment_status
+                    ) AS open_payment_status,
+                    EXISTS(
+                        SELECT 1 FROM membership_payment_plans mpp
+                        WHERE mpp.user_id = u.id AND mpp.status = 'active'
+                    ) AS has_active_payment_plan
                 FROM users u
                 LEFT JOIN profiles p ON p.user_id = u.id AND p.deleted_at IS NULL
                 LEFT JOIN membership_payments mp ON mp.user_id = u.id
@@ -367,6 +371,7 @@ class SqlAlchemyMembershipRepository:
             member_bank_name=row["member_bank_name"] or "",
             member_debit_plan=row["member_debit_plan"] or "",
             city=row["city"] or "",
+            has_active_payment_plan=bool(row["has_active_payment_plan"]),
         )
 
     def get_payment(self, user_id: int) -> MembershipPayment | None:

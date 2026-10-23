@@ -2,6 +2,13 @@ import { authorizedFetch } from "@/modules/auth/infrastructure/authorized-fetch"
 import type {
   AdminPaymentStats,
   AdminPaymentsQuery,
+  ConfirmInstallmentsResponse,
+  CreatePaymentPlanInput,
+  CreatePaymentPlanResponse,
+  InstallmentStatus,
+  PaymentPlan,
+  PaymentPlanPreview,
+  PeriodInstallmentsResponse,
   MembershipPaymentsAdminResponse,
   MembershipPaymentsQuery,
   MemberPaymentsAdminResponse,
@@ -112,6 +119,9 @@ export async function listMembershipPaymentsAdmin(
   }
   if (query.period) {
     params.set("period", query.period);
+  }
+  if (query.paymentPlanStatus) {
+    params.set("payment_plan_status", query.paymentPlanStatus);
   }
 
   const response = await authorizedFetch(`${API_URL}/api/payments/admin/membership?${params.toString()}`, {
@@ -295,6 +305,74 @@ export async function sendDebitAgreement(
     headers: authHeaders(token),
   });
   return parseResponse<SendDebitAgreementResponse>(response);
+}
+
+export async function previewPaymentPlan(
+  token: string,
+  memberId: number,
+  installment: string,
+  startPeriod: string,
+): Promise<PaymentPlanPreview> {
+  const params = new URLSearchParams({ installment, start_period: startPeriod });
+  const response = await authorizedFetch(
+    `${API_URL}/api/payments/admin/members/${memberId}/payment-plan/preview?${params.toString()}`,
+    { headers: authHeaders(token), cache: "no-store" },
+  );
+  return parseResponse<PaymentPlanPreview>(response);
+}
+
+export async function getMemberPaymentPlan(token: string, memberId: number): Promise<PaymentPlan | null> {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/members/${memberId}/payment-plan`, {
+    headers: authHeaders(token),
+    cache: "no-store",
+  });
+  return parseResponse<PaymentPlan | null>(response);
+}
+
+export async function createPaymentPlan(
+  token: string,
+  memberId: number,
+  input: CreatePaymentPlanInput,
+): Promise<CreatePaymentPlanResponse> {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/members/${memberId}/payment-plan`, {
+    method: "POST",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return parseResponse<CreatePaymentPlanResponse>(response);
+}
+
+export async function cancelPaymentPlan(token: string, planId: number): Promise<PaymentPlan> {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/payment-plans/${planId}/cancel`, {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+  return parseResponse<PaymentPlan>(response);
+}
+
+export async function listPlanInstallments(token: string, period?: string): Promise<PeriodInstallmentsResponse> {
+  const params = new URLSearchParams();
+  if (period) {
+    params.set("period", period);
+  }
+  const response = await authorizedFetch(
+    `${API_URL}/api/payments/admin/payment-plans/installments?${params.toString()}`,
+    { headers: authHeaders(token), cache: "no-store" },
+  );
+  return parseResponse<PeriodInstallmentsResponse>(response);
+}
+
+export async function confirmPlanInstallments(
+  token: string,
+  installmentIds: number[],
+  status: Exclude<InstallmentStatus, "pending">,
+): Promise<ConfirmInstallmentsResponse> {
+  const response = await authorizedFetch(`${API_URL}/api/payments/admin/payment-plans/installments/confirm`, {
+    method: "POST",
+    headers: { ...authHeaders(token), "Content-Type": "application/json" },
+    body: JSON.stringify({ installment_ids: installmentIds, status }),
+  });
+  return parseResponse<ConfirmInstallmentsResponse>(response);
 }
 
 export async function getPublicAgreement(token: string): Promise<PublicDebitAgreement> {

@@ -291,6 +291,7 @@ class GetMembershipStatusUseCase:
                 status.coverage_until,
                 status.credit_balance,
                 today,
+                has_active_payment_plan=status.has_active_payment_plan,
             )
         return replace(
             status,

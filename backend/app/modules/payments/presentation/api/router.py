@@ -1,3 +1,4 @@
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
 
@@ -11,8 +12,11 @@ from app.modules.auth.domain.entities import User
 from app.modules.auth.presentation.api.dependencies import get_current_user, require_access
 from app.modules.payments.application.use_cases import (
     ApprovePaymentUseCase,
+    CancelPaymentPlanUseCase,
+    ConfirmPlanInstallmentsUseCase,
     CreateAdminPaymentUseCase,
     CreatePaymentCommand,
+    CreatePaymentPlanUseCase,
     CreateRenewalUseCase,
     DeleteAdminPaymentUseCase,
     DownloadPublicAgreementPdfUseCase,
@@ -21,8 +25,12 @@ from app.modules.payments.application.use_cases import (
     GetMemberPaymentsAdminUseCase,
     GetMyPaymentsUseCase,
     GetPaymentMediaUseCase,
+    GetPaymentPlanUseCase,
     GetPublicAgreementUseCase,
     ListAdminPaymentsUseCase,
+    ListPlanInstallmentsUseCase,
+    PaymentPlanCommand,
+    PreviewPaymentPlanUseCase,
     RejectPaymentUseCase,
     SendDebitAgreementUseCase,
     UpdateAdminPaymentUseCase,
@@ -43,13 +51,19 @@ from app.modules.payments.presentation.api.dependencies import (
     get_admin_membership_dashboard_use_case,
     get_admin_payment_stats_use_case,
     get_approve_payment_use_case,
+    get_cancel_payment_plan_use_case,
+    get_confirm_plan_installments_use_case,
     get_create_admin_payment_use_case,
+    get_create_payment_plan_use_case,
     get_create_renewal_use_case,
     get_delete_admin_payment_use_case,
     get_list_admin_payments_use_case,
+    get_list_plan_installments_use_case,
     get_member_payments_admin_use_case,
     get_my_payments_use_case,
     get_payment_media_use_case,
+    get_payment_plan_use_case,
+    get_preview_payment_plan_use_case,
     get_public_agreement_pdf_use_case,
     get_public_agreement_use_case,
     get_reject_payment_use_case,
@@ -58,7 +72,12 @@ from app.modules.payments.presentation.api.dependencies import (
     get_upload_agreement_documents_use_case,
     get_upload_voucher_use_case,
 )
+from app.modules.payments.domain.subscription import format_period, money_str
 from app.modules.payments.presentation.api.schemas import (
+    ConfirmInstallmentsRequest,
+    ConfirmInstallmentsResponse,
+    CreatePaymentPlanRequest,
+    CreatePaymentPlanResponse,
     CreatePaymentRequest,
     MembershipDashboardResponse,
     MemberPaymentsResponse,
@@ -68,6 +87,10 @@ from app.modules.payments.presentation.api.schemas import (
     PaymentItemResponse,
     PaymentListResponse,
     PaymentMutationResponse,
+    PaymentPlanPreviewResponse,
+    PaymentPlanResponse,
+    PeriodInstallmentResponse,
+    PeriodInstallmentsResponse,
     PublicAgreementResponse,
     RejectPaymentRequest,
     RenewalRequest,
@@ -145,6 +168,7 @@ def admin_membership_dashboard(
     balance_status: str | None = None,
     agreement_status: str | None = None,
     period: str | None = None,
+    payment_plan_status: str | None = None,
 ) -> MembershipDashboardResponse:
     dashboard = use_case.execute(
         SubscriptionListQuery(
@@ -155,9 +179,117 @@ def admin_membership_dashboard(
             balance_status=balance_status,
             agreement_status=agreement_status,
             period=period,
+            payment_plan_status=payment_plan_status,
         ),
     )
     return MembershipDashboardResponse.from_domain(dashboard)
+
+
+@router.get(
+    "/admin/members/{member_id}/payment-plan/preview",
+    response_model=PaymentPlanPreviewResponse,
+)
+def preview_payment_plan(
+    member_id: int,
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[PreviewPaymentPlanUseCase, Depends(get_preview_payment_plan_use_case)],
+    installment: Decimal = Query(...),
+    start_period: str = Query(..., min_length=7, max_length=10),
+) -> PaymentPlanPreviewResponse:
+    try:
+        return PaymentPlanPreviewResponse.from_domain(use_case.execute(member_id, installment, start_period))
+    except PaymentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Miembro no encontrado.") from exc
+    except (PaymentValidationError, PaymentConflictError) as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/admin/members/{member_id}/payment-plan", response_model=PaymentPlanResponse | None)
+def get_payment_plan(
+    member_id: int,
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[GetPaymentPlanUseCase, Depends(get_payment_plan_use_case)],
+) -> PaymentPlanResponse | None:
+    try:
+        plan = use_case.execute(member_id)
+    except PaymentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Miembro no encontrado.") from exc
+    return PaymentPlanResponse.from_domain(plan) if plan else None
+
+
+@router.post(
+    "/admin/members/{member_id}/payment-plan",
+    response_model=CreatePaymentPlanResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_payment_plan(
+    member_id: int,
+    request: CreatePaymentPlanRequest,
+    current_user: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[CreatePaymentPlanUseCase, Depends(get_create_payment_plan_use_case)],
+) -> CreatePaymentPlanResponse:
+    try:
+        result = use_case.execute(
+            PaymentPlanCommand(
+                member_id=member_id,
+                installment_amount=request.installment_amount,
+                start_period=request.start_period,
+                bank_name=request.bank_name,
+                account_type=request.account_type,
+                account_number=request.account_number,
+                created_by=current_user.id,
+            ),
+        )
+    except PaymentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Miembro no encontrado.") from exc
+    except (PaymentValidationError, PaymentConflictError) as exc:
+        raise _http_error(exc) from exc
+    return CreatePaymentPlanResponse.from_domain(result)
+
+
+@router.post("/admin/payment-plans/{plan_id}/cancel", response_model=PaymentPlanResponse)
+def cancel_payment_plan(
+    plan_id: int,
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[CancelPaymentPlanUseCase, Depends(get_cancel_payment_plan_use_case)],
+) -> PaymentPlanResponse:
+    try:
+        return PaymentPlanResponse.from_domain(use_case.execute(plan_id))
+    except PaymentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Convenio no encontrado.") from exc
+    except PaymentValidationError as exc:
+        raise _http_error(exc) from exc
+
+
+@router.get("/admin/payment-plans/installments", response_model=PeriodInstallmentsResponse)
+def list_plan_installments(
+    _: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[ListPlanInstallmentsUseCase, Depends(get_list_plan_installments_use_case)],
+    period: str | None = None,
+) -> PeriodInstallmentsResponse:
+    try:
+        target, rows = use_case.execute(period)
+    except PaymentValidationError as exc:
+        raise _http_error(exc) from exc
+    total = sum((row.installment.total_amount for row in rows), Decimal("0.00"))
+    return PeriodInstallmentsResponse(
+        period=format_period(target) or "",
+        items=[PeriodInstallmentResponse.from_row(row) for row in rows],
+        total_amount=money_str(total),
+    )
+
+
+@router.post("/admin/payment-plans/installments/confirm", response_model=ConfirmInstallmentsResponse)
+def confirm_plan_installments(
+    request: ConfirmInstallmentsRequest,
+    current_user: Annotated[User, Depends(require_access("admin"))],
+    use_case: Annotated[ConfirmPlanInstallmentsUseCase, Depends(get_confirm_plan_installments_use_case)],
+) -> ConfirmInstallmentsResponse:
+    try:
+        result = use_case.execute(request.installment_ids, request.status, current_user.id)
+    except PaymentValidationError as exc:
+        raise _http_error(exc) from exc
+    return ConfirmInstallmentsResponse.from_domain(result)
 
 
 @router.post("/admin/members/{member_id}/send-agreement", response_model=SendAgreementResponse)

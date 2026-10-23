@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 
 
 ENABLED_STATE_ID = 1
@@ -138,6 +139,8 @@ class MemberCobrosRow:
     member_account_type: str = ""
     member_account_number: str = ""
     member_debit_plan: str = ""
+    amount: Decimal | None = None
+    user_id: int = 0
 
 
 @dataclass(frozen=True)

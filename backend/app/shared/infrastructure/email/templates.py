@@ -526,6 +526,74 @@ def render_debit_agreement(context: dict) -> tuple[str, str, str]:
     return subject, text, html
 
 
+def payment_plan_paragraphs(context: dict) -> list[str]:
+    fee = context.get("monthly_fee") or "10.00"
+    installment = context.get("installment") or "20.00"
+    monthly_total = context.get("monthly_total") or "30.00"
+    debt_total = context.get("debt_total") or "0.00"
+    debt_from = context.get("debt_from") or ""
+    debt_to = context.get("debt_to") or ""
+    start = context.get("start") or ""
+    regular_from = context.get("regular_from") or ""
+    days = context.get("debit_days") or "primeros cinco días de cada mes"
+
+    period = f", correspondiente al período de {debt_from} a {debt_to}," if debt_from and debt_to else ","
+    paragraphs = [
+        f"De acuerdo con el saldo pendiente de su membresía{period} la deuda acumulada es de ${debt_total}.",
+    ]
+    if context.get("has_full"):
+        paragraphs.append(
+            f"A partir de {start}, se realizará un débito mensual de ${monthly_total} durante los {days}, "
+            "distribuido de la siguiente manera:",
+        )
+        paragraphs.append(f"• ${fee}: aporte correspondiente al mes en curso.")
+        paragraphs.append(f"• ${installment}: abono a la deuda pendiente.")
+        paragraphs.append(f"Este esquema se mantendrá hasta {context.get('full_until')}.")
+        if context.get("partial_last"):
+            paragraphs.append(
+                f"En {context.get('last_period')} se debitarán ${context.get('last_total')}, correspondientes "
+                f"a los últimos ${context.get('last_debt')} de deuda y los ${fee} del aporte mensual.",
+            )
+    else:
+        paragraphs.append(
+            f"En {context.get('last_period')} se debitarán ${context.get('last_total')} durante los {days}, "
+            f"correspondientes a los ${context.get('last_debt')} de deuda y los ${fee} del aporte mensual.",
+        )
+    paragraphs.append(
+        f"A partir de {regular_from}, el débito será únicamente de ${fee} mensuales, "
+        "correspondientes a su membresía regular.",
+    )
+    paragraphs.append("Agradecemos su compromiso y colaboración con COPSSTEC.")
+    return paragraphs
+
+
+def render_payment_plan_agreement(context: dict) -> tuple[str, str, str]:
+    nombres = context.get("nombres") or "miembro"
+    url = context.get("url") or f"{_site_url()}/mi-espacio/pagos"
+    subject = f"Convenio de pago de membresía - {nombres}"
+    paragraphs = payment_plan_paragraphs(context)
+    text = f"Estimado/a {nombres}:\n\n" + "\n\n".join(paragraphs) + f"\n\n{url}\n"
+    rows = []
+    for paragraph in paragraphs:
+        if paragraph.startswith("• "):
+            rows.append(f'<p style="margin:0 0 6px 16px;">{_esc(paragraph)}</p>')
+        else:
+            rows.append(f'<p style="margin:0 0 16px;">{_esc(paragraph)}</p>')
+    inner = (
+        f'<p style="margin:0 0 16px;font-size:16px;">Estimado/a <strong>{_esc(nombres)}</strong>:</p>'
+        + "".join(rows)
+    )
+    html = branded_layout(
+        preview=subject,
+        heading="<strong>Convenio de pago de membresía</strong>",
+        inner_html=inner,
+        cta_label="Ver mis pagos",
+        cta_href=url,
+        heading_center=False,
+    )
+    return subject, text, html
+
+
 def render_payment_reminder(context: dict) -> tuple[str, str, str]:
     nombres = context.get("nombres") or "miembro"
     amount = context.get("valor_pendiente") or "0.00"
@@ -569,6 +637,7 @@ RENDERERS = {
     "branded_content": render_branded_content,
     "payment_reminder": render_payment_reminder,
     "debit_agreement": render_debit_agreement,
+    "payment_plan_agreement": render_payment_plan_agreement,
 }
 
 

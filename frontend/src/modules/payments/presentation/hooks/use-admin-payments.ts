@@ -9,6 +9,7 @@ import type {
   AgreementStatus,
   BalanceStatus,
   MembershipPaymentsAdminResponse,
+  MembershipPaymentsQuery,
   MembershipPeriod,
   Payment,
   PaymentStatus,
@@ -41,6 +42,7 @@ export function useAdminPayments() {
   const [balanceStatus, setBalanceStatus] = useState<BalanceStatus | "">("");
   const [agreementStatus, setAgreementStatus] = useState<AgreementStatus | "">("");
   const [membershipPeriod, setMembershipPeriod] = useState<MembershipPeriod | "">("");
+  const [paymentPlanStatus, setPaymentPlanStatus] = useState<MembershipPaymentsQuery["paymentPlanStatus"]>("");
   const [stats, setStats] = useState<AdminPaymentStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
@@ -95,6 +97,7 @@ export function useAdminPayments() {
         balanceStatus,
         agreementStatus,
         period: membershipPeriod,
+        paymentPlanStatus,
       });
       setMembership(result);
     } catch (err) {
@@ -109,6 +112,7 @@ export function useAdminPayments() {
     membershipPageSize,
     membershipPeriod,
     membershipQ,
+    paymentPlanStatus,
     subscriptionStatus,
     token,
   ]);
@@ -211,6 +215,7 @@ export function useAdminPayments() {
     subscriptionStatus,
     balanceStatus,
     agreementStatus,
+    paymentPlanStatus,
     stats,
     isLoading,
     isStatsLoading,
@@ -231,6 +236,7 @@ export function useAdminPayments() {
     setSubscriptionStatus,
     setBalanceStatus,
     setAgreementStatus,
+    setPaymentPlanStatus,
     setNotice,
     loadPayments,
     loadMembership,

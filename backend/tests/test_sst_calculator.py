@@ -243,16 +243,16 @@ def test_balance_reader_reflects_approve_update_and_delete_payment() -> None:
     use_case = GetMembershipBalanceUseCase(repository)
     today = date(2026, 4, 2)
 
-    assert use_case.execute(17, today).pending_balance == Decimal("150.00")
+    assert use_case.execute(17, today).pending_balance == Decimal("160.00")
 
-    repository.approved_renewals.append((Decimal("150.00"), date(2026, 4, 2)))
+    repository.approved_renewals.append((Decimal("160.00"), date(2026, 4, 2)))
     assert use_case.execute(17, today).pending_balance == Decimal("0.00")
 
     repository.approved_renewals[0] = (Decimal("120.00"), date(2026, 4, 2))
-    assert use_case.execute(17, today).pending_balance == Decimal("30.00")
+    assert use_case.execute(17, today).pending_balance == Decimal("40.00")
 
     repository.approved_renewals.clear()
-    assert use_case.execute(17, today).pending_balance == Decimal("150.00")
+    assert use_case.execute(17, today).pending_balance == Decimal("160.00")
 
 
 def test_invalid_or_missing_catalog_returns_generic_error_without_exposing_path(

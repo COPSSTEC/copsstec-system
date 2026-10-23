@@ -277,7 +277,7 @@ export function paymentCoveragePeriod(
   subscription: SubscriptionSummary | null,
 ): string | null {
   const type = normalizeType(payment.type);
-  if (type !== "membresía" && type !== "inscripcion") {
+  if ((type !== "membresía" && type !== "inscripcion") || payment.applies_to_debt) {
     return null;
   }
 
@@ -476,6 +476,9 @@ function normalizeType(type: string): string {
 }
 
 function membershipSubtitle(payment: Payment): string {
+  if (payment.applies_to_debt) {
+    return "Abono a deuda de membresía";
+  }
   const amount = Number(payment.amount);
   if (amount >= 120) {
     return "Membresía anual COPSSTEC";

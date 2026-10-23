@@ -5,7 +5,10 @@ from decimal import Decimal
 from app.modules.payments.domain.subscription import (
     AGREEMENT_NONE,
     BALANCE_AL_DIA,
+    INSTALLMENT_PENDING,
+    PLAN_NONE,
     STATUS_APPROVED,
+    PlanScheduleItem,
     STATUS_PENDING_PAYMENT,
     STATUS_PENDING_REVIEW,
     STATUS_REJECTED,
@@ -36,6 +39,7 @@ class Payment:
     trans_id: str = "NA"
     client_id: str = "NA"
     total_cents: str = ""
+    applies_to_debt: bool = False
 
     @property
     def plan(self) -> str | None:
@@ -80,6 +84,7 @@ class MemberSubscription:
     has_signed_authorization: bool = False
     has_identity_document: bool = False
     email: str = ""
+    payment_plan_status: str = PLAN_NONE
 
 
 @dataclass(frozen=True)
@@ -131,6 +136,7 @@ class SubscriptionListQuery:
     balance_status: str | None = None
     agreement_status: str | None = None
     period: str | None = None
+    payment_plan_status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -180,6 +186,7 @@ class MyPaymentsView:
     open_payment: Payment | None
     subscription: MemberSubscription | None
     payment_info: BankTransferInfo
+    payment_plan: "PaymentPlan | None" = None
 
 
 @dataclass(frozen=True)
@@ -269,3 +276,107 @@ class UploadAgreementResult:
     has_signed_authorization: bool
     has_identity_document: bool
     message: str
+
+
+@dataclass(frozen=True)
+class PlanInstallment:
+    id: int
+    plan_id: int
+    period: date
+    fee_amount: Decimal
+    debt_amount: Decimal
+    total_amount: Decimal
+    status: str = INSTALLMENT_PENDING
+    fee_payment_id: int | None = None
+    debt_payment_id: int | None = None
+    confirmed_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class PaymentPlan:
+    id: int
+    user_id: int
+    debt_total: Decimal
+    monthly_fee: Decimal
+    installment_amount: Decimal
+    start_period: date
+    end_period: date
+    status: str
+    debt_from_period: date | None = None
+    debt_to_period: date | None = None
+    bank_name: str = ""
+    account_type: str = ""
+    account_number: str = ""
+    debit_agreement_id: int | None = None
+    created_by: int | None = None
+    created_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    completed_at: datetime | None = None
+    member_name: str = ""
+    installments: tuple[PlanInstallment, ...] = ()
+
+
+@dataclass(frozen=True)
+class PlanBankDetails:
+    bank_name: str = ""
+    account_type: str = ""
+    account_number: str = ""
+
+
+@dataclass(frozen=True)
+class PaymentPlanPreview:
+    user_id: int
+    member_name: str
+    email: str
+    debt_total: Decimal
+    monthly_fee: Decimal
+    installment_amount: Decimal
+    start_period: date
+    end_period: date
+    debt_from_period: date
+    debt_to_period: date
+    schedule: tuple[PlanScheduleItem, ...]
+    bank: PlanBankDetails
+
+
+@dataclass(frozen=True)
+class NewPaymentPlan:
+    user_id: int
+    debt_total: Decimal
+    monthly_fee: Decimal
+    installment_amount: Decimal
+    start_period: date
+    end_period: date
+    debt_from_period: date
+    debt_to_period: date
+    bank: PlanBankDetails
+    schedule: tuple[PlanScheduleItem, ...]
+    created_by: int | None
+    debit_agreement_id: int | None = None
+
+
+@dataclass(frozen=True)
+class PeriodInstallmentRow:
+    installment: PlanInstallment
+    user_id: int
+    member_name: str
+    identifier: str
+    plan_status: str
+    bank_name: str
+    account_type: str
+    account_number: str
+
+
+@dataclass(frozen=True)
+class CreatePaymentPlanResult:
+    plan: PaymentPlan
+    email: str
+    email_sent: bool
+    message: str
+
+
+@dataclass(frozen=True)
+class ConfirmInstallmentsResult:
+    updated: int
+    skipped: int
+    items: list[PeriodInstallmentRow]

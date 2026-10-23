@@ -4,6 +4,7 @@ from hashlib import sha256
 from typing import Any
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.payments.domain.entities import (
@@ -13,9 +14,14 @@ from app.modules.payments.domain.entities import (
     DebitAgreement,
     MemberHeader,
     MemberSubscription,
+    NewPaymentPlan,
     Payment,
     PaymentAdminStats,
     PaymentListResult,
+    PaymentPlan,
+    PeriodInstallmentRow,
+    PlanBankDetails,
+    PlanInstallment,
     PublicAgreementView,
     SubscriptionListQuery,
     SubscriptionListResult,
@@ -26,8 +32,14 @@ from app.modules.payments.domain.subscription import (
     AGREEMENT_SENT,
     AGREEMENT_STATUSES,
     BALANCE_STATUSES,
+    INSTALLMENT_PENDING,
     MEMBERSHIP_TYPE_ALIASES,
     PAYMENT_TYPE_MEMBERSHIP,
+    PLAN_ACTIVE,
+    PLAN_CANCELLED,
+    PLAN_COMPLETED,
+    PLAN_FILTER_STATUSES,
+    PLAN_NONE,
     STATUS_APPROVED,
     STATUS_PENDING_PAYMENT,
     STATUS_PENDING_REVIEW,
@@ -41,6 +53,9 @@ from app.modules.payments.domain.subscription import (
     is_membership_type,
     parse_register_date,
     pending_membership_balance,
+    PlanScheduleItem,
+    add_months,
+    month_start,
     replay,
     resolve_enrollment_date,
     subscription_status_label,
@@ -70,9 +85,33 @@ PAYMENT_SELECT = """
         p.reviewed_at,
         p.admin_observation,
         p.trans_id,
-        p.client_id
+        p.client_id,
+        COALESCE(p.applies_to_debt, false) AS applies_to_debt
     FROM payments p
     LEFT JOIN profiles pr ON pr.user_id = p.user_id
+"""
+
+PLAN_SELECT = """
+    SELECT
+        mpp.*,
+        TRIM(CONCAT(COALESCE(p.names, ''), ' ', COALESCE(p.lastname, ''))) AS member_name
+    FROM membership_payment_plans mpp
+    LEFT JOIN profiles p ON p.user_id = mpp.user_id
+"""
+
+INSTALLMENT_ROW_SELECT = """
+    SELECT
+        i.*,
+        mpp.user_id,
+        mpp.status AS plan_status,
+        mpp.bank_name,
+        mpp.account_type,
+        mpp.account_number,
+        TRIM(CONCAT(COALESCE(p.names, ''), ' ', COALESCE(p.lastname, ''))) AS member_name,
+        COALESCE(p.identifier, '') AS identifier
+    FROM membership_plan_installments i
+    INNER JOIN membership_payment_plans mpp ON mpp.id = i.plan_id
+    LEFT JOIN profiles p ON p.user_id = mpp.user_id
 """
 
 SORT_COLUMNS = {
@@ -298,6 +337,7 @@ class SqlAlchemyPaymentsRepository:
         admin_observation: str | None = None,
         reviewed_by: int | None = None,
         recalculate: bool = True,
+        applies_to_debt: bool = False,
     ) -> Payment:
         payment_id = self._insert_payment(
             user_id=user_id,
@@ -312,6 +352,7 @@ class SqlAlchemyPaymentsRepository:
             voucher_path=voucher_path,
             admin_observation=admin_observation,
             reviewed_by=reviewed_by,
+            applies_to_debt=applies_to_debt,
         )
         if recalculate and is_membership_type(payment_type) and status == STATUS_APPROVED:
             self._recalculate_subscription(user_id)
@@ -641,6 +682,12 @@ class SqlAlchemyPaymentsRepository:
         elif agreement_status in AGREEMENT_STATUSES:
             filters += " AND da.status = :agreement_status"
             params["agreement_status"] = agreement_status
+        plan_status = (query.payment_plan_status or "").strip()
+        if plan_status == PLAN_NONE:
+            filters += " AND plan.status IS NULL"
+        elif plan_status in PLAN_FILTER_STATUSES:
+            filters += " AND plan.status = :payment_plan_status"
+            params["payment_plan_status"] = plan_status
 
         from_sql = """
             FROM users u
@@ -659,6 +706,14 @@ class SqlAlchemyPaymentsRepository:
                 ORDER BY mp.id DESC
                 LIMIT 1
             ) onb ON TRUE
+            LEFT JOIN LATERAL (
+                SELECT mpp.status
+                FROM membership_payment_plans mpp
+                WHERE mpp.user_id = u.id
+                  AND mpp.status IN ('active', 'completed')
+                ORDER BY mpp.id DESC
+                LIMIT 1
+            ) plan ON TRUE
             WHERE r.name = :member_role
               AND p.deleted_at IS NULL
         """
@@ -682,6 +737,7 @@ class SqlAlchemyPaymentsRepository:
                     da.identity_document_path,
                     onb.signed_authorization_path AS onboarding_authorization_path,
                     onb.identity_document_path AS onboarding_identity_path,
+                    plan.status AS payment_plan_db_status,
                     (
                         SELECT COUNT(*) FROM payments pay
                         WHERE pay.user_id = u.id
@@ -1113,6 +1169,369 @@ class SqlAlchemyPaymentsRepository:
             raise PaymentNotFoundError()
         return self._to_agreement(row)
 
+    def get_payment_plan_bank_defaults(self, user_id: int) -> PlanBankDetails:
+        row = self.session.execute(
+            text(
+                """
+                SELECT bank_name, account_type, account_number
+                FROM membership_payment_plans
+                WHERE user_id = :user_id
+                  AND COALESCE(account_number, '') <> ''
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+            ),
+            {"user_id": user_id},
+        ).mappings().first()
+        if row is None:
+            row = self.session.execute(
+                text(
+                    """
+                    SELECT
+                        COALESCE(member_bank_name, '') AS bank_name,
+                        COALESCE(member_account_type, '') AS account_type,
+                        COALESCE(member_account_number, '') AS account_number
+                    FROM membership_payments
+                    WHERE user_id = :user_id
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                ),
+                {"user_id": user_id},
+            ).mappings().first()
+        if row is None:
+            return PlanBankDetails()
+        return PlanBankDetails(
+            bank_name=row["bank_name"] or "",
+            account_type=row["account_type"] or "",
+            account_number=row["account_number"] or "",
+        )
+
+    def get_current_payment_plan(self, user_id: int) -> PaymentPlan | None:
+        row = self.session.execute(
+            text(
+                f"""
+                {PLAN_SELECT}
+                WHERE mpp.user_id = :user_id
+                  AND mpp.status IN (:active, :completed)
+                ORDER BY mpp.id DESC
+                LIMIT 1
+                """,
+            ),
+            {"user_id": user_id, "active": PLAN_ACTIVE, "completed": PLAN_COMPLETED},
+        ).mappings().first()
+        if row is None:
+            return None
+        return self._to_plan(row)
+
+    def get_payment_plan(self, plan_id: int) -> PaymentPlan | None:
+        row = self.session.execute(
+            text(f"{PLAN_SELECT} WHERE mpp.id = :plan_id LIMIT 1"),
+            {"plan_id": plan_id},
+        ).mappings().first()
+        if row is None:
+            return None
+        return self._to_plan(row)
+
+    def create_payment_plan(self, data: NewPaymentPlan) -> PaymentPlan:
+        now = _now()
+        try:
+            plan_id = self.session.execute(
+                text(
+                    """
+                    INSERT INTO membership_payment_plans (
+                        user_id, debit_agreement_id, debt_total, monthly_fee, installment_amount,
+                        start_period, end_period, debt_from_period, debt_to_period, status,
+                        bank_name, account_type, account_number, created_by, created_at, updated_at
+                    )
+                    VALUES (
+                        :user_id, :debit_agreement_id, :debt_total, :monthly_fee, :installment_amount,
+                        :start_period, :end_period, :debt_from_period, :debt_to_period, :status,
+                        :bank_name, :account_type, :account_number, :created_by, :now, :now
+                    )
+                    RETURNING id
+                    """,
+                ),
+                {
+                    "user_id": data.user_id,
+                    "debit_agreement_id": data.debit_agreement_id,
+                    "debt_total": str(data.debt_total),
+                    "monthly_fee": str(data.monthly_fee),
+                    "installment_amount": str(data.installment_amount),
+                    "start_period": data.start_period,
+                    "end_period": data.end_period,
+                    "debt_from_period": data.debt_from_period,
+                    "debt_to_period": data.debt_to_period,
+                    "status": PLAN_ACTIVE,
+                    "bank_name": data.bank.bank_name,
+                    "account_type": data.bank.account_type,
+                    "account_number": data.bank.account_number,
+                    "created_by": data.created_by,
+                    "now": now,
+                },
+            ).scalar_one()
+        except IntegrityError as exc:
+            self.session.rollback()
+            raise PaymentConflictError("El miembro ya tiene un convenio activo.") from exc
+        self._insert_installments(int(plan_id), list(data.schedule), now)
+        self.session.commit()
+        plan = self.get_payment_plan(int(plan_id))
+        if plan is None:
+            raise PaymentNotFoundError()
+        return plan
+
+    def cancel_payment_plan(self, plan_id: int) -> PaymentPlan:
+        now = _now()
+        self.session.execute(
+            text(
+                """
+                DELETE FROM membership_plan_installments
+                WHERE plan_id = :plan_id AND status = :pending
+                """,
+            ),
+            {"plan_id": plan_id, "pending": INSTALLMENT_PENDING},
+        )
+        self.session.execute(
+            text(
+                """
+                UPDATE membership_payment_plans
+                SET status = :status, cancelled_at = :now, updated_at = :now
+                WHERE id = :plan_id
+                """,
+            ),
+            {"status": PLAN_CANCELLED, "now": now, "plan_id": plan_id},
+        )
+        self.session.commit()
+        plan = self.get_payment_plan(plan_id)
+        if plan is None:
+            raise PaymentNotFoundError()
+        return plan
+
+    def complete_payment_plan(self, plan_id: int) -> None:
+        now = _now()
+        self.session.execute(
+            text(
+                """
+                UPDATE membership_payment_plans
+                SET status = :status, completed_at = :now, updated_at = :now
+                WHERE id = :plan_id AND status = :active
+                """,
+            ),
+            {"status": PLAN_COMPLETED, "active": PLAN_ACTIVE, "now": now, "plan_id": plan_id},
+        )
+        self.session.commit()
+
+    def list_period_installments(self, period: date) -> list[PeriodInstallmentRow]:
+        target = month_start(period)
+        if target <= add_months(month_start(_today()), 1):
+            self._ensure_regular_installments(target)
+        rows = self.session.execute(
+            text(
+                f"""
+                {INSTALLMENT_ROW_SELECT}
+                WHERE i.period = :period
+                  AND mpp.status IN (:active, :completed)
+                ORDER BY p.lastname ASC NULLS LAST, p.names ASC NULLS LAST, i.id ASC
+                """,
+            ),
+            {"period": target, "active": PLAN_ACTIVE, "completed": PLAN_COMPLETED},
+        ).mappings().all()
+        return [self._to_installment_row(row) for row in rows]
+
+    def get_installment_rows(self, installment_ids: list[int]) -> list[PeriodInstallmentRow]:
+        if not installment_ids:
+            return []
+        placeholders = ", ".join(f":id_{index}" for index, _ in enumerate(installment_ids))
+        params: dict[str, Any] = {f"id_{index}": value for index, value in enumerate(installment_ids)}
+        rows = self.session.execute(
+            text(f"{INSTALLMENT_ROW_SELECT} WHERE i.id IN ({placeholders}) ORDER BY i.period ASC, i.id ASC"),
+            params,
+        ).mappings().all()
+        return [self._to_installment_row(row) for row in rows]
+
+    def mark_installment(
+        self,
+        installment_id: int,
+        *,
+        status: str,
+        confirmed_by: int,
+        fee_payment_id: int | None = None,
+        debt_payment_id: int | None = None,
+    ) -> None:
+        now = _now()
+        self.session.execute(
+            text(
+                """
+                UPDATE membership_plan_installments
+                SET status = :status,
+                    fee_payment_id = :fee_payment_id,
+                    debt_payment_id = :debt_payment_id,
+                    confirmed_by = :confirmed_by,
+                    confirmed_at = :now,
+                    updated_at = :now
+                WHERE id = :installment_id
+                """,
+            ),
+            {
+                "status": status,
+                "fee_payment_id": fee_payment_id,
+                "debt_payment_id": debt_payment_id,
+                "confirmed_by": confirmed_by,
+                "now": now,
+                "installment_id": installment_id,
+            },
+        )
+        self.session.commit()
+
+    def replace_pending_installments(
+        self,
+        plan_id: int,
+        after_period: date,
+        schedule: list[PlanScheduleItem],
+    ) -> None:
+        now = _now()
+        self.session.execute(
+            text(
+                """
+                DELETE FROM membership_plan_installments
+                WHERE plan_id = :plan_id
+                  AND status = :pending
+                  AND period > :after_period
+                """,
+            ),
+            {"plan_id": plan_id, "pending": INSTALLMENT_PENDING, "after_period": after_period},
+        )
+        self._insert_installments(plan_id, schedule, now)
+        self.session.execute(
+            text(
+                """
+                UPDATE membership_payment_plans
+                SET end_period = COALESCE(
+                        (
+                            SELECT MAX(period) FROM membership_plan_installments
+                            WHERE plan_id = :plan_id AND debt_amount > 0
+                        ),
+                        end_period
+                    ),
+                    updated_at = :now
+                WHERE id = :plan_id
+                """,
+            ),
+            {"plan_id": plan_id, "now": now},
+        )
+        self.session.commit()
+
+    def _insert_installments(self, plan_id: int, schedule: list[PlanScheduleItem], now: datetime) -> None:
+        for item in schedule:
+            self.session.execute(
+                text(
+                    """
+                    INSERT INTO membership_plan_installments (
+                        plan_id, period, fee_amount, debt_amount, total_amount,
+                        status, created_at, updated_at
+                    )
+                    VALUES (
+                        :plan_id, :period, :fee_amount, :debt_amount, :total_amount,
+                        :status, :now, :now
+                    )
+                    ON CONFLICT (plan_id, period) DO NOTHING
+                    """,
+                ),
+                {
+                    "plan_id": plan_id,
+                    "period": item.period,
+                    "fee_amount": str(item.fee_amount),
+                    "debt_amount": str(item.debt_amount),
+                    "total_amount": str(item.total_amount),
+                    "status": INSTALLMENT_PENDING,
+                    "now": now,
+                },
+            )
+
+    def _ensure_regular_installments(self, period: date) -> None:
+        now = _now()
+        self.session.execute(
+            text(
+                """
+                INSERT INTO membership_plan_installments (
+                    plan_id, period, fee_amount, debt_amount, total_amount,
+                    status, created_at, updated_at
+                )
+                SELECT mpp.id, :period, mpp.monthly_fee, 0, mpp.monthly_fee, :pending, :now, :now
+                FROM membership_payment_plans mpp
+                WHERE mpp.status = :completed
+                  AND mpp.end_period < :period
+                ON CONFLICT (plan_id, period) DO NOTHING
+                """,
+            ),
+            {"period": period, "pending": INSTALLMENT_PENDING, "completed": PLAN_COMPLETED, "now": now},
+        )
+        self.session.commit()
+
+    def _plan_installments(self, plan_id: int) -> tuple[PlanInstallment, ...]:
+        rows = self.session.execute(
+            text(
+                """
+                SELECT * FROM membership_plan_installments
+                WHERE plan_id = :plan_id
+                ORDER BY period ASC, id ASC
+                """,
+            ),
+            {"plan_id": plan_id},
+        ).mappings().all()
+        return tuple(self._to_installment(row) for row in rows)
+
+    def _to_installment(self, row: Any) -> PlanInstallment:
+        return PlanInstallment(
+            id=int(row["id"]),
+            plan_id=int(row["plan_id"]),
+            period=row["period"],
+            fee_amount=Decimal(str(row["fee_amount"])),
+            debt_amount=Decimal(str(row["debt_amount"])),
+            total_amount=Decimal(str(row["total_amount"])),
+            status=row["status"],
+            fee_payment_id=int(row["fee_payment_id"]) if row["fee_payment_id"] is not None else None,
+            debt_payment_id=int(row["debt_payment_id"]) if row["debt_payment_id"] is not None else None,
+            confirmed_at=row["confirmed_at"],
+        )
+
+    def _to_installment_row(self, row: Any) -> PeriodInstallmentRow:
+        return PeriodInstallmentRow(
+            installment=self._to_installment(row),
+            user_id=int(row["user_id"]),
+            member_name=(row["member_name"] or "").strip(),
+            identifier=row["identifier"] or "",
+            plan_status=row["plan_status"],
+            bank_name=row["bank_name"] or "",
+            account_type=row["account_type"] or "",
+            account_number=row["account_number"] or "",
+        )
+
+    def _to_plan(self, row: Any) -> PaymentPlan:
+        plan_id = int(row["id"])
+        return PaymentPlan(
+            id=plan_id,
+            user_id=int(row["user_id"]),
+            debt_total=Decimal(str(row["debt_total"])),
+            monthly_fee=Decimal(str(row["monthly_fee"])),
+            installment_amount=Decimal(str(row["installment_amount"])),
+            start_period=row["start_period"],
+            end_period=row["end_period"],
+            status=row["status"],
+            debt_from_period=row["debt_from_period"],
+            debt_to_period=row["debt_to_period"],
+            bank_name=row["bank_name"] or "",
+            account_type=row["account_type"] or "",
+            account_number=row["account_number"] or "",
+            debit_agreement_id=int(row["debit_agreement_id"]) if row["debit_agreement_id"] is not None else None,
+            created_by=int(row["created_by"]) if row["created_by"] is not None else None,
+            created_at=row["created_at"],
+            cancelled_at=row["cancelled_at"],
+            completed_at=row["completed_at"],
+            member_name=(row["member_name"] or "").strip(),
+            installments=self._plan_installments(plan_id),
+        )
+
     def _subscriptions_with_balance(self, rows: list[Any]) -> list[MemberSubscription]:
         user_ids = [int(row["user_id"]) for row in rows]
         renewals = self.list_approved_membership_payments(user_ids)
@@ -1160,6 +1579,7 @@ class SqlAlchemyPaymentsRepository:
                     has_signed_authorization=signed,
                     has_identity_document=identity,
                     email=(row.get("email") or "").strip(),
+                    payment_plan_status=row.get("payment_plan_db_status") or PLAN_NONE,
                 )
             )
         return items
@@ -1196,6 +1616,7 @@ class SqlAlchemyPaymentsRepository:
         voucher_path: str | None = None,
         admin_observation: str | None = None,
         reviewed_by: int | None = None,
+        applies_to_debt: bool = False,
     ) -> int:
         now = _now()
         sync_serial_sequence(self.session, "payments")
@@ -1205,12 +1626,12 @@ class SqlAlchemyPaymentsRepository:
                 INSERT INTO payments (
                     user_id, type, last_digits, total, reference, trans_id, client_id,
                     date_register, created_at, updated_at, status, voucher_path,
-                    reviewed_by, reviewed_at, admin_observation
+                    reviewed_by, reviewed_at, admin_observation, applies_to_debt
                 )
                 VALUES (
                     :user_id, :type, :last_digits, :total, :reference, :trans_id, :client_id,
                     :date_register, :now, :now, :status, :voucher_path,
-                    :reviewed_by, :reviewed_at, :admin_observation
+                    :reviewed_by, :reviewed_at, :admin_observation, :applies_to_debt
                 )
                 RETURNING id
                 """,
@@ -1230,6 +1651,7 @@ class SqlAlchemyPaymentsRepository:
                 "reviewed_by": reviewed_by,
                 "reviewed_at": now if reviewed_by is not None else None,
                 "admin_observation": admin_observation,
+                "applies_to_debt": applies_to_debt,
             },
         ).scalar_one()
         return int(payment_id)
@@ -1243,6 +1665,7 @@ class SqlAlchemyPaymentsRepository:
                 WHERE user_id = :user_id
                   AND lower(type) IN ('membresía', 'membresia')
                   AND status = :status
+                  AND NOT COALESCE(applies_to_debt, false)
                 ORDER BY
                     CASE
                         WHEN date_register ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'
@@ -1360,6 +1783,7 @@ class SqlAlchemyPaymentsRepository:
             trans_id=row["trans_id"] or "NA",
             client_id=row["client_id"] or "NA",
             total_cents=str(row["total"] or ""),
+            applies_to_debt=bool(row.get("applies_to_debt")),
         )
 
     def _to_subscription(self, row: Any) -> MemberSubscription:
