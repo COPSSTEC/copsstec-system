@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { LoginForm } from "@/modules/auth/presentation/forms/login-form";
+import { AppLogo } from "@/shared/components/app-logo";
 import { AuthScene } from "@/shared/components/auth-scene";
 
 export function LoginPage() {
@@ -8,6 +9,14 @@ export function LoginPage() {
     <AuthScene>
       <div className="login-layout">
         <section className="login-glass-card">
+          <div className="login-brand-row">
+            <Link aria-label="Ir al inicio de COPSSTEC" className="login-brand-link" href="/">
+              <AppLogo compact />
+            </Link>
+            <Link className="login-home-link" href="/">
+              ← Volver al landing
+            </Link>
+          </div>
           <h1>Iniciar sesión</h1>
           <p className="login-subtitle">Ingresa a tu cuenta COPSSTEC</p>
           <div className="login-entry-links">
