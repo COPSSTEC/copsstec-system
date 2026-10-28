@@ -4,6 +4,7 @@ from typing import Literal
 
 BalanceStatus = Literal["al_dia", "saldo_pendiente"]
 RiskLevel = Literal["Bajo", "Medio", "Alto"]
+CatalogRisk = Literal["Bajo", "Medio", "Alto", "no_definido"]
 
 
 @dataclass(frozen=True)
@@ -33,3 +34,12 @@ class CiiuActivity:
     code: str
     description: str
     risk: RiskLevel
+
+
+@dataclass(frozen=True)
+class CiiuCatalogRecord:
+    """Raw bundled catalog record, including activities without risk classification."""
+
+    code: str
+    description: str
+    risk: CatalogRisk

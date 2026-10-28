@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -196,12 +197,12 @@ def test_sst_endpoints_return_401_without_session(path: str) -> None:
     assert response.json() == {"detail": "Sesión requerida."}
 
 
-def test_catalog_returns_all_original_activities_for_eligible_member(api_overrides) -> None:
+def test_catalog_returns_only_activities_with_defined_risk_for_eligible_member(api_overrides) -> None:
     response = TestClient(app).get("/api/sst-calculator/catalog")
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 1738
+    assert len(body) == 5604
     assert all(set(item) == {"code", "description", "risk"} for item in body)
     assert {item["risk"] for item in body} == {"Bajo", "Medio", "Alto"}
 
@@ -274,3 +275,28 @@ def test_invalid_or_missing_catalog_returns_generic_error_without_exposing_path(
     assert response.status_code == 500
     assert response.json() == {"detail": "No fue posible cargar el catálogo CIIU."}
     assert str(missing_path) not in response.text
+
+
+def test_bundled_catalog_preserves_source_counts_and_long_descriptions() -> None:
+    records = JsonCiiuCatalogAdapter().list_records()
+
+    assert len(records) == 6360
+    assert len({record.code for record in records}) == 6360
+    assert Counter(record.risk for record in records) == {
+        "Bajo": 2235,
+        "Medio": 2522,
+        "Alto": 847,
+        "no_definido": 756,
+    }
+
+    longest = next(record for record in records if record.code == "E383001")
+    assert len(longest.description) == 1154
+    assert longest.description.startswith("ACTIVIDADES DE PROCESAMIENTO DE DESPERDICIOS")
+    assert longest.description.endswith("PARA REDUCIR EL VOLUMEN.")
+
+
+def test_bundled_catalog_excludes_undefined_risk_from_selectable_activities() -> None:
+    activities = JsonCiiuCatalogAdapter().list_activities()
+
+    assert len(activities) == 5604
+    assert all(activity.risk in {"Bajo", "Medio", "Alto"} for activity in activities)
