@@ -28,8 +28,8 @@ from app.modules.sst_calculator.presentation.api.schemas import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sst-calculator", tags=["sst-calculator"])
 
-ACCESS_DENIED_DETAIL = "No tienes acceso a Calcular SST. Verifica tu estado de membresía y pagos."
-EVALUATION_ERROR_DETAIL = "No fue posible validar el acceso a Calcular SST."
+ACCESS_DENIED_DETAIL = "No tienes acceso a Cotiza SST. Verifica tu estado de membresía y pagos."
+EVALUATION_ERROR_DETAIL = "No fue posible validar el acceso a Cotiza SST."
 CATALOG_ERROR_DETAIL = "No fue posible cargar el catálogo CIIU."
 
 

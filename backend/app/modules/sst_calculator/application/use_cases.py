@@ -12,9 +12,9 @@ MEMBER_ROLE = "miembro"
 MEMBER_ACCESS_LEVEL = "member"
 ENABLED_STATE_ID = 1
 
-MEMBER_ONLY_REASON = "Calcular SST está disponible únicamente para miembros."
+MEMBER_ONLY_REASON = "Cotiza SST está disponible únicamente para miembros."
 PORTAL_DISABLED_REASON = "Tu acceso al portal de miembros no está habilitado."
-PENDING_BALANCE_REASON = "Debes estar al día con tus pagos para usar Calcular SST."
+PENDING_BALANCE_REASON = "Debes estar al día con tus pagos para usar Cotiza SST."
 
 
 class GetSstCalculatorAccessUseCase:

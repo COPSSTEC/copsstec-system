@@ -59,7 +59,7 @@ export function SstCalculatorPage() {
         ) : (
           <section className="sst-state" role="alert">
             <div className="sst-state-icon">!</div>
-            <h1>No se pudo abrir el cotizador</h1>
+            <h1>No se pudo abrir Cotiza SST</h1>
             <p>{catalogError ?? "El catálogo CIIU no está disponible en este momento."}</p>
             <button className="sst-button" onClick={() => void loadCatalog()} type="button">
               Reintentar

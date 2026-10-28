@@ -129,20 +129,20 @@ def test_access_denies_member_with_pending_balance(api_overrides) -> None:
         "allowed": False,
         "balance_status": "saldo_pendiente",
         "pending_balance": "20.00",
-        "reason": "Debes estar al día con tus pagos para usar Calcular SST.",
+        "reason": "Debes estar al día con tus pagos para usar Cotiza SST.",
     }
 
 
 @pytest.mark.parametrize(
     ("roles", "expected_reason"),
     [
-        (["admin"], "Calcular SST está disponible únicamente para miembros."),
-        (["bibliotecario"], "Calcular SST está disponible únicamente para miembros."),
-        ([], "Calcular SST está disponible únicamente para miembros."),
-        (["rol-desconocido"], "Calcular SST está disponible únicamente para miembros."),
+        (["admin"], "Cotiza SST está disponible únicamente para miembros."),
+        (["bibliotecario"], "Cotiza SST está disponible únicamente para miembros."),
+        ([], "Cotiza SST está disponible únicamente para miembros."),
+        (["rol-desconocido"], "Cotiza SST está disponible únicamente para miembros."),
         (
             ["miembro", "admin"],
-            "Calcular SST está disponible únicamente para miembros.",
+            "Cotiza SST está disponible únicamente para miembros.",
         ),
     ],
     ids=["admin", "operations", "restricted-empty", "restricted-role", "admin-and-member"],
@@ -215,7 +215,7 @@ def test_catalog_returns_403_when_balance_is_pending(api_overrides) -> None:
 
     assert response.status_code == 403
     assert response.json() == {
-        "detail": "No tienes acceso a Calcular SST. Verifica tu estado de membresía y pagos.",
+        "detail": "No tienes acceso a Cotiza SST. Verifica tu estado de membresía y pagos.",
     }
 
 
@@ -233,7 +233,7 @@ def test_catalog_revalidates_access_after_payment_state_changes(api_overrides) -
         "allowed": False,
         "balance_status": "saldo_pendiente",
         "pending_balance": "10.00",
-        "reason": "Debes estar al día con tus pagos para usar Calcular SST.",
+        "reason": "Debes estar al día con tus pagos para usar Cotiza SST.",
     }
     assert catalog.status_code == 403
     assert reader.calls == 3

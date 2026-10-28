@@ -75,7 +75,7 @@ export function SstCalculatorWizard({ catalog }: { catalog: CiiuActivity[] }) {
 
   if (preview) return <ProposalPreview input={input} issuerLogo={issuerLogo} onClose={() => setPreview(false)} signature={signature} />;
   return <div className="sst-wizard">
-    <header className="sst-module-header"><div><span>BENEFICIO PARA MIEMBROS AL DÍA</span><h1>Calcular SST</h1><p>Cotiza servicios externos de Seguridad y Salud en el Trabajo con dimensionamiento normativo y proyección financiera.</p></div><div className="sst-step-count">{step + 1}<small>de 6</small></div></header>
+    <header className="sst-module-header"><div><span>BENEFICIO PARA MIEMBROS AL DÍA</span><h1>Cotiza SST</h1><p>Cotiza servicios externos de Seguridad y Salud en el Trabajo con dimensionamiento normativo y proyección financiera.</p></div><div className="sst-step-count">{step + 1}<small>de 6</small></div></header>
     <nav aria-label="Progreso de cotización" className="sst-progress">{STEPS.map((label, index) => <div className={index <= step ? "active" : ""} key={label}><span>{index + 1}</span><small>{label}</small></div>)}</nav>
     <section className="sst-step"><div className="sst-step-heading"><span>{step + 1}</span><div><h2>{STEPS[step]}</h2><p>{["Ingresa los datos del cliente y selecciona su actividad económica.", "Revisa la necesidad normativa y define la modalidad del servicio.", "Configura salarios y provisiones del equipo asignado.", "Distribuye las visitas y selecciona el alcance del servicio.", "Define el plazo y simula el margen de negociación.", "Revisa, firma y exporta la propuesta comercial."][step]}</p></div></div>
       {error ? <div className="sst-error" role="alert">{error}</div> : null}

@@ -74,7 +74,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             if (sstAccess.allowed && !navigation.some((item) => item.href === "/mi-espacio/calcular-sst")) {
               navigation = [
                 ...navigation,
-                { label: "Calcular SST", href: "/mi-espacio/calcular-sst" },
+                { label: "Cotiza SST", href: "/mi-espacio/calcular-sst" },
               ];
             }
           } catch {

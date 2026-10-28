@@ -70,12 +70,12 @@ afterEach(() => {
 });
 
 describe("DashboardShell SST navigation", () => {
-  it("adds Calcular SST only after eligibility is confirmed", async () => {
+  it("adds Cotiza SST only after eligibility is confirmed", async () => {
     mocks.getSstCalculatorAccess.mockResolvedValue({ allowed: true, balance_status: "al_dia", pending_balance: "0.00", reason: null });
 
     render(<DashboardShell><div>dashboard content</div></DashboardShell>);
 
-    expect(await screen.findByRole("link", { name: "Calcular SST" })).toHaveAttribute("href", "/mi-espacio/calcular-sst");
+    expect(await screen.findByRole("link", { name: "Cotiza SST" })).toHaveAttribute("href", "/mi-espacio/calcular-sst");
     expect(screen.getByText("dashboard content")).toBeInTheDocument();
     expect(policy.navigation).toEqual([{ label: "Mi espacio", href: "/mi-espacio" }]);
   });
@@ -87,7 +87,7 @@ describe("DashboardShell SST navigation", () => {
 
     await screen.findByText("dashboard content");
     await waitFor(() => expect(mocks.getSstCalculatorAccess).toHaveBeenCalledOnce());
-    expect(screen.queryByRole("link", { name: "Calcular SST" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Cotiza SST" })).not.toBeInTheDocument();
     expect(mocks.router.replace).not.toHaveBeenCalled();
   });
 });

@@ -21,7 +21,7 @@ describe("SstAccessGate", () => {
     );
 
     expect(screen.queryByText("calculator content")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Calcular SST no está disponible" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Cotiza SST no está disponible" })).toBeInTheDocument();
     expect(screen.getByText("Saldo pendiente: USD 20.00")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Revisar mis pagos" })).toHaveAttribute("href", "/mi-espacio/pagos");
   });
