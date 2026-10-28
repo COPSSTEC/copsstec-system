@@ -83,4 +83,12 @@ describe("SstCalculatorWizard", () => {
     fireEvent.change(signatureInput, { target: { files: [oversized] } });
     expect(screen.getByRole("alert")).toHaveTextContent("El archivo de firma debe pesar máximo 1,5 MB.");
   });
+
+  it("renders the complete CIIU description in a selectable result", () => {
+    const description = `Servicios especializados ${"con descripción completa ".repeat(30)}sin truncamiento`;
+
+    render(<SstCalculatorWizard catalog={[{ code: "M7490.01", description, risk: "Medio" }]} />);
+
+    expect(screen.getByText(description)).toHaveClass("sst-ciiu-description");
+  });
 });

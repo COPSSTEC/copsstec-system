@@ -17,6 +17,16 @@ describe("CIIU search", () => {
     expect(searchCiiu(catalog, "b0710")).toEqual([catalog[1]]);
   });
 
+  it("preserves a long description in the result instead of truncating its value", () => {
+    const longDescription = `Actividad de servicios ${"especializados ".repeat(90)}con conservación íntegra de la descripción`;
+    const catalog: CiiuActivity[] = [{ code: "M7490.01", description: longDescription, risk: "Medio" }];
+
+    const results = searchCiiu(catalog, "conservacion integra");
+
+    expect(results).toEqual([catalog[0]]);
+    expect(results[0]?.description).toBe(longDescription);
+  });
+
   it("shows 20 defaults and limits matching results to 35", () => {
     const catalog: CiiuActivity[] = Array.from({ length: 50 }, (_, index) => ({
       code: `A${index}`,

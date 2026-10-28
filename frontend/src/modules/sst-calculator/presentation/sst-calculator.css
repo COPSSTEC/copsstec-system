@@ -340,8 +340,10 @@
   cursor: pointer;
   display: grid;
   gap: 0.2rem;
+  min-width: 0;
   padding: 0.7rem;
   text-align: left;
+  width: 100%;
 }
 
 .sst-search-results button:hover,
@@ -349,9 +351,13 @@
   background: color-mix(in srgb, var(--sst-primary) 8%, white);
 }
 
-.sst-search-results button span {
+.sst-search-results button span,
+.sst-ciiu-description {
   color: var(--muted);
   font-size: 0.82rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .sst-selected {
@@ -373,6 +379,12 @@
 .sst-selected span {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.sst-selected .sst-ciiu-description {
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .sst-selected button {
@@ -632,14 +644,22 @@ details.sst-card > summary {
   text-align: left;
 }
 
-.sst-iso-header td:first-child {
+.sst-issuer-header-cell {
   text-align: center;
   width: 25%;
 }
 
-.sst-iso-header img {
+.sst-issuer-logo {
   max-height: 38px;
   object-fit: contain;
+}
+
+.sst-header-emitter-placeholder {
+  color: #526176;
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .sst-proposal-ref {
@@ -689,9 +709,11 @@ details.sst-card > summary {
 .sst-info th,
 .sst-info td {
   border-bottom: 1px solid #dde4ed;
+  overflow-wrap: anywhere;
   padding: 0.25rem 0.3rem;
   text-align: left;
   vertical-align: top;
+  white-space: normal;
 }
 
 .sst-info th {
@@ -883,6 +905,18 @@ details.sst-card > summary {
   overflow-wrap: anywhere;
 }
 
+.sst-validation-code {
+  color: var(--sst-primary-dark);
+  font-size: 0.68rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.sst-qr-message {
+  line-height: 1.35;
+  white-space: normal;
+}
+
 .sst-pdf-footer {
   align-items: center;
   border-top: 1px solid #cdd7e3;
@@ -1032,8 +1066,12 @@ details.sst-card > summary {
     padding: 2px 4px;
   }
 
-  .sst-iso-header img {
+  .sst-issuer-logo {
     max-height: 30px;
+  }
+
+  .sst-header-emitter-placeholder {
+    font-size: 6.5px;
   }
 
   .sst-proposal-ref {
@@ -1210,6 +1248,14 @@ details.sst-card > summary {
   .sst-signature-grid small {
     font-size: 6px;
     line-height: 1.15;
+  }
+
+  .sst-validation-code {
+    font-size: 6.4px;
+  }
+
+  .sst-qr-message {
+    line-height: 1.2;
   }
 
   .sst-pdf-footer {
