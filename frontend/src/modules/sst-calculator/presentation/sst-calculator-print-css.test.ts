@@ -9,11 +9,11 @@ describe("Cotiza SST presentation styles", () => {
   it("keeps the proposal in normal paginated flow without unbreakable whole sections", () => {
     const printCss = stylesheet.slice(stylesheet.lastIndexOf("@media print"));
 
-    expect(printCss).not.toMatch(/\.sst-proposal-section\s*\{[^}]*break-inside\s*:\s*avoid(?:-page)?/s);
-    expect(printCss).not.toMatch(/\.sst-proposal-section\s*\{[^}]*page-break-inside\s*:\s*avoid/s);
+    expect(printCss).not.toMatch(/\.sst-proposal-section\s*\{[^}]*break-inside\s*:\s*avoid(?:-page)?/);
+    expect(printCss).not.toMatch(/\.sst-proposal-section\s*\{[^}]*page-break-inside\s*:\s*avoid/);
     expect(printCss).not.toMatch(/min-height\s*:\s*297mm/i);
     expect(printCss).not.toMatch(/position\s*:\s*absolute/i);
-    expect(printCss).toMatch(/\.sst-proposal-page\s*\{[^}]*position\s*:\s*static/s);
+    expect(printCss).toMatch(/\.sst-proposal-page\s*\{[^}]*position\s*:\s*static/);
   });
 
   it("keeps proposal logos bounded for screen and A4 print layouts", () => {

@@ -1,6 +1,6 @@
 ---
 id: SPEC-025
-status: DRAFT
+status: IMPLEMENTED
 feature: mejoras-cotiza-sst
 created: 2026-10-28
 updated: 2026-10-28
@@ -11,7 +11,7 @@ related-specs: ["SPEC-024"]
 
 # Spec: Mejoras de propuesta y catálogo CIIU de Cotiza SST
 
-> **Estado:** `DRAFT`
+> **Estado:** `IMPLEMENTED`
 > **Ciclo de vida:** DRAFT → APPROVED → IN_PROGRESS → IMPLEMENTED → DEPRECATED
 
 ## 1. OBJETIVO Y ALCANCE
